@@ -56,6 +56,10 @@ class CsvCodeSource:
             else None,
         }
 
+    def labels(self, system, code, version=""):
+        metadata = self.check(system, code, version).get("metadata")
+        return concept_labels(metadata, source=str(self.path), version=metadata.get("version", version)) if metadata else []
+
 
 class SqliteCodeSource:
     """Read-only code table with (system, code, version, display)."""
@@ -94,6 +98,10 @@ class SqliteCodeSource:
             "metadata": {"display": row[0], "version": row[1]} if row else None,
         }
 
+    def labels(self, system, code, version=""):
+        metadata = self.check(system, code, version).get("metadata")
+        return concept_labels(metadata, source=str(self.path), version=metadata.get("version", version)) if metadata else []
+
 
 class FhirCodeSource:
     def __init__(self, base_url: str, token: str = "", client_cert: str = "", client_key: str = ""):
@@ -129,17 +137,32 @@ class FhirCodeSource:
             ),
         }
 
+    def labels(self, system, code, version=""):
+        metadata = self.check(system, code, version).get("metadata")
+        return concept_labels(metadata, source=self.client.base_url, version=metadata.get("version", version)) if metadata else []
+
 
 class FhirArtifactSource:
-    """Installed CodeSystem content and explicit ValueSet expansions; no network."""
+    """Installed R4 resources, including package/ layouts and label supplements."""
     def __init__(self, path: Path):
         self.path = path
-        self.systems, self.value_sets = {}, {}
-        files = sorted(path.glob("*.json")) if path.is_dir() else [path]
+        self.systems, self.value_sets, self.supplements = {}, {}, []
+        self._name_index = None
+        receipt = path / "installation.json" if path.is_dir() else None
+        self.provenance = {}
+        if receipt and receipt.is_file():
+            if receipt.is_symlink():
+                raise ValueError("Package receipt must be a regular file")
+            installation = json.loads(receipt.read_text())
+            self.provenance = {key: installation.get(key) for key in
+                               ("name", "version", "registry", "archive_url", "publisher_sha1", "archive_sha256")}
+        files = artifact_files(path)
         for source in files:
             if source.is_symlink():
                 raise ValueError("Terminology artifacts must be regular files")
-            data = json.loads(source.read_text())
+            data = json.loads(source.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                raise ValueError("Terminology artifact must contain a JSON object")
             kind = data.get("resourceType")
             if kind not in {"CodeSystem", "ValueSet"}:
                 continue
@@ -152,7 +175,16 @@ class FhirArtifactSource:
                         if item.get("code"):
                             yield item["code"], item
                         yield from concepts(item.get("concept", []))
-                self.systems[key] = (dict(concepts(data.get("concept", []))), data.get("content") == "complete")
+                rows = dict(concepts(data.get("concept", [])))
+                if data.get("content") == "supplement" or data.get("supplements"):
+                    base, _, version = str(data.get("supplements", "")).partition("|")
+                    if not base:
+                        raise ValueError("CodeSystem supplement needs its base canonical system")
+                    self.supplements.append((base, version, key, rows, str(source)))
+                else:
+                    if key in self.systems:
+                        raise ValueError("Duplicate CodeSystem edition in terminology artifacts")
+                    self.systems[key] = (rows, data.get("content") == "complete", data.get("version", ""), str(source))
             elif "expansion" in data:
                 expansion = data["expansion"]
                 def entries(items, inherited_system=""):
@@ -177,7 +209,45 @@ class FhirArtifactSource:
         selected = self._select(self.systems, system, version)
         row = selected[0].get(code) if selected else None
         return {"state": "valid" if row else "invalid" if selected and selected[1] else "unknown",
-                "source": str(self.path), "metadata": row}
+                "source": selected[3] if selected else str(self.path),
+                "metadata": {**row, "version": selected[2], "package": self.provenance} if row else None}
+
+    def labels(self, system, code, version=""):
+        """Translations enrich a base code; they never independently validate it."""
+        results = []
+        selected = self._select(self.systems, system, version)
+        if selected and code in selected[0]:
+            results += concept_labels(selected[0][code], source=selected[3], version=selected[2])
+        for base, base_version, (canonical, edition), rows, source in self.supplements:
+            if base != system or code not in rows or version and base_version and version != base_version:
+                continue
+            results += [dict(label, supplement=canonical, supplement_version=edition,
+                             base_version_declared=bool(base_version))
+                        for label in concept_labels(rows[code], source=source, version=base_version)]
+        return [dict(label, package=self.provenance) for label in results]
+
+    def search_names(self, name):
+        """Reverse exact display/translation search; ambiguous matches remain candidates."""
+        from .name_checks import normalized_name
+
+        if not isinstance(name, str) or not name.strip() or len(name) > 300:
+            raise ValueError("Name search requires 1..300 characters of terminology text")
+        if self._name_index is None:
+            index = {}
+            collections = [(system, version, rows, source, {})
+                           for (system, version), (rows, _, _, source) in self.systems.items()]
+            collections += [(base, version, rows, source, {"supplement": canonical, "supplement_version": edition})
+                            for base, version, (canonical, edition), rows, source in self.supplements]
+            for system, version, rows, source, qualifier in collections:
+                for code, concept in rows.items():
+                    for label in concept_labels(concept, source=source, version=version):
+                        candidate = {"state": "candidate", "system": system, "code": code, "version": version,
+                                     "label": label["value"], "language": label["language"], "source": source,
+                                     "method": "artifact_exact_name", "requires_code_and_context_validation": True,
+                                     "package": self.provenance, **qualifier}
+                        index.setdefault(normalized_name(label["value"]), []).append(candidate)
+            self._name_index = index
+        return self._name_index.get(normalized_name(name), [])[:10]
 
     def check_binding(self, value_set, system, code, version="", value_set_version=""):
         selected = self._select(self.value_sets, value_set, value_set_version)
@@ -187,6 +257,32 @@ class FhirArtifactSource:
         version_unknown = bool(version and any(not entry[2] for entry in matches))
         return {"state": "member" if member else "unknown" if version_unknown or not selected or not selected[1]
                 else "not_member", "source": str(self.path)}
+
+
+def artifact_files(path):
+    """Use the package's content directory, or an explicitly supplied artifact directory."""
+    path = Path(path)
+    if path.is_symlink() or not path.exists():
+        raise ValueError("Terminology artifacts are missing; run package-init for configured packages")
+    if not path.is_dir():
+        return [path]
+    content = path / "package" if (path / "package").is_dir() else path
+    files = sorted(content.rglob("*.json"))
+    if not files or len(files) > 10000:
+        raise ValueError("Terminology artifact directory is empty or exceeds file budget")
+    if any(parent.is_symlink() for file in files for parent in (file, *file.parents) if parent.is_relative_to(path)):
+        raise ValueError("Terminology artifacts must not traverse symbolic links")
+    return files
+
+
+def concept_labels(concept, *, source, version=""):
+    labels = []
+    if concept.get("display"):
+        labels.append({"value": concept["display"], "language": "", "source": source, "version": version})
+    for row in concept.get("designation", []):
+        if row.get("value"):
+            labels.append({"value": row["value"], "language": row.get("language", ""), "source": source, "version": version})
+    return labels
 
 class WebsiteCandidateSource:
     """Extract only quoted source text; the result is a review candidate."""
@@ -253,23 +349,7 @@ class TerminologyRouter:
             if not isinstance(systems, list) or not systems or not all(isinstance(s, str) for s in systems):
                 raise ValueError("Each terminology source needs explicit systems")
             kind = entry.get("kind")
-            if kind == "fhir":
-                source = FhirCodeSource(
-                    entry["base_url"],
-                    os.getenv(entry.get("token_env", ""), ""),
-                    entry.get("client_cert", ""),
-                    entry.get("client_key", ""),
-                )
-            elif kind == "csv":
-                source = CsvCodeSource(Path(entry["path"]), complete=bool(entry.get("complete", False)))
-            elif kind == "sqlite":
-                source = SqliteCodeSource(Path(entry["path"]), complete=bool(entry.get("complete", False)))
-            elif kind == "fhir_artifacts":
-                source = FhirArtifactSource(Path(entry["path"]))
-            elif kind == "website":
-                source = WebsiteCandidateSource(entry["url_template"], entry.get("keywords", []), llm=llm)
-            else:
-                raise ValueError(f"Unknown terminology source: {kind}")
+            source = make_source(entry, llm=llm)
             self.sources.append((set(systems), source, kind == "website"))
 
     def close(self) -> None:
@@ -332,6 +412,49 @@ class TerminologyRouter:
                 errors.append(str(exc))
         return {**(negative or unknown or {"state": "unknown", "source": None}), "errors": errors}
 
+    def labels(self, system, code, version=""):
+        labels, errors = [], []
+        for systems, source, _ in self.sources:
+            if system in systems and hasattr(source, "labels"):
+                try:
+                    labels.extend(source.labels(system, code, version))
+                except Exception as exc:
+                    errors.append(type(exc).__name__)
+        return labels, errors
+
+    def search_names(self, system, name):
+        candidates, errors = [], []
+        for systems, source, _ in self.sources:
+            if system in systems and hasattr(source, "search_names"):
+                try:
+                    candidates.extend(source.search_names(name))
+                except Exception as exc:
+                    errors.append(type(exc).__name__)
+        return candidates, errors
+
+
+def make_source(entry, *, llm=None):
+    kind = entry.get("kind")
+    if kind == "fhir":
+        return FhirCodeSource(entry["base_url"], os.getenv(entry.get("token_env", ""), ""),
+                              entry.get("client_cert", ""), entry.get("client_key", ""))
+    if kind == "csv":
+        return CsvCodeSource(Path(entry["path"]), complete=bool(entry.get("complete", False)))
+    if kind == "sqlite":
+        return SqliteCodeSource(Path(entry["path"]), complete=bool(entry.get("complete", False)))
+    if kind == "fhir_artifacts":
+        return FhirArtifactSource(Path(entry["path"]))
+    if kind == "website":
+        return WebsiteCandidateSource(entry["url_template"], entry.get("keywords", []), llm=llm)
+    from .terminology_apis import OlsNameSource, WhoIcdSource
+    if kind == "ols":
+        return OlsNameSource(entry["base_url"], ontology=entry["ontology"], limit=entry.get("limit", 5))
+    if kind == "who_icd":
+        return WhoIcdSource(entry["base_url"], release=entry["release"], language=entry.get("language", "en"),
+            client_id=os.getenv(entry.get("client_id_env", ""), ""), client_secret=os.getenv(entry.get("client_secret_env", ""), ""),
+            token_endpoint=entry["token_endpoint"])
+    raise ValueError(f"Unknown terminology source: {kind}")
+
 
 def load_sources(path: Path) -> list[dict[str, Any]]:
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -341,7 +464,7 @@ def load_sources(path: Path) -> list[dict[str, Any]]:
         raise ValueError("Terminology source config needs a JSON source array")
     data = [dict(row) for row in data]
     for row in data:
-        if row.get("kind") in {"csv", "sqlite"} and row.get("path"):
+        if row.get("kind") in {"csv", "sqlite", "fhir_artifacts"} and row.get("path"):
             value = Path(row["path"])
             if not value.is_absolute():
                 row["path"] = str(path.resolve().parent / value)

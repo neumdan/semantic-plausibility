@@ -452,6 +452,10 @@ class Checker:
         item = report["measurements"][0]
         ranges = item["reference_checks"]
         findings: list[tuple[str, str]] = []
+        if any(check["state"] in {"unverified", "alias_version_unverified"} for check in item["name_checks"]):
+            findings.append(("unclear", "Analytbezeichnung ist für diesen Code und diese Version nicht eindeutig belegt; fachlich prüfen."))
+        if item["unit_label_check"]["state"] in {"unverified", "alias_version_unverified"}:
+            findings.append(("unclear", "Einheitenbezeichnung ist für den angegebenen Einheiten-Code nicht belegt; fachlich prüfen."))
         value_types = payload.get("source_value_types", [])
         if len(value_types) > 1:
             findings.append(
@@ -683,6 +687,8 @@ class Checker:
         sources = [item.get("ucum_source"), item.get("loinc_source")]
         sources += [c["terminology"].get("source") for c in codes]
         sources += [s.get("source") for s in item["study_candidates"]]
+        sources += [label.get("source") for check in (*item["name_checks"], item["unit_label_check"])
+                    for label in (*check.get("matched_aliases", []), *check.get("candidates", []))]
         row["evidenz_quellen"] = "; ".join(dict.fromkeys(str(s) for s in sources if s))
         report.pop("decision", None)
         for measurement_report in report["measurements"]:

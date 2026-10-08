@@ -26,17 +26,18 @@
 <text x="366" y="462" class="body">Known counts → mean/SE, median/IQR</text>
 <text x="366" y="487" class="body">Items: retain ID / component path</text>
 </g>
-<g data-node="REF"><rect x="20" y="580" width="290" height="182" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<g data-node="REF"><rect x="20" y="580" width="290" height="207" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
 <text x="36" y="609" class="heading">Real terminology sources</text>
-<text x="36" y="637" class="body" style="font-size:16px">NLM UCUM + LOINC FHIR</text>
-<text x="36" y="662" class="body" style="font-size:16px">Versioned CodeSystem artifacts</text>
-<text x="36" y="687" class="body" style="font-size:16px">Site CSV / SQLite catalogues</text>
-<text x="36" y="712" class="body" style="font-size:16px">Capture actual lookup responses</text>
-<text x="36" y="737" class="body" style="font-size:16px">Unavailable stays unverified</text>
+<text x="36" y="637" class="body" style="font-size:16px">NLM UCUM + LOINC API</text>
+<text x="36" y="662" class="body" style="font-size:16px">Pinned BfArM / FHIR packages</text>
+<text x="36" y="687" class="body" style="font-size:16px">Base codes / label supplements</text>
+<text x="36" y="712" class="body" style="font-size:16px">SemLookP names: opt-in candidates</text>
+<text x="36" y="737" class="body" style="font-size:16px">Site CSV / SQLite catalogues</text>
+<text x="36" y="762" class="body" style="font-size:16px">Real evidence; missing → unknown</text>
 </g>
 <g data-node="CHECK"><rect x="350" y="580" width="400" height="157" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
 <text x="366" y="609" class="heading">Shared laboratory check kernel</text>
-<text x="366" y="637" class="body">Exact lookup → fit → numeric bounds</text>
+<text x="366" y="637" class="body">Exact lookup → aliases → fit → bounds</text>
 <text x="366" y="662" class="body">Transformations need verified factors</text>
 <text x="366" y="687" class="body">Unknown evidence stays unknown</text>
 <text x="366" y="712" class="body">Every partial finding stays visible</text>

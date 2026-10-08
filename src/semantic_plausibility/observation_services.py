@@ -241,9 +241,15 @@ class LoincFhirClient:
         properties: dict[str, list[str]] = {}
         part_codes: dict[str, str] = {}
         display = ""
+        designations = []
         for entry in payload.get("parameter", []):
             if entry.get("name") == "display":
                 display = entry.get("valueString") or ""
+            if entry.get("name") == "designation":
+                parts = {part.get("name"): part for part in entry.get("part", [])}
+                label = parts.get("value", {}).get("valueString", "")
+                if label:
+                    designations.append({"value": label, "language": parts.get("language", {}).get("valueCode", "")})
             if entry.get("name") != "property":
                 continue
             parts = {part.get("name"): part for part in entry.get("part", [])}
@@ -285,6 +291,8 @@ class LoincFhirClient:
             example_units=many("EXAMPLE_UNITS"),
             source=response.url,
             part_codes=part_codes,
+            designations=tuple(designations),
+            synonyms=tuple(dict.fromkeys((*many("RELATEDNAMES2"), *many("SHORTNAME")))),
         )
         self._cache[cache_key] = term
         return term

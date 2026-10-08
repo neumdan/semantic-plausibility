@@ -1,4 +1,4 @@
-# Laboratory input and output contract (0.9.2)
+# Laboratory input and output contract (0.9.3)
 
 ## Minimum export
 
@@ -9,6 +9,7 @@ Supported inputs: CSV, FHIR R4 Bundle/JSON/NDJSON, mapped PostgreSQL view, read-
 | TOML role | Source meaning |
 | --- | --- |
 | `code`, `code_system`, `code_version` | Declared terminology identity and edition; no implicit LOINC assignment |
+| `analyte_name` / `code_text`, `code_display` | Source analyte/test name → CodeableConcept.text; optional coding display → Coding.display. Native FHIR retains both |
 | `value` | Point value, including genuine zero; finite decimal required for numeric readiness |
 | `value_comparator` | Preserve censoring; censored values are not expanded into a numeric distribution |
 | `unit`, `unit_code`, `unit_system` | Display label, machine code, canonical system; display is not proof of UCUM |
@@ -26,6 +27,8 @@ Use defaults only for facts established by the source contract. Do not label all
 CSV headers must be unique/nonempty and mapped columns present. Mismatched row width fails the batch with a redacted failure audit. Invalid measurement numbers within an otherwise valid CSV become review findings. A numeric encoding budget (1,024 coefficient digits, at most 1,024 digits before the decimal point and absolute decimal exponent at most 1,024; input text at most 4,096 characters) prevents pathological fixed-point expansion. It is not a biological plausibility threshold. Native FHIR uses `granularity="individual"` and native elements/`input.elements`; CSV column/default mappings and a distinct frequency declaration are rejected rather than ignored. Export already aggregated frequency sets as mapped CSV/DB rows. Native FHIR exports must contain one current version per Observation ID; duplicate IDs fail rather than silently doubling counts.
 
 ## Frequency and aggregation
+
+Supplied code displays/analyte names remain in guarded group identity. The name check adds sourced aliases/candidates, not a normalized replacement. For cross-source comparisons select names consistently; the comparator refuses duplicate canonical signatures instead of silently combining potentially different tests.
 
 - `granularity="individual"`: each measurement counts once. Components remain separate measurements; source records and selected measurement counts are both reported.
 - `granularity="distinct"`: supplied `count` weights the distribution. Without it, frequency stays unknown and weighted summaries stay unavailable.

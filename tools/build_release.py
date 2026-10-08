@@ -26,6 +26,7 @@ ROOT_FILES = {
     "compose.offline.yaml",
     "compose.gpu.yaml",
     "pipeline.example.toml",
+    "terminology.example.toml",
 }
 FOLDERS = {"src", "tests", "examples", "docs", "deploy", "tools", ".github"}
 

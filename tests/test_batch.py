@@ -82,6 +82,15 @@ class BatchTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     BatchConfiguration(self.config)
 
+    def test_optional_package_configuration_is_pinned_and_does_not_activate_sources(self):
+        source = ROOT / 'terminology.example.toml'
+        config = BatchConfiguration(source)
+        self.assertFalse(config.data['packages']['loinc_de']['enabled'])
+        self.assertFalse(config.data['lookups']['icd11']['enabled'])
+        self.config.write_text(source.read_text().replace('version = "2.82.0"', 'version = "latest"'))
+        with self.assertRaisesRegex(ValueError, 'exact semantic version'):
+            BatchConfiguration(self.config)
+
     def test_distinct_input_cannot_recreate_ids(self):
         self.config.write_text(self.config.read_text().replace('mode = "distinct"', 'mode = "items"'))
         with self.assertRaisesRegex(ValueError, "Item mode needs individual"):

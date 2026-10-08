@@ -38,7 +38,7 @@ def build_site(root, output):
         shutil.copyfile(root / "examples" / name, output / "examples" / name)
     shutil.copytree(root / "examples" / "lab", output / "examples" / "lab")
     shutil.copytree(root / "examples" / "profiles", output / "examples" / "profiles")
-    for name in ("pipeline.example.toml", "README.md", "LICENSE"):
+    for name in ("pipeline.example.toml", "terminology.example.toml", "README.md", "LICENSE"):
         shutil.copyfile(root / name, output / name)
     (output / "index.html").write_text(
         '<!doctype html><html lang="en"><meta charset="utf-8">'

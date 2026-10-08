@@ -35,7 +35,7 @@ from .export_report import (
 )
 from .support import _csv_text, _input_hash, read_contexts
 from .observation_quality import LoincTerm
-from .terminology_router import TerminologyRouter, load_sources
+from .terminology_router import TerminologyRouter, artifact_files, load_sources
 
 EXTRA_FIELDS = [
     "semantic_signature",
@@ -70,6 +70,10 @@ EXTRA_FIELDS = [
     "suggested_code_system",
     "coding_proposal_json",
     "fhir_mapping_proposal_json",
+    "analyte_name",
+    "name_check",
+    "unit_label_check",
+    "name_evidence_json",
 ]
 
 
@@ -401,12 +405,14 @@ def reference_artifacts(config):
         if not value:
             continue
         path = config.path_value(value)
-        files = sorted(path.glob("*.json")) if path.is_dir() else [path]
+        files = artifact_files(path) if path.is_dir() else [path]
+        if path.is_dir() and (path / "installation.json").exists():
+            files.append(path / "installation.json")
         digest = hashlib.sha256()
         for file in files:
             if file.is_symlink() or not file.is_file():
                 raise ValueError("Local reference artifacts must be regular files")
-            digest.update(encoded([file.name, _input_hash(file)]).encode())
+            digest.update(encoded([str(file.relative_to(path)) if path.is_dir() else file.name, _input_hash(file)]).encode())
         artifacts.append({"role": role, "sha256": digest.hexdigest(), "files": len(files)})
     return artifacts
 
@@ -728,6 +734,15 @@ def _review_export(config):
                             **detail,
                         }
                         row = review_row(raw_row, detail, config)
+                        measurement = detail.get("report", {}).get("measurements", [{}])[0]
+                        names = measurement.get("name_checks", [])
+                        unit_label = measurement.get("unit_label_check", {})
+                        row.update(
+                            analyte_name=payload["code"].get("text") or next((c.get("display") for c in payload["code"].get("coding", []) if c.get("display")), ""),
+                            name_check="; ".join(check["state"] for check in names) or "not_provided",
+                            unit_label_check=unit_label.get("state", "not_provided"),
+                            name_evidence_json=encoded({"analyte": names, "unit": unit_label}),
+                        )
                         row["profile"] = selected_profile.name
                         if not row["ig_canonical"]:
                             row["ig_canonical"] = selected_profile.canonical
@@ -773,6 +788,8 @@ def _review_export(config):
                                         "code_unit_fit",
                                         "reference_check",
                                         "value_reference_check",
+                                        "name_check",
+                                        "unit_label_check",
                                     )
                                 ]
                             ),

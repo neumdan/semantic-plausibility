@@ -1,5 +1,6 @@
 """Real HTTP integration checks. No fixtures, mock servers or invented verdicts."""
 from decimal import Decimal
+import csv
 import json
 import os
 from pathlib import Path
@@ -8,7 +9,8 @@ import unittest
 
 from semantic_plausibility import run_batch, verify_audit
 from semantic_plausibility.observation_services import NlmUcumClient, LoincFhirClient
-from test_batch import configuration
+from semantic_plausibility.name_checks import check_name
+from test_batch import configuration, ROOT
 
 
 @unittest.skipUnless(os.getenv("SQC_LIVE_TESTS") == "1", "Set SQC_LIVE_TESTS=1 to contact real terminology services")
@@ -61,3 +63,36 @@ class LiveLookupTests(unittest.TestCase):
             saved = run_batch(config)
             self.assertEqual(saved.statuses, result.statuses)
             self.assertEqual(verify_audit(saved.log)['status'], 'verified')
+
+    def test_real_german_loinc_aliases_and_unresolved_name(self):
+        term = LoincFhirClient('https://tx.fhir.org/r4').lookup('718-7')
+        self.assertTrue(term.designations)
+        self.assertEqual(check_name('Hämoglobin', 'http://loinc.org', '718-7', term=term)['state'], 'exact_alias')
+        self.assertEqual(check_name('Hb', 'http://loinc.org', '718-7', term=term)['state'], 'exact_alias')
+        self.assertEqual(check_name('Glucose', 'http://loinc.org', '718-7', term=term)['state'], 'unverified')
+
+    def test_analyte_name_column_reaches_actual_batch_report(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            config = configuration(root, connected=True)
+            with (ROOT / 'examples/laboratory.csv').open(newline='') as handle:
+                reader = csv.DictReader(handle)
+                fields, row = reader.fieldnames, next(reader)
+            input_file = root / 'named.csv'
+            row['analyte_name'] = 'Hämoglobin'
+            with input_file.open('w', newline='') as handle:
+                writer = csv.DictWriter(handle, fieldnames=[*fields, 'analyte_name'])
+                writer.writeheader()
+                writer.writerow(row)
+            text = config.read_text().replace(str(ROOT / 'examples/laboratory.csv'), str(input_file))
+            text = text.replace('[input.columns]', '[input.columns]\nanalyte_name="analyte_name"')
+            config.write_text(text)
+            result = run_batch(config)
+            with result.csv.open(newline='') as handle:
+                report = next(csv.DictReader(handle))
+            self.assertEqual(report['analyte_name'], 'Hämoglobin')
+            self.assertEqual(report['name_check'], 'exact_alias')
+            self.assertEqual(report['code'], '718-7')
+            evidence = json.loads(report['name_evidence_json'])
+            self.assertTrue(evidence['analyte'][0]['matched_aliases'])
+            self.assertEqual(verify_audit(result.log)['status'], 'verified')

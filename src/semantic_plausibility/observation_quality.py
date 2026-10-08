@@ -34,6 +34,8 @@ class LoincTerm:
     version: str = ""
     time_aspect: str = ""
     part_codes: dict[str, str] = field(default_factory=dict)
+    designations: tuple[dict[str, str], ...] = ()
+    synonyms: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

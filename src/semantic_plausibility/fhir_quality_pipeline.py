@@ -14,6 +14,7 @@ import re
 from typing import Any
 
 from .observation_quality import ApprovedMapping, LoincTerm
+from .name_checks import measurement_names
 from .profile_config import (
     InputProfile,
     load_profile,
@@ -188,6 +189,7 @@ class FhirQualityPipeline:
             term = None
             errors.append(f"LOINC unavailable: {exc}")
 
+        name_checks, unit_label_check = measurement_names(item.get("code") or {}, quantity, term=term, router=self.terminology)
         code_checks = []
         for coding in codings:
             if not isinstance(coding, dict):
@@ -444,6 +446,8 @@ class FhirQualityPipeline:
         )
         return {
             "path": path,
+            "name_checks": name_checks,
+            "unit_label_check": unit_label_check,
             "loinc_code": loinc_code,
             "loinc_axes": axes,
             "loinc_source": term.source if term else None,
@@ -491,7 +495,7 @@ class FhirQualityPipeline:
             "unit_spelling": spelling,
             "reference_unit_spelling": reference_spelling,
             "reference_checks": reference_checks,
-            "execution_order": ["exact_lookup", "catalogue_spelling", "website_lookup", "study_search"],
+            "execution_order": ["exact_lookup", "name_aliases_and_candidates", "catalogue_spelling", "website_lookup", "study_search"],
             "study_candidates": studies,
             "study_comparisons": comparisons,
             "errors": errors,

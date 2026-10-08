@@ -465,6 +465,15 @@ class Deployment:
                             "keywords",
                             "client_cert",
                             "client_key",
+                            "ontology",
+                            "limit",
+                            "release",
+                            "language",
+                            "token_endpoint",
+                            "client_id_env",
+                            "client_id_file",
+                            "client_secret_env",
+                            "client_secret_file",
                         },
                     )
                 )
@@ -478,6 +487,12 @@ class Deployment:
                     row["token_env"] = variable
                 else:
                     row.pop("token_file", None)
+                for key in ("client_id", "client_secret"):
+                    if row.get(key + "_file") and live and credentials_needed:
+                        variable = f"SQC_CFG_TX_{key.upper()}_{index}"
+                        updates[variable] = self.secret(row, key, required=True)
+                        row[key + "_env"] = variable
+                    row.pop(key + "_file", None)
                 transformed.append(row)
             sources_file = bridge("terminology", {"sources": transformed}) if transformed else None
             audit = dict(self.data.get("audit", {}))

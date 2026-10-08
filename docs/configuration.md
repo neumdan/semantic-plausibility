@@ -10,6 +10,7 @@ Copy `pipeline.example.toml` to `pipeline.toml`. Paths are relative to that file
 | `specification` | FHIR R4 and the selected deployed profile/policy |
 | `aggregation` | Optional exact-value grouping; other semantic qualifiers are always guarded |
 | `network` / `lookups` | Offline mode or explicit terminology APIs/lists |
+| `packages` | Optional pinned BfArM package setup; downloaded only by `package-init` |
 | `quality` | Optional reviewed ConceptMap; mappings remain proposals |
 | `study` | Matched cohort/period declarations for source comparisons |
 | `output` | Report filename and `distinct`/`items` mode |
@@ -77,3 +78,5 @@ uv run --no-sync --env-file .env plausibility batch --config pipeline.toml
 ```
 
 `config-check` checks setup; `--connections` additionally requests connection probes. The batch checks the actual input contract. Existing outputs require a new filename or explicit `output.overwrite=true`.
+
+Optional German labels, SemLookP name candidates and WHO ICD-11 lookup have one [configuration example](../terminology.example.toml) and [setup guide](lookups.md#german-packages-and-labels). Package installation is separate from a batch; model startup remains separate as well.

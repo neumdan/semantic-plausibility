@@ -9,6 +9,7 @@ output
 local
 .env
 pipeline.toml
+terminology.toml
 .env.*
 !.env.example
 **/.env

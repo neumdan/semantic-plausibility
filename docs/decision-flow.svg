@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1450" viewBox="0 0 1100 1450" role="img" aria-labelledby="title desc">
-<title id="title">Laboratory decisions — evidence, numeric checks and review</title><desc id="desc">Input contract + selected profile; Validate declared code/system and unit/system; Confirmed invalid; Verified code / unit; Not verified; Check LOINC axes / example units and supplied context; Documented unchanged fit; Verified linear conversion; Ambiguous / mismatch; Optional local research pass; Values and reference metadata; Write separate checks, credibility and explicit readiness denominators; Expert adjudication → approved site mapping → formal FHIR validation</desc>
+<title id="title">Laboratory decisions — evidence, numeric checks and review</title><desc id="desc">Input contract + selected profile; Validate declared code/system and unit/system; Confirmed invalid; Verified code / unit; Not verified; Check supplied aliases, LOINC axes / example units and context; Documented unchanged fit; Verified linear conversion; Ambiguous / mismatch; Explicit candidate sources and optional local research; Values and reference metadata; Write separate checks, credibility and explicit readiness denominators; Expert adjudication → approved site mapping → formal FHIR validation</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#537487"/></marker></defs>
 <style>text{font-family:Arial,sans-serif;fill:#142d42}.heading{font-size:19px;font-weight:700}.body{font-size:17px}.label{font-size:14px;fill:#526978}</style><rect width="1100" height="100%" fill="white"/>
 <g data-node="INPUT"><rect x="130" y="20" width="840" height="106" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
@@ -27,8 +27,8 @@
 <text x="766" y="402" class="body">Unavailable is not invalid</text>
 </g>
 <g data-node="FIT"><rect x="130" y="485" width="840" height="82" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="146" y="514" class="heading">Check LOINC axes / example units and supplied context</text>
-<text x="146" y="542" class="body">Unit syntax alone cannot prove code-unit fit; examples are not a universal whitelist</text>
+<text x="146" y="514" class="heading">Check supplied aliases, LOINC axes / example units and context</text>
+<text x="146" y="542" class="body">Names and unit syntax alone cannot prove fit; examples are not a universal whitelist</text>
 </g>
 <g data-node="MATCH"><rect x="20" y="620" width="330" height="132" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
 <text x="36" y="649" class="heading">Documented unchanged fit</text>
@@ -49,8 +49,8 @@
 <text x="766" y="727" class="body">No guessed transformation</text>
 </g>
 <g data-node="RESEARCH"><rect x="130" y="815" width="840" height="106" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="146" y="844" class="heading">Optional local research pass</text>
-<text x="146" y="872" class="body">Catalogue → local model → quoted lookup pages → bounded PubMed candidates</text>
+<text x="146" y="844" class="heading">Explicit candidate sources and optional local research</text>
+<text x="146" y="872" class="body">SemLookP names; catalogue → local model → quoted lookup pages → PubMed candidates</text>
 <text x="146" y="897" class="body">Schema/source validation; missing evidence remains unresolved</text>
 </g>
 <g data-node="NUMERIC"><rect x="130" y="980" width="840" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>

@@ -257,6 +257,8 @@ def write_html(path, rows, summary, csv_name, log_name):
     metrics = summary["metrics"]
     columns = [
         "code",
+        "analyte_name",
+        "name_check",
         "code_system",
         "unit_code",
         "occurrence_count",

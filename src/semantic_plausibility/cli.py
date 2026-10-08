@@ -29,6 +29,16 @@ def main(argv: list[str] | None = None) -> int:
     config.add_argument("--config", type=Path, default=Path("pipeline.toml"))
     config.add_argument("--connections", action="store_true")
     config.add_argument("--out", type=Path)
+    packages = sub.add_parser("package-init", help="Install explicitly enabled, pinned BfArM FHIR packages locally")
+    packages.add_argument("--config", type=Path, default=Path("pipeline.toml"))
+    packages.add_argument("--package", default=None, help="Optional configured package alias")
+    lookup = sub.add_parser("lookup", help="Inspect one configured code or name source; no batch/model is started")
+    lookup.add_argument("--config", type=Path, default=Path("pipeline.toml"))
+    lookup.add_argument("--lookup", required=True, help="Alias in [lookups]")
+    lookup.add_argument("--system", default="")
+    lookup.add_argument("--code", default="")
+    lookup.add_argument("--version", default="")
+    lookup.add_argument("--name", default="")
     for name, help_text in (
         ("model-init", "Provision the configured local Ollama model"),
         ("catalog-init", "Prepare the configured local unit catalogue"),
@@ -101,8 +111,19 @@ def main(argv: list[str] | None = None) -> int:
             from .deployment_checks import sync_catalogue
 
             print(json.dumps(sync_catalogue(args.config), indent=2))
+        elif args.command == "package-init":
+            from .terminology_packages import initialise_packages
+
+            installed = initialise_packages(args.config, args.package)
+            print(json.dumps({alias: {key: row[key] for key in ("name", "version", "path", "archive_sha256", "downloaded")}
+                              for alias, row in installed.items()}, ensure_ascii=False, indent=2))
+        elif args.command == "lookup":
+            from .terminology_lookup import lookup_terminology
+
+            print(json.dumps(lookup_terminology(args.config, args.lookup, system=args.system, code=args.code,
+                version=args.version, name=args.name), ensure_ascii=False, indent=2))
         return 0
-    except (ValueError, OSError, json.JSONDecodeError) as exc:
+    except (ValueError, OSError, RuntimeError, json.JSONDecodeError) as exc:
         parser.error(str(exc))
     return 2
 

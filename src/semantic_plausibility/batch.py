@@ -13,6 +13,7 @@ from .db_source import _identifier_parts, record_from_row, scan, validate_mappin
 from .deployment import Deployment, table
 
 ROLE_ALIASES = {
+    "analyte_name": "code_text",
     "reference_low": "range_low",
     "reference_high": "range_high",
     "reference_unit": "range_low_code",
@@ -86,9 +87,12 @@ class BatchConfiguration:
                 "network",
                 "study",
                 "quality",
+                "packages",
             },
         )
         self.version = data.get("config_version")
+        from .terminology_packages import validate_packages
+        validate_packages(data.get("packages", {}))
         if self.version != 3:
             raise ValueError(
                 "Use config_version=3 and the current pipeline.example.toml; retired config versions are unsupported"
@@ -257,6 +261,8 @@ class BatchConfiguration:
             "code",
             "code_system",
             "code_version",
+            "code_display",
+            "code_text",
             "unit",
             "unit_code",
             "unit_system",
@@ -440,6 +446,15 @@ class BatchConfiguration:
                     "complete",
                     "url_template",
                     "keywords",
+                    "ontology",
+                    "limit",
+                    "release",
+                    "language",
+                    "token_endpoint",
+                    "client_id_env",
+                    "client_id_file",
+                    "client_secret_env",
+                    "client_secret_file",
                 },
             )
             if type(row.get("enabled", False)) is not bool:
@@ -467,7 +482,18 @@ class BatchConfiguration:
                         "password_file",
                     }
                 }
-            elif kind in {"fhir", "csv", "sqlite", "website", "fhir_artifacts"}:
+            elif kind in {"fhir", "csv", "sqlite", "website", "fhir_artifacts", "ols", "who_icd"}:
+                if kind in {"ols", "who_icd"}:
+                    from .terminology_apis import OlsNameSource, WhoIcdSource, ICD11_MMS
+                    if kind == "ols":
+                        OlsNameSource(row.get("endpoint", ""), ontology=row.get("ontology", ""), limit=row.get("limit", 5))
+                    else:
+                        if row.get("systems") != [ICD11_MMS]:
+                            raise ValueError("WHO ICD source must explicitly select the ICD-11 MMS canonical system")
+                        if not all(row.get(key + "_env") or row.get(key + "_file") for key in ("client_id", "client_secret")):
+                            raise ValueError("WHO ICD source needs client_id and client_secret environment/file references")
+                        WhoIcdSource(row.get("endpoint", ""), release=row.get("release", ""), language=row.get("language", "en"),
+                            token_endpoint=row.get("token_endpoint", ""), client_id="", client_secret="")
                 if row.get("endpoint_env"):
                     raise ValueError(
                         "Generic FHIR lookup endpoints use endpoint; credentials remain environment/file references"
@@ -492,6 +518,15 @@ class BatchConfiguration:
                                 "complete",
                                 "url_template",
                                 "keywords",
+                                "ontology",
+                                "limit",
+                                "release",
+                                "language",
+                                "token_endpoint",
+                                "client_id_env",
+                                "client_id_file",
+                                "client_secret_env",
+                                "client_secret_file",
                             }
                         },
                     }

@@ -23,7 +23,7 @@ LOINC's API requires a registered account and Basic Authentication. Public looku
 
 ## Germany and Europe
 
-BfArM/gematik's central terminology service currently documents public browsers and versioned FHIR **packages**. This catalogue does not invent a `$validate-code` endpoint: import the appropriate release into your own server/list, or use its public page as candidate evidence. [Official description](https://ref.terminologien.bfarm.de/).
+BfArM/gematik publishes versioned FHIR R4 **packages** through an [NPM-compatible package API](https://terminologien.bfarm.de/fhirpackages.html). The runner now downloads pinned editions explicitly and reads their CodeSystems, label supplements and expanded ValueSets locally. The registry is a package service; it is not assumed to expose `$validate-code`.
 
 Austria's ELGA TerminoloGit offers public terminology artifacts and versioned releases. Import the exact relevant edition; the old `termpub` service is not the current publication channel. [ELGA documentation](https://www.elga.gv.at/technischer-hintergrund/technische-elga-leitfaeden/).
 
@@ -32,6 +32,83 @@ WHO ATC offers a free searchable index, while complete downloads use registered 
 EMA SPOR has read-only browser access and version-specific account/role requirements for its APIs. Its dedicated API is listed as **known, not implemented**; it is not a FHIR terminology endpoint. [EMA SPOR](https://spor.ema.europa.eu/).
 
 SNOMED CT content needs the appropriate licence and edition. A public browser is not a production service guarantee. EBI OLS provides ontology lookup; its dedicated API also requires an adapter rather than being treated as FHIR.
+
+## German packages and labels
+
+Use [terminology.example.toml](../terminology.example.toml) as an optional setup example, or copy its selected tables into your existing `pipeline.toml`. The sample uses the illustrative FHIR Bundle and keeps all additional sources disabled until configured.
+
+```sh
+cp -n terminology.example.toml terminology.toml
+```
+
+1. In `terminology.toml`, select `[packages.loinc_de]` and/or `[packages.ucum_de]`: set `enabled=true`, pin the edition and local `path`.
+2. Read the [LOINC download conditions](https://terminologien.bfarm.de/bfarm.terminologien.loinc-conditions.html) and [UCUM conditions](https://terminologien.bfarm.de/bfarm.terminologien.ucum-conditions.html). Set `accept_download_conditions=true` only if you accept the conditions for that package. BfArM then issues its download token. Alternatively reference an existing `token_env` or `token_file`; acceptance remains explicit. Tokens are never saved in receipts or reports.
+3. Install the selected packages, then enable the corresponding `[lookups.loinc_de]` / `[lookups.ucum_de]` artifact sources. Their `path` must equal the installation path.
+
+```sh
+uv run --no-sync --env-file .env plausibility package-init --config terminology.toml
+# Or, with the read/write local volume used only for installation:
+SQC_CONFIG_FILE=terminology.toml podman compose --profile terminology run --rm --build package-init
+```
+
+Ordinary `batch` runs never download packages. `package-init` checks the publisher SHA-1, records SHA-256, preserves the original archive/licence files and installs atomically. Repeated installation verifies the existing files. Dependencies are recorded, not automatically downloaded. Package version and CodeSystem version can differ; code checks use the CodeSystem edition. Installed contents stay under ignored `local/`; transfer this folder to a disconnected review machine. For offline LOINC axes/units and UCUM syntax/factors, also supply a pack captured from real APIs; a translation package alone is insufficient.
+
+**Supplements supply labels, not independent code membership.** A base `CodeSystem.content="complete"` can establish membership/absence for its edition; a fragment cannot disprove an absent code. Only explicit ValueSet expansions are evaluated locally; unevaluated `compose` filters stay unverified. UCUM has a generative grammar: Common UCUM Units is a useful finite subset, not a complete list of every valid expression.
+
+The configuration pins the BfArM LOINC translation to `2.82.0`, matching the public test server's observed LOINC `2.82`. BfArM also publishes `2.83.0`; select matching API/base/translation releases for your study. UCUM common-unit translation is `1.5.0`; this is its list version, not the UCUM grammar version. Nothing follows `latest` automatically.
+
+## Analyte names and translation candidates
+
+Map CSV/SQL columns explicitly:
+
+```toml
+[input.columns]
+# Add these to your existing column map; do not replace the other roles.
+analyte_name = "test_name"          # internal Observation.code.text
+code_display = "coding_display"  # optional Observation.code.coding[].display
+```
+
+Native FHIR preserves both fields. Source names remain in guarded groups; different names are not silently merged. The report adds `analyte_name`, `name_check`, `unit_label_check` and `name_evidence_json`. Read these alongside the independent code/unit checks:
+
+| Finding | Meaning |
+| --- | --- |
+| `exact_alias` | Supplied name matches a sourced display/designation/synonym, ignoring case and whitespace |
+| `alias_version_unverified` | A supplement supplies the alias but does not establish the requested base edition |
+| `unverified` | Name/translation is not established; review it, rather than assuming the code is wrong |
+| `same_as_code` | Unit display equals the machine code; its syntax is checked separately |
+| `not_provided` | No label was supplied |
+
+For example, the real FHIR LOINC lookup for `718-7` supports “Hämoglobin” and “Hb”; “Glucose” is not an established alias for that code. Alias agreement does not prove that the source measurement used the right specimen, property, time, scale or method. UCUM describes units; it does not identify the measured analyte. A translation cannot establish a conversion factor.
+
+```sh
+uv run --no-sync --env-file .env plausibility lookup --config pipeline.toml --lookup loinc --code 718-7 --name 'Hämoglobin'
+# After installing/enabling the German package, reverse-search its real aliases:
+uv run --no-sync --env-file .env plausibility lookup --config terminology.toml --lookup loinc_de --name 'Hämoglobin'
+```
+
+Reverse package lookup returns up to ten exact label/translation candidates, retaining their code, canonical system, language and edition. Multiple matches stay ambiguous. It neither supplies a missing LOINC axis nor approves a local LIS-to-LOINC mapping. Search indexes are built lazily and remain local.
+
+## SemLookP and TS4NFDI
+
+Enable `[lookups.semlook]` in the optional TOML to query the real [SemLookP OLS API](https://semanticlookup.zbmed.de/about/api) at `https://semanticlookup.zbmed.de/ols/api`. Select an explicit `ontology` and `limit`; no API credential is needed for the public service. The adapter caches bounded searches. It returns quoted labels, IRIs and response hashes as **candidates**; a LOINC coding candidate is included only when the result's LOINC IRI and identifier agree. Every candidate still needs exact code/version and clinical-context review. German coverage varies; no automatic model translation is invented.
+
+```sh
+uv run --no-sync --env-file .env plausibility lookup --config terminology.toml --lookup semlook --name hemoglobin
+```
+
+In a batch, configured name searches run only for supplied, unresolved analyte labels, independently of optional model research. Add your local LIS canonical to `systems` if you explicitly want its names searched for LOINC candidates. The underlying model stays local; the enabled API receives the terminology name, never a measurement value or resource ID.
+
+The [TS4NFDI Terminology Service Suite](https://github.com/ts4nfdi/terminology-service-suite) supplies React/TypeScript widgets and plain-HTML adapters for a future expert interface. Its underlying APIs are useful here; the frontend suite adds no dependency to this Python batch library.
+
+## WHO ICD-11 MMS API
+
+The optional `[lookups.icd11]` uses `type="who_icd"`, canonical `http://id.who.int/icd/release/11/mms`, a pinned `release`, `language`, API endpoint and OAuth endpoint. Set `WHO_ICD_CLIENT_ID` and `WHO_ICD_CLIENT_SECRET` in ignored `.env`, or use `client_id_file` / `client_secret_file`. Register for credentials at the [WHO ICD API](https://icd.who.int/icdapi); [authentication uses client credentials and scope `icdapi_access`](https://icd.who.int/docs/icd-api/API-Authentication/).
+
+```sh
+uv run --no-sync --env-file .env plausibility lookup --config terminology.toml --lookup icd11 --code 1A00 --version 2026-01
+```
+
+The adapter confirms the release, exact stem code and entity, requests `API-Version: v2`, uses HTTPS and caches the short-lived OAuth token in memory. WHO MMS is distinct from uncoded Foundation entities and from ICD-10-GM. Postcoordination stays unverified in this first adapter; no code simplification is applied. English is the example default; [WHO marks German in 2026-01 as prerelease](https://icd.who.int/docs/icd-api/SupportedClassifications/). This is a standalone terminology lookup, not implemented diagnosis/severity/Condition assessment.
 
 ## Credentials and own servers
 
@@ -55,4 +132,4 @@ A CSV catalogue needs `system,code` and may include `version,display`. SQLite ne
 
 For every enabled service, credentials must be referenced in the TOML. Put their values in `.env` or mounted secret files. Complete release imports and licence acquisition are explicit setup steps, not autonomous model tasks.
 
-Catalogue documentation was reviewed on 6 October 2026. Availability, edition coverage and credentials must be checked for the actual deployment; not every listed service was contacted by a live integration test.
+Catalogue documentation was reviewed on 8 October 2026. Live tests cover NLM, LOINC FHIR, BfArM public package installation and SemLookP. Protected German translation downloads and authenticated WHO lookups additionally require explicit licence acceptance/credentials and their opt-in tests; they are not claimed as tested without those prerequisites.

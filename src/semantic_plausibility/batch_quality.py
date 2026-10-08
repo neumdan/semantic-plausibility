@@ -66,11 +66,15 @@ def observation_from_row(
     coding = {"system": code_system, "code": code}
     if mapping.value(row, "code_version"):
         coding["version"] = mapping.value(row, "code_version")
+    if mapping.value(row, "code_display"):
+        coding["display"] = mapping.value(row, "code_display")
     obs: dict[str, Any] = {
         "resourceType": "Observation",
         "code": {"coding": [coding]},
         "valueQuantity": quantity,
     }
+    if mapping.value(row, "code_text"):
+        obs["code"]["text"] = mapping.value(row, "code_text")
     if mapping.value(row, "status"):
         obs["status"] = mapping.value(row, "status")
     for role, target in (("method_json", "method"), ("modifier_extensions_json", "modifierExtension")):

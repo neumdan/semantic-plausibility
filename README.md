@@ -50,6 +50,20 @@ uv run --no-sync --env-file .env plausibility batch --config pipeline.toml
 
 The TOML already defines `ministral-3:3b`; `.env` supplies its local URL. [Start the optional model, download the real UCUM catalogue and enable research](docs/shipped-stack.md#ollama). Model output never establishes code validity or a conversion factor by itself.
 
+## German labels and other APIs
+
+[BfArM packages and name/API configuration](docs/lookups.md#german-packages-and-labels) add versioned German LOINC/UCUM labels locally. `package-init` installs explicitly selected editions after you accept their download conditions; ordinary batches never download packages automatically. APIs remain available alongside local artifacts.
+
+Optional SemLookP/OLS searches return name candidates for review. A separate WHO ICD-11 MMS lookup uses your OAuth credentials and a pinned release/language. The laboratory batch still assesses Observation; Condition/medication assessment is later work. [Optional configuration](terminology.example.toml).
+
+## Architecture
+
+![Local export review architecture](docs/architecture.svg)
+
+## Decision flow
+
+![Terminology, label, unit-fit and evidence decisions](docs/decision-flow.svg)
+
 [Input/profile configuration](docs/configuration.md) · [Field/output contract](docs/data-contract.md) · [Architecture and decision diagrams](docs/index.html) · [MII quality checks](docs/mii-quality.md) · [Study protocol](docs/studies.md)
 
 ```python

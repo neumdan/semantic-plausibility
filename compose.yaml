@@ -3,7 +3,7 @@ name: semantic-plausibility-stack
 # Runtime configuration: pipeline.toml. Credentials: .env or local/ secret files.
 # Portable CPU setup; optional Linux GPU overlay: compose.gpu.yaml.
 x-runner: &runner
-  image: semantic-plausibility-stack:0.9.2
+  image: semantic-plausibility-stack:0.9.3
   build:
     context: .
     dockerfile: deploy/Dockerfile
@@ -34,6 +34,15 @@ services:
     <<: *runner
     command: ["catalog-init", "--config", "/app/pipeline.toml"]
     profiles: [research]
+    volumes:
+      - ./${SQC_CONFIG_FILE:-pipeline.example.toml}:/app/pipeline.toml:ro
+      - ./examples:/app/examples:ro
+      - ./local:/app/local
+      - ./output:/app/output
+  package-init:
+    <<: *runner
+    command: ["package-init", "--config", "/app/pipeline.toml"]
+    profiles: [terminology]
     volumes:
       - ./${SQC_CONFIG_FILE:-pipeline.example.toml}:/app/pipeline.toml:ro
       - ./examples:/app/examples:ro
