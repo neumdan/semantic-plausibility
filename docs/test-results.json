@@ -1,0 +1,114 @@
+{
+  "version": "0.9.1",
+  "created_at": "2026-10-07T12:58:08.129442+00:00",
+  "status": "passed",
+  "unittest": {
+    "tests": 129,
+    "failures": 0,
+    "errors": 0,
+    "installation": "final wheel in a separate non-editable environment",
+    "command": "python -m unittest discover -s tests -q"
+  },
+  "lint": {
+    "tool": "ruff",
+    "version": "0.16.10",
+    "scope": "src tests tools",
+    "status": "passed"
+  },
+  "software": {
+    "semantic_plausibility": "0.9.1",
+    "python": "3.14.8",
+    "libraries": {
+      "duckdb": "1.5.6",
+      "psycopg": "3.3.6",
+      "psycopg-binary": "3.3.6"
+    }
+  },
+  "container": {
+    "image": "semantic-plausibility-stack:0.9.1",
+    "id": "be4ad1e4223bfd2d5c8716a64e702aba298036d3b5bf6044045735ab91173cb1",
+    "architecture": "linux/arm64",
+    "bytes": 388000309,
+    "podman": "5.8.3",
+    "compose_provider": "Docker Compose 5.1.4",
+    "documented_compose_command": "passed",
+    "offline_no_network": true,
+    "read_only_filesystem": true,
+    "capabilities_dropped": true,
+    "artifact_hash_verification": "passed",
+    "oci_save": "passed",
+    "compressed_archive": "gzip integrity checked"
+  },
+  "synthetic_studies": [
+    {
+      "target": "fhir",
+      "baseline_groups": 7,
+      "target_groups": 7,
+      "shared_groups": 7,
+      "missing_or_changed_context": 0,
+      "added_or_changed_context": 0,
+      "baseline_group_coverage": {
+        "numerator": 7,
+        "denominator": 7,
+        "ratio": 1.0
+      },
+      "changed_value_distributions": 0,
+      "changed_known_frequencies": 0,
+      "exact_value_comparison_unavailable": 1,
+      "target_readiness": {
+        "numerator": 3,
+        "denominator": 7,
+        "ratio": 0.42857142857142855
+      }
+    },
+    {
+      "target": "cds-hub-demo",
+      "baseline_groups": 7,
+      "target_groups": 7,
+      "shared_groups": 6,
+      "missing_or_changed_context": 1,
+      "added_or_changed_context": 1,
+      "baseline_group_coverage": {
+        "numerator": 6,
+        "denominator": 7,
+        "ratio": 0.8571428571428571
+      },
+      "changed_value_distributions": 1,
+      "changed_known_frequencies": 1,
+      "exact_value_comparison_unavailable": 1,
+      "target_readiness": {
+        "numerator": 3,
+        "denominator": 7,
+        "ratio": 0.42857142857142855
+      }
+    }
+  ],
+  "manual": {
+    "html_files_checked": 7,
+    "local_links_and_anchors_checked": 58,
+    "errors": []
+  },
+  "simplification": {
+    "example_toml_lines": 56,
+    "readme_words": 454,
+    "visual_guide_words": 631,
+    "default_grouping": "guarded code-unit-reference sets; exact values explicit",
+    "public_api": "run_batch, BatchResult, compare_reports, verify_audit",
+    "new_runtime_dependencies": 0
+  },
+  "limits": [
+    "Synthetic data/evidence; no clinical accuracy claim",
+    "No live hospital LIS/FHIR/CDS Hub access",
+    "TORCH/CQL and official validators are complementary upstream/downstream tools",
+    "Live model/research accuracy not established by core tests",
+    "Windows/AMD64 execution not tested here"
+  ],
+  "public_source_distribution": {
+    "manifest": "verified",
+    "bundled_wheel": "identical_to_tested_wheel",
+    "private_config_and_local_data": "excluded",
+    "quickstart": "passed",
+    "audit_verify": "passed",
+    "three_source_study_demo": "passed"
+  }
+}

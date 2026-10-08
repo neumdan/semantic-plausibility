@@ -1,0 +1,20 @@
+%% Same node/edge contract as batch-flow.svg.
+flowchart TD
+    LIS["LIS export<br/>CSV / approved DB view<br/>Vendor extraction upstream"]
+    HUB["CDS Hub export<br/>Mapped scalar DB / CSV<br/>Read-only optional DB input"]
+    FHIR["FHIR R4 export<br/>Bundle / NDJSON files<br/>TORCH / CQL upstream"]
+    CSV["Export contract<br/>Individual or distinct<br/>Real count only if known"]
+    GROUP["One selected semantic representation<br/>code + code_system + value/bounds + unit + unit_system + full reference set<br/>DuckDB: distinct guarded sets; optional items with ID/path<br/>Keep status, versions, comparator, specimen/method and interval qualifiers"]
+    CHECK["Exact checks and optional evidence candidates<br/>Local pack / configured terminology → code-unit fit → numbers/reference consistency<br/>Reviewable coding/quantity proposals with independently supported transformations"]
+    OUT["Local CSV report + HTML + summary + evidence + audit log<br/>Original sets + eligible distributions + separate checks + readiness ratio<br/>Compare matched LIS / FHIR / CDS Hub exports; physician review before mapping<br/>No upload, message interception or aggregate-to-patient resource generation"]
+    LIS --> GROUP
+    HUB --> GROUP
+    FHIR --> GROUP
+    CSV --> GROUP
+    GROUP --> CHECK
+    CHECK --> OUT
+    classDef normal fill:#f3f7fa,stroke:#c4d5df,color:#142d42
+    class LIS,HUB,FHIR,CSV,GROUP normal
+    classDef teal fill:#eef7f4,stroke:#a8cfc6,color:#142d42
+    class CHECK,OUT teal
+    classDef error fill:#fcf1f3,stroke:#ecc7cf,color:#142d42

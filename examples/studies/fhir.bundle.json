@@ -1,0 +1,3002 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-0",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-1",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-2",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-3",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-4",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-5",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-6",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-7",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-8",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-9",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-10",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-11",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-12",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-13",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-14",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-15",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-16",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-17",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-18",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-19",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-20",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-21",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-22",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-23",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-24",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-25",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-26",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-27",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-28",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-29",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-30",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-31",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-32",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-33",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-34",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-35",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-36",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-37",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-38",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-0-39",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-1-0",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 18.5,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-1-1",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 18.5,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-1-2",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 18.5,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-1-3",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 18.5,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-1-4",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 18.5,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-2-0",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 140.0,
+          "unit": "g/L",
+          "code": "g/L",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 120,
+              "code": "g/L",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 160,
+              "code": "g/L",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-2-1",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 140.0,
+          "unit": "g/L",
+          "code": "g/L",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 120,
+              "code": "g/L",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 160,
+              "code": "g/L",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-2-2",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 140.0,
+          "unit": "g/L",
+          "code": "g/L",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 120,
+              "code": "g/L",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 160,
+              "code": "g/L",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-2-3",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 140.0,
+          "unit": "g/L",
+          "code": "g/L",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 120,
+              "code": "g/L",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 160,
+              "code": "g/L",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-2-4",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 140.0,
+          "unit": "g/L",
+          "code": "g/L",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 120,
+              "code": "g/L",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 160,
+              "code": "g/L",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-2-5",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 140.0,
+          "unit": "g/L",
+          "code": "g/L",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 120,
+              "code": "g/L",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 160,
+              "code": "g/L",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-2-6",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 140.0,
+          "unit": "g/L",
+          "code": "g/L",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 120,
+              "code": "g/L",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 160,
+              "code": "g/L",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-2-7",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 140.0,
+          "unit": "g/L",
+          "code": "g/L",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 120,
+              "code": "g/L",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 160,
+              "code": "g/L",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-2-8",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 140.0,
+          "unit": "g/L",
+          "code": "g/L",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 120,
+              "code": "g/L",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 160,
+              "code": "g/L",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-2-9",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 140.0,
+          "unit": "g/L",
+          "code": "g/L",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 120,
+              "code": "g/L",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 160,
+              "code": "g/L",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-3-0",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*3/uL",
+          "code": "10*3/uL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-3-1",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*3/uL",
+          "code": "10*3/uL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-3-2",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*3/uL",
+          "code": "10*3/uL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-3-3",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*3/uL",
+          "code": "10*3/uL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-3-4",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*3/uL",
+          "code": "10*3/uL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-3-5",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*3/uL",
+          "code": "10*3/uL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-3-6",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*3/uL",
+          "code": "10*3/uL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-3-7",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*3/uL",
+          "code": "10*3/uL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-3-8",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*3/uL",
+          "code": "10*3/uL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-3-9",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*3/uL",
+          "code": "10*3/uL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-3-10",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*3/uL",
+          "code": "10*3/uL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-3-11",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*3/uL",
+          "code": "10*3/uL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-3-12",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*3/uL",
+          "code": "10*3/uL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-3-13",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*3/uL",
+          "code": "10*3/uL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-3-14",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*3/uL",
+          "code": "10*3/uL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-3-15",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*3/uL",
+          "code": "10*3/uL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-3-16",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*3/uL",
+          "code": "10*3/uL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-3-17",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*3/uL",
+          "code": "10*3/uL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-3-18",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*3/uL",
+          "code": "10*3/uL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-3-19",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*3/uL",
+          "code": "10*3/uL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-4-0",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*6",
+          "code": "10*6",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-4-1",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*6",
+          "code": "10*6",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-4-2",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 5.6,
+          "unit": "10*6",
+          "code": "10*6",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 10,
+              "code": "10*3/uL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-5-0",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": "not-a-number",
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 11,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 15,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-6-0",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": []
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-6-1",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": []
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-7-0",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "urn:example:lis-tests",
+              "code": "LIS-HB"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-7-1",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "urn:example:lis-tests",
+              "code": "LIS-HB"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "synthetic-7-2",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "urn:example:lis-tests",
+              "code": "LIS-HB"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 14.0,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 12,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "high": {
+              "value": 16,
+              "code": "g/dL",
+              "system": "http://unitsofmeasure.org"
+            },
+            "text": "SYNTHETIC interval, not clinical evidence"
+          }
+        ]
+      }
+    }
+  ]
+}

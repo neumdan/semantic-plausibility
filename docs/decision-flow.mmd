@@ -1,0 +1,37 @@
+%% Same node/edge contract as decision-flow.svg.
+flowchart TD
+    INPUT["Input contract + selected profile<br/>Valid headers/types, frequency contract, versions, full reference/context guards<br/>Unsupported/malformed contracts fail with a redacted audit; valid rows continue"]
+    LOOKUP["Validate declared code/system and unit/system<br/>Use only the configured source and edition; no default remote fallthrough"]
+    INVALID["Confirmed invalid<br/>Keep deterministic error<br/>Assess remaining fields"]
+    KNOWN["Verified code / unit<br/>Identity or syntax supported<br/>Still check semantic fit"]
+    UNKNOWN["Not verified<br/>Missing source/version/context<br/>Unavailable is not invalid"]
+    FIT["Check LOINC axes / example units and supplied context<br/>Unit syntax alone cannot prove code-unit fit; examples are not a universal whitelist"]
+    MATCH["Documented unchanged fit<br/>Continue to values/references<br/>Clinical applicability remains<br/>a separate review question"]
+    CONVERT["Verified linear conversion<br/>Propose target + numeric factor<br/>Check each reference bound too<br/>Never rewrite source values"]
+    AMBIG["Ambiguous / mismatch<br/>10*6 without a denominator<br/>First example is a candidate<br/>No guessed transformation"]
+    RESEARCH["Optional local research pass<br/>Catalogue → local model → quoted lookup pages → bounded PubMed candidates<br/>Schema/source validation; missing evidence remains unresolved"]
+    NUMERIC["Values and reference metadata<br/>Finite numbers, ordered bounds, supplied units and interval context<br/>Out-of-reference is descriptive; it is not automatically a data error<br/>Evidence of clinical plausibility requires method/population review"]
+    OUTPUT["Write separate checks, credibility and explicit readiness denominators<br/>Priority: error → unclear → suggestion → passed<br/>Readiness is a numeric semantic proxy, not MII certification or clinical approval"]
+    REVIEW["Expert adjudication → approved site mapping → formal FHIR validation<br/>Patient Observations are never generated from aggregate means"]
+    INPUT --> LOOKUP
+    LOOKUP --> INVALID
+    LOOKUP --> KNOWN
+    LOOKUP --> UNKNOWN
+    INVALID --> FIT
+    KNOWN --> FIT
+    UNKNOWN --> FIT
+    FIT --> MATCH
+    FIT --> CONVERT
+    FIT --> AMBIG
+    MATCH --> RESEARCH
+    CONVERT --> RESEARCH
+    AMBIG --> RESEARCH
+    RESEARCH --> NUMERIC
+    NUMERIC --> OUTPUT
+    OUTPUT --> REVIEW
+    classDef normal fill:#f3f7fa,stroke:#c4d5df,color:#142d42
+    class INPUT,LOOKUP,UNKNOWN,FIT,CONVERT,AMBIG,NUMERIC,REVIEW normal
+    classDef teal fill:#eef7f4,stroke:#a8cfc6,color:#142d42
+    class KNOWN,MATCH,RESEARCH,OUTPUT teal
+    classDef error fill:#fcf1f3,stroke:#ecc7cf,color:#142d42
+    class INVALID error

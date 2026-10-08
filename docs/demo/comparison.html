@@ -1,0 +1,60 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Export comparison</title><style>body{font:16px/1.6 system-ui;color:#142d42;max-width:1000px;margin:40px auto;padding:20px}pre{white-space:pre-wrap}</style><h1>LIS → FHIR → CDS Hub export comparison</h1><p>Matched cohort/period is declared by the operator. This compares semantic groups and available value frequencies.</p><p><a href="comparison.csv">Detailed comparison CSV</a></p><pre>{
+  &quot;scope&quot;: &quot;matched_export_group_and_value_frequency_comparison&quot;,
+  &quot;study&quot;: {
+    &quot;cohort&quot;: &quot;synthetic-cohort-v1&quot;,
+    &quot;period_start&quot;: &quot;2026-01-01&quot;,
+    &quot;period_end&quot;: &quot;2026-01-31&quot;,
+    &quot;source_label&quot;: &quot;lis&quot;
+  },
+  &quot;cohort_equivalence&quot;: &quot;operator_declared_not_independently_proven&quot;,
+  &quot;comparisons&quot;: [
+    {
+      &quot;target&quot;: &quot;fhir&quot;,
+      &quot;baseline_groups&quot;: 7,
+      &quot;target_groups&quot;: 7,
+      &quot;shared_groups&quot;: 7,
+      &quot;missing_or_changed_context&quot;: 0,
+      &quot;added_or_changed_context&quot;: 0,
+      &quot;baseline_group_coverage&quot;: {
+        &quot;numerator&quot;: 7,
+        &quot;denominator&quot;: 7,
+        &quot;ratio&quot;: 1.0
+      },
+      &quot;changed_value_distributions&quot;: 0,
+      &quot;changed_known_frequencies&quot;: 0,
+      &quot;exact_value_comparison_unavailable&quot;: 1,
+      &quot;target_readiness&quot;: {
+        &quot;numerator&quot;: 3,
+        &quot;denominator&quot;: 7,
+        &quot;ratio&quot;: 0.42857142857142855
+      }
+    },
+    {
+      &quot;target&quot;: &quot;cds-hub-demo&quot;,
+      &quot;baseline_groups&quot;: 7,
+      &quot;target_groups&quot;: 7,
+      &quot;shared_groups&quot;: 6,
+      &quot;missing_or_changed_context&quot;: 1,
+      &quot;added_or_changed_context&quot;: 1,
+      &quot;baseline_group_coverage&quot;: {
+        &quot;numerator&quot;: 6,
+        &quot;denominator&quot;: 7,
+        &quot;ratio&quot;: 0.8571428571428571
+      },
+      &quot;changed_value_distributions&quot;: 1,
+      &quot;changed_known_frequencies&quot;: 1,
+      &quot;exact_value_comparison_unavailable&quot;: 1,
+      &quot;target_readiness&quot;: {
+        &quot;numerator&quot;: 3,
+        &quot;denominator&quot;: 7,
+        &quot;ratio&quot;: 0.42857142857142855
+      }
+    }
+  ],
+  &quot;limitations&quot;: [
+    &quot;No patient/event linkage is reconstructed from distinct exports&quot;,
+    &quot;A missing semantic signature may reflect changed qualifiers/references rather than a lost observation&quot;,
+    &quot;Summary-only, invalid, missing or censored values cannot prove exact value congruence&quot;,
+    &quot;Numeric frequency agreement does not prove patient/event correspondence&quot;
+  ]
+}</pre></html>

@@ -1,0 +1,23 @@
+{
+  "resourceType": "ConceptMap",
+  "url": "urn:example:lis-to-loinc",
+  "version": "synthetic-1",
+  "status": "draft",
+  "group": [
+    {
+      "source": "urn:example:lis-tests",
+      "target": "http://loinc.org",
+      "element": [
+        {
+          "code": "LIS-HB",
+          "target": [
+            {
+              "code": "718-7",
+              "equivalence": "equivalent"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

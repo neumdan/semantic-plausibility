@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1450" viewBox="0 0 1100 1450" role="img" aria-labelledby="title desc">
+<title id="title">Laboratory decisions — evidence, numeric checks and review</title><desc id="desc">Input contract + selected profile; Validate declared code/system and unit/system; Confirmed invalid; Verified code / unit; Not verified; Check LOINC axes / example units and supplied context; Documented unchanged fit; Verified linear conversion; Ambiguous / mismatch; Optional local research pass; Values and reference metadata; Write separate checks, credibility and explicit readiness denominators; Expert adjudication → approved site mapping → formal FHIR validation</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#537487"/></marker></defs>
+<style>text{font-family:Arial,sans-serif;fill:#142d42}.heading{font-size:19px;font-weight:700}.body{font-size:17px}.label{font-size:14px;fill:#526978}</style><rect width="1100" height="100%" fill="white"/>
+<g data-node="INPUT"><rect x="130" y="20" width="840" height="106" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="146" y="49" class="heading">Input contract + selected profile</text>
+<text x="146" y="77" class="body">Valid headers/types, frequency contract, versions, full reference/context guards</text>
+<text x="146" y="102" class="body">Unsupported/malformed contracts fail with a redacted audit; valid rows continue</text>
+</g>
+<g data-node="LOOKUP"><rect x="130" y="185" width="840" height="82" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="146" y="214" class="heading">Validate declared code/system and unit/system</text>
+<text x="146" y="242" class="body">Use only the configured source and edition; no default remote fallthrough</text>
+</g>
+<g data-node="INVALID"><rect x="20" y="320" width="330" height="106" rx="9" fill="#fcf1f3" stroke="#ecc7cf"/>
+<text x="36" y="349" class="heading">Confirmed invalid</text>
+<text x="36" y="377" class="body">Keep deterministic error</text>
+<text x="36" y="402" class="body">Assess remaining fields</text>
+</g>
+<g data-node="KNOWN"><rect x="385" y="320" width="330" height="106" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="401" y="349" class="heading">Verified code / unit</text>
+<text x="401" y="377" class="body">Identity or syntax supported</text>
+<text x="401" y="402" class="body">Still check semantic fit</text>
+</g>
+<g data-node="UNKNOWN"><rect x="750" y="320" width="330" height="106" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="766" y="349" class="heading">Not verified</text>
+<text x="766" y="377" class="body">Missing source/version/context</text>
+<text x="766" y="402" class="body">Unavailable is not invalid</text>
+</g>
+<g data-node="FIT"><rect x="130" y="485" width="840" height="82" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="146" y="514" class="heading">Check LOINC axes / example units and supplied context</text>
+<text x="146" y="542" class="body">Unit syntax alone cannot prove code-unit fit; examples are not a universal whitelist</text>
+</g>
+<g data-node="MATCH"><rect x="20" y="620" width="330" height="132" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="36" y="649" class="heading">Documented unchanged fit</text>
+<text x="36" y="677" class="body">Continue to values/references</text>
+<text x="36" y="702" class="body">Clinical applicability remains</text>
+<text x="36" y="727" class="body">a separate review question</text>
+</g>
+<g data-node="CONVERT"><rect x="385" y="620" width="330" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="401" y="649" class="heading">Verified linear conversion</text>
+<text x="401" y="677" class="body">Propose target + numeric factor</text>
+<text x="401" y="702" class="body">Check each reference bound too</text>
+<text x="401" y="727" class="body">Never rewrite source values</text>
+</g>
+<g data-node="AMBIG"><rect x="750" y="620" width="330" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="766" y="649" class="heading">Ambiguous / mismatch</text>
+<text x="766" y="677" class="body">10*6 without a denominator</text>
+<text x="766" y="702" class="body">First example is a candidate</text>
+<text x="766" y="727" class="body">No guessed transformation</text>
+</g>
+<g data-node="RESEARCH"><rect x="130" y="815" width="840" height="106" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="146" y="844" class="heading">Optional local research pass</text>
+<text x="146" y="872" class="body">Catalogue → local model → quoted lookup pages → bounded PubMed candidates</text>
+<text x="146" y="897" class="body">Schema/source validation; missing evidence remains unresolved</text>
+</g>
+<g data-node="NUMERIC"><rect x="130" y="980" width="840" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="146" y="1009" class="heading">Values and reference metadata</text>
+<text x="146" y="1037" class="body">Finite numbers, ordered bounds, supplied units and interval context</text>
+<text x="146" y="1062" class="body">Out-of-reference is descriptive; it is not automatically a data error</text>
+<text x="146" y="1087" class="body">Evidence of clinical plausibility requires method/population review</text>
+</g>
+<g data-node="OUTPUT"><rect x="130" y="1175" width="840" height="106" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="146" y="1204" class="heading">Write separate checks, credibility and explicit readiness denominators</text>
+<text x="146" y="1232" class="body">Priority: error → unclear → suggestion → passed</text>
+<text x="146" y="1257" class="body">Readiness is a numeric semantic proxy, not MII certification or clinical approval</text>
+</g>
+<g data-node="REVIEW"><rect x="130" y="1340" width="840" height="82" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="146" y="1369" class="heading">Expert adjudication → approved site mapping → formal FHIR validation</text>
+<text x="146" y="1397" class="body">Patient Observations are never generated from aggregate means</text>
+</g>
+<path data-edge="INPUT-LOOKUP" d="M550 126 V182" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="LOOKUP-INVALID" d="M550 267 V295 H185 V317" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="LOOKUP-KNOWN" d="M550 267 V317" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="LOOKUP-UNKNOWN" d="M550 267 V295 H915 V317" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="INVALID-FIT" d="M185 426 V455 H550 V482" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="KNOWN-FIT" d="M550 426 V482" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="UNKNOWN-FIT" d="M915 426 V455 H550 V482" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="FIT-MATCH" d="M550 567 V595 H185 V617" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="FIT-CONVERT" d="M550 567 V617" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="FIT-AMBIG" d="M550 567 V595 H915 V617" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="MATCH-RESEARCH" d="M185 752 V785 H550 V812" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="CONVERT-RESEARCH" d="M550 752 V812" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="AMBIG-RESEARCH" d="M915 752 V785 H550 V812" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="RESEARCH-NUMERIC" d="M550 921 V977" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="NUMERIC-OUTPUT" d="M550 1112 V1172" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="OUTPUT-REVIEW" d="M550 1281 V1337" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+</svg>

@@ -1,0 +1,14 @@
+semantic-plausibility
+
+The initial semantic checking kernel and terminology inventory were extracted
+from the Apache-2.0 licensed INTERPOLAR quality_control component at commit
+eaf1747a, then adapted into an independent src-layout Python project.
+No INTERPOLAR runtime, private data, access credentials or patient extracts
+are included. The original license is retained in LICENSE.
+Terminology catalogs and implementation guides retain their own licenses.
+
+The unchanged public MII ObservationLab 2026.0.3 profile snapshot in
+examples/profiles is attributed to Medizininformatik-Initiative and its authors,
+under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).
+Source: https://github.com/medizininformatik-initiative/kerndatensatzmodul-labor
+Package: de.medizininformatikinitiative.kerndatensatz.laborbefund#2026.0.3

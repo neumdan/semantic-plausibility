@@ -1,0 +1,7 @@
+{
+  "resource_type": "Observation",
+  "relation": "audit.fhir_observations",
+  "fields": {
+    "resource_json": "resource"
+  }
+}

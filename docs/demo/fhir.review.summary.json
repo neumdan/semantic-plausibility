@@ -1,0 +1,107 @@
+{
+  "format_version": 1,
+  "run_id": "c675387d-f3f7-40a5-97a5-95672694f89e",
+  "mode": "distinct",
+  "software": {
+    "semantic_plausibility": "0.9.1",
+    "python": "3.14.8",
+    "libraries": {
+      "duckdb": "1.5.6",
+      "psycopg": "3.3.6",
+      "psycopg-binary": "3.3.6"
+    }
+  },
+  "configuration_sha256": "db41efe03d19fa41fecfbfc17264ae1188f0bb29040e09d0e5a4ec45ea32db4a",
+  "input_sha256": "7a40d570a4593cfb6da7ba1bed650fa4227f7d44053ac11c68c9f289a4423920",
+  "reference_pack_sha256": "ea8a090b1f92045f4106a8299c2adf5716c7a3ed6499291cbbce8d36dbc45843",
+  "reference_artifacts": [
+    {
+      "role": "reference_pack",
+      "sha256": "9b041a765b73a8190b1ee43cbcf73ae40ca705efc5b7922072565b2ede23365c",
+      "files": 1
+    },
+    {
+      "role": "concept_map",
+      "sha256": "ae6622858d7e45809456a28f6f78dd482bfe4968f1a6f8a433765534305e07ea",
+      "files": 1
+    },
+    {
+      "role": "lookup:local",
+      "sha256": "842e3e7f0abafa4b33132835111425dfa692aca8c28e91d8602be3322dd99241",
+      "files": 1
+    }
+  ],
+  "evidence_kind": "synthetic_fixture_not_official_evidence",
+  "synthetic_demo": true,
+  "network_mode": "offline",
+  "input_records": 84,
+  "selected_items": 84,
+  "output_rows": 7,
+  "skipped_resources": 0,
+  "accounting": {
+    "individual_records": 84,
+    "distinct_records": 0,
+    "known_source_occurrences": 84,
+    "unknown_frequency_records": 0,
+    "semantic_items_seen": 84
+  },
+  "statuses": {
+    "passed": 2,
+    "error": 1,
+    "unclear": 3,
+    "suggestion": 1
+  },
+  "metrics": {
+    "mii_numeric_set_ready": {
+      "numerator": 3,
+      "denominator": 7,
+      "ratio": 0.42857142857142855
+    },
+    "code_verified": {
+      "numerator": 7,
+      "denominator": 7,
+      "ratio": 1.0
+    },
+    "unit_verified": {
+      "numerator": 7,
+      "denominator": 7,
+      "ratio": 1.0
+    },
+    "value_numeric_ready": {
+      "numerator": 6,
+      "denominator": 7,
+      "ratio": 0.8571428571428571
+    },
+    "reference_numeric_ready": {
+      "numerator": 5,
+      "denominator": 7,
+      "ratio": 0.7142857142857143
+    }
+  },
+  "weighted_readiness": {
+    "numerator": 75,
+    "denominator": 84,
+    "ratio": 0.8928571428571429
+  },
+  "readiness_definition": "Selected quantitative laboratory groups with an explicit valid LOINC coding, explicit valid UCUM unit code, documented unchanged or verified linearly convertible code-unit fit, finite ordered value/bounds, at least one numerically valid reference interval, and no deterministic error, ambiguous LOINC identity or uninterpreted modifier. This numeric semantic readiness proxy is not MII/FDPG certification, full FHIR validation or clinical plausibility.",
+  "full_fhir_validation": "not_performed",
+  "clinical_value_and_reference_evidence": "not_established_by_numeric_checks",
+  "study": {
+    "cohort": "synthetic-cohort-v1",
+    "period_start": "2026-01-01",
+    "period_end": "2026-01-31",
+    "source_label": "fhir"
+  },
+  "export_manifest": {},
+  "specification": {
+    "FHIR_VERSION": "4.0.1",
+    "PROFILE": "fhir-r4-lab"
+  },
+  "lookup_errors": [],
+  "imported_profile": null,
+  "elapsed_seconds": 0.046,
+  "output_hashes": {
+    "fhir.review.csv": "56a924a13074c42f01a30403df3fd0b0e6f1645a7b48b722e21b060d4c79939a",
+    "fhir.review.evidence.jsonl": "2d07b8fdbb6a3f1e2cfbd6d8985f8f79ae94d2e117fb6eb5433e5bb23b575a69"
+  }
+}

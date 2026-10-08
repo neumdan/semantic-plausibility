@@ -1,0 +1,46 @@
+"""Build the compact English guide; detailed contracts live in the linked references."""
+
+from pathlib import Path
+
+DOCS = Path(__file__).resolve().parents[1] / "docs"
+HTML = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:;">
+<title>Laboratory Semantic Review · Quick guide</title>
+<style>
+:root{--ink:#142d42;--muted:#526978;--teal:#176c63;--line:#d5e1e8}*{box-sizing:border-box}body{margin:0;background:#f4f7f9;color:var(--ink);font:16px/1.6 system-ui,sans-serif}header,main,footer{max-width:1060px;margin:auto;padding:24px}header{padding-top:42px}h1{font-size:clamp(30px,5vw,44px);line-height:1.15}h2{font-size:25px;line-height:1.25}a{color:var(--teal)}nav{display:flex;gap:18px;flex-wrap:wrap}section{background:white;border:1px solid var(--line);border-radius:8px;padding:24px;margin-bottom:20px;scroll-margin-top:18px}pre{background:#142d42;color:#f4f7f9;padding:16px;border-radius:5px;overflow:auto}code,pre{font:14px/1.6 ui-monospace,monospace}p code,li code,td code{background:#eef4f6;padding:2px 4px}table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}th{background:#eef5f4}.scroll{overflow:auto}.note{border-left:3px solid var(--teal);padding:12px;background:#eef7f4}.small,footer{color:var(--muted);font-size:14px}figure{margin:12px 0}img{width:100%;height:auto}figcaption{color:var(--muted);font-size:14px}details{border-top:1px solid var(--line);padding:14px 0}summary{cursor:pointer;font-weight:600}@media(max-width:600px){header,main,footer,section{padding:18px}}
+</style></head><body>
+<header><p class="small">Local Python library · laboratory exports · expert review</p><h1>Export. Check. Review.</h1><p>Code, unit, value and reference range become a documented laboratory set. The runner writes local findings and proposals; physicians decide which changes to apply.</p><nav><a href="#start">Run</a><a href="#input">Your data</a><a href="#architecture">Pipeline</a><a href="#output">Results</a><a href="#terminology">Options</a></nav></header>
+<main>
+<section id="start"><h2>1. Run the offline example</h2><pre>uv sync --locked --no-editable
+uv run --no-sync plausibility batch --config pipeline.example.toml</pre><p>Open <code>output/laboratory-export-review.html</code>. The runner exits after writing its CSV, HTML, summary, evidence and audit log. No model is needed.</p><p class="note"><strong>Synthetic example:</strong> 8 rows representing 84 occurrences → 7 review groups. Expected: 2 passed, 1 suggestion, 3 unclear, 1 error. <a href="demo/lis.review.html">View the generated report</a>.</p><details><summary>Use Podman instead</summary><pre>cp .env.example .env
+mkdir -p local output
+podman compose run --rm --build runner</pre><p>Install Podman and a Compose provider; start the configured machine on macOS/Windows. <a href="shipped-stack.md">Setup, secrets and disconnected operation</a>.</p></details><p class="small">Installation needs internet or prepared dependencies. Runtime defaults to offline. Repeated runs protect existing reports; change the output filename.</p></section>
+
+<section id="input"><h2>2. Configure your export</h2><ol><li>Copy <a href="../pipeline.example.toml">pipeline.example.toml</a> to <code>pipeline.toml</code>.</li><li>Set the source and map its actual fields.</li><li>Replace the synthetic reference pack/ConceptMap with reviewed evidence, or remove them and explicitly enable lookup sources.</li><li>Select the deployed profile rules and an output filename.</li></ol><div class="scroll"><table><tr><th>Input</th><th>Setting</th></tr><tr><td>LIS / database CSV</td><td><code>type="csv"</code>; map headers</td></tr><tr><td>FHIR R4 Bundle / NDJSON</td><td><code>type="fhir_file"</code>; native Observation fields</td></tr><tr><td>PostgreSQL view / SQLite export</td><td><code>type="postgres"</code> / <code>"sqlite"</code>; explicit table/columns</td></tr></table></div><p><code>code + code_system + value/bounds + unit + unit_system + full reference set</code> is the shared input. Preserve versions, comparators, specimen, method and interval qualifiers.</p><p id="configuration"><strong>Individual</strong> rows count once; <strong>distinct</strong> rows use their real source frequency. Unknown counts stay unknown. Default output groups values per guarded set; <code>items</code> keeps IDs and needs individual input.</p><pre>uv run --no-sync plausibility batch --config pipeline.toml</pre><p><a href="configuration.md">Source/profile configuration</a> · <a href="data-contract.md">Exact field and output contract</a>. For secrets add <code>--env-file .env</code> before <code>plausibility</code>.</p></section>
+
+<section id="architecture"><h2>3. Follow the pipeline</h2><figure><img src="architecture.svg" alt="Read-only export adapters, guarded DuckDB grouping, semantic checks and local review reports"><figcaption>Validate input → preserve laboratory meaning → group in DuckDB → check configured evidence → write auditable proposals.</figcaption></figure><details id="decisions"><summary>Decision flow: what passes, what needs review?</summary><figure><img src="decision-flow.svg" alt="Invalid data is an error; known units are checked for fit; unknown evidence remains unresolved; proposals require review"></figure></details><details><summary>Where LIS, FHIR and CDS Hub fit</summary><figure><img src="batch-flow.svg" alt="LIS, FHIR, CDS Hub and CSV exports converge on the same semantic set"></figure><p>FHIR server selection happens upstream through TORCH/CRTDL or supported CQL. A LIS API likewise produces an export. The same checks apply to each representation.</p></details><p id="quality"><a href="mii-quality.md">Placement alongside MII FHIR Validator and FDE</a>: formal conformance, availability and semantic plausibility have separate scopes.</p></section>
+
+<section id="output"><h2>4. Read and review the findings</h2><div class="scroll"><table><tr><th>Status</th><th>Meaning</th></tr><tr><td><code>passed</code></td><td>Assessed checks supported</td></tr><tr><td><code>suggestion</code></td><td>Documented mapping/transformation needs approval</td></tr><tr><td><code>unclear</code></td><td>Evidence or a unique interpretation is missing</td></tr><tr><td><code>error</code></td><td>Deterministic inconsistency found</td></tr></table></div><p id="cases"><code>g/L → g/dL</code> can propose a verified factor of 0.1. An ambiguous <code>10*6</code> cannot acquire an invented denominator/factor. A value outside its supplied reference range is shown separately from coding validity. <a href="studies.md">All synthetic cases and study protocol</a>.</p><p><code>mii_numeric_set_ready</code> requires verified LOINC–UCUM fit and numeric value/reference completeness. The example yields <strong>3/7 groups</strong>, or <strong>75/84 represented occurrences</strong>. This is not clinical approval or full MII conformance; credibility labels are evidence categories, not probabilities.</p><p>Keep the original report. Physicians enter decisions in the expert columns of a <strong>separate CSV copy</strong>. Verify original artifacts with:</p><pre>plausibility verify output/laboratory-export-review.audit.jsonl</pre><p id="studies"><a href="demo/comparison.html">View the synthetic LIS → FHIR → database comparison</a>. Matching cohort, period and selection is required.</p></section>
+
+<section id="terminology"><h2>5. Add only what you need</h2><div class="scroll"><table><tr><th>Option</th><th>Guide</th></tr><tr><td>Local lists, installed artifacts, NLM/LOINC or your terminology server</td><td><a href="lookups.md">Lookup configuration and catalogues</a></td></tr><tr><td id="model">Catalogue spelling, quoted lookup pages, PubMed candidates through a local model</td><td><a href="research.md">Optional research</a></td></tr><tr><td id="library">Library API, module map, locked versions, audit and testing</td><td><a href="implementation.md">Implementation</a></td></tr></table></div><p>Research is off by default. Only configured APIs and local/LAN models are used. Broad web/deep-search orchestration, medication and diagnosis are future work.</p><p class="small"><a href="../README.md">README</a> · <a href="test-results.json">Verification record</a>. Detailed reports can contain sensitive measurements; removing IDs is not anonymisation.</p></section>
+</main><footer>Laboratory Semantic Review · Apache-2.0 · separate terminology/model licences · local reports and physician review</footer></body></html>
+"""
+
+
+def main():
+    (DOCS / "index.html").write_text(HTML, encoding="utf-8")
+    for name, section in (("multi-source-proposal.html", "terminology"), ("shipped-stack.html", "start")):
+        target = "index.html#" + section
+        (DOCS / name).write_text(
+            '<!doctype html><html lang="en"><meta charset="utf-8">'
+            '<meta http-equiv="refresh" content="0;url=' + target + '">'
+            '<title>Laboratory Semantic Review</title><p><a href="'
+            + target
+            + '">Open the current guide</a></p></html>',
+            encoding="utf-8",
+        )
+
+
+if __name__ == "__main__":
+    main()

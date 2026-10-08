@@ -1,0 +1,63 @@
+name: semantic-plausibility-stack
+
+# Runtime configuration: pipeline.toml. Credentials: .env or local/ secret files.
+# Portable CPU setup; optional Linux GPU overlay: compose.gpu.yaml.
+x-runner: &runner
+  image: semantic-plausibility-stack:0.9.1
+  build:
+    context: .
+    dockerfile: deploy/Dockerfile
+    args: {INSTALL_POSTGRES: "1"}
+  env_file: .env
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs: [/tmp]
+  volumes:
+    - ./${SQC_CONFIG_FILE:-pipeline.example.toml}:/app/pipeline.toml:ro
+    - ./examples:/app/examples:ro
+    - ./local:/app/local:ro
+    - ./output:/app/output
+  restart: "no"
+
+services:
+  runner:
+    <<: *runner
+    command: ["batch", "--config", "/app/pipeline.toml"]
+  model-init:
+    <<: *runner
+    command: ["model-init", "--config", "/app/pipeline.toml"]
+    profiles: [research]
+    depends_on:
+      ollama: {condition: service_healthy}
+  catalog-init:
+    <<: *runner
+    command: ["catalog-init", "--config", "/app/pipeline.toml"]
+    profiles: [research]
+    volumes:
+      - ./${SQC_CONFIG_FILE:-pipeline.example.toml}:/app/pipeline.toml:ro
+      - ./examples:/app/examples:ro
+      - ./local:/app/local
+      - ./output:/app/output
+  ollama:
+    profiles: [research]
+    image: ${OLLAMA_IMAGE:-docker.io/ollama/ollama:0.34.1}
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_CONTEXT_LENGTH: 8192
+      OLLAMA_NUM_PARALLEL: 1
+      OLLAMA_MAX_LOADED_MODELS: 1
+      OLLAMA_KEEP_ALIVE: 2m
+      OLLAMA_NO_CLOUD: "true"
+    volumes: ["ollama_models:/root/.ollama"]
+    ports: ["127.0.0.1:${SQC_OLLAMA_PORT:-11434}:11434"]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  ollama_models:

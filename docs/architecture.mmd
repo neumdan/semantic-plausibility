@@ -1,0 +1,29 @@
+%% Same node/edge contract as architecture.svg.
+flowchart TD
+    INPUT["Hospital export boundary<br/>LIS / FHIR / CDS Hub → files/view<br/>TORCH/CQL or SQL selection upstream<br/>Matched scope + export manifest"]
+    CONFIG["TOML + secrets<br/>Columns / native element mapping<br/>Pinned R4 / selected profile rules<br/>Grouping + distinct or items mode<br/>Explicit local or remote sources"]
+    NORMAL["Validate and standardise<br/>Codes + units + values + references<br/>Preserve versions/context; no rewrite"]
+    GROUP["Embedded DuckDB grouping<br/>Distinct: complete guarded sets<br/>Known counts → mean/SE, median/IQR<br/>Items: retain ID / component path"]
+    REF["Local reference evidence<br/>Pack: UCUM + LOINC + factors<br/>CodeSystem / ValueSet artifacts<br/>Versioned CSV / SQLite lists<br/>Default offline; no HTTP fallback<br/>Optional explicitly enabled APIs"]
+    CHECK["Shared laboratory check kernel<br/>Exact lookup → fit → numeric bounds<br/>Transformations need verified factors<br/>Unknown evidence stays unknown<br/>Every partial finding stays visible"]
+    RESEARCH["Optional research module<br/>Local model only<br/>Catalogue spelling candidates<br/>Quoted terminology pages<br/>Bounded PubMed abstracts<br/>Expert applicability required"]
+    QC["Other MII quality checks<br/>FHIR Validator: conformance<br/>FDE: availability/completeness<br/>Separate scopes and outputs"]
+    OUTPUT["Local review artifacts<br/>CSV + HTML + summary + evidence<br/>Terminology credibility / readiness<br/>Suggested mapping / transformation<br/>Chained log + hashes + versions"]
+    STUDY["Matched export studies<br/>LIS ↔ FHIR ↔ CDS Hub<br/>Groups + known frequencies<br/>Context changes / loss candidates"]
+    EXPERT["Laboratory physician review<br/>Approve proposals in a separate copy<br/>Apply/revalidate in the site ETL"]
+    INPUT --> NORMAL
+    CONFIG --> NORMAL
+    NORMAL --> GROUP
+    GROUP --> CHECK
+    REF --> CHECK
+    CHECK -.-> |"optional"| RESEARCH
+    CHECK --> OUTPUT
+    RESEARCH -.-> |"candidate evidence"| OUTPUT
+    OUTPUT --> STUDY
+    OUTPUT --> EXPERT
+    QC -.-> |"complementary"| EXPERT
+    classDef normal fill:#f3f7fa,stroke:#c4d5df,color:#142d42
+    class INPUT,CONFIG,NORMAL,GROUP,REF,CHECK,QC,STUDY normal
+    classDef teal fill:#eef7f4,stroke:#a8cfc6,color:#142d42
+    class RESEARCH,OUTPUT,EXPERT teal
+    classDef error fill:#fcf1f3,stroke:#ecc7cf,color:#142d42

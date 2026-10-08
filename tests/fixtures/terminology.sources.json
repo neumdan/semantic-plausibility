@@ -1,0 +1,13 @@
+{
+  "sources": [
+    {
+      "kind": "csv",
+      "systems": [
+        "https://example.org/CodeSystem/lis",
+        "http://fhir.de/CodeSystem/bfarm/atc"
+      ],
+      "path": "terminology.synthetic.csv",
+      "complete": false
+    }
+  ]
+}

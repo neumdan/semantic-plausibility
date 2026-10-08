@@ -1,0 +1,56 @@
+# Run this synthetic offline example, or copy it to pipeline.toml for your export.
+# Paths are relative to this file. Optional database/model setup: docs/.
+config_version = 3
+
+[general]
+PROJECT_NAME = "laboratory-export-review"
+RESOURCE_TYPE = "Observation"
+
+[input]
+type = "csv"
+origin = "lis"
+path = "examples/studies/lis.distinct.csv"
+granularity = "distinct"              # Already grouped rows; count supplies their frequency.
+manifest = "examples/studies/lis.manifest.json" # DEMO counts: replace/remove for your export.
+snapshot = "examples/studies/reference-pack.synthetic.json" # DEMO: replace for real data.
+
+[input.columns]                       # Left: semantic role. Right: your column name.
+code = "code"
+code_system = "code_system"
+value = "value"
+unit = "unit"
+unit_code = "unit_code"
+unit_system = "unit_system"
+count = "count"                        # Omit if source frequency is unknown.
+reference_ranges_json = "reference_ranges_json"
+specimen = "specimen"                  # Resolved LOINC axis, e.g. Bld; not a SNOMED code.
+source_test = "source_test"
+status = "status"
+
+[specification]
+FHIR_VERSION = "4.0.1"
+PROFILE = "fhir-r4-lab"                 # Selected semantic rules; no full FHIR validation.
+
+[network]
+mode = "offline"                       # Local evidence only; no remote fallback.
+
+[lookups.local_codes]
+enabled = true
+type = "csv"
+path = "examples/studies/local-codes.csv"
+systems = ["urn:example:lis-tests"]
+complete = false                       # A missing code in a partial list stays unknown.
+
+[quality]
+concept_map = "examples/studies/conceptmap.synthetic.json" # DEMO mapping candidates only.
+
+[study]                               # Match these declarations when comparing sources.
+cohort = "synthetic-cohort-v1"
+period_start = "2026-01-01"
+period_end = "2026-01-31"
+source_label = "lis"
+
+[output]
+mode = "distinct"                      # "items" keeps IDs; requires individual input.
+path = "output/laboratory-export-review.csv"
+# Also writes HTML, summary, evidence and audit files. Existing reports are protected.

@@ -1,0 +1,24 @@
+{
+  "resource_type": "Observation",
+  "profile": "fhir-r4-lab",
+  "relation": "audit.lab_observations",
+  "fields": {
+    "id": "observation_id",
+    "code": "loinc_code",
+    "code_system": "code_system",
+    "unit": "unit_display",
+    "unit_code": "unit_code",
+    "unit_system": "unit_system",
+    "value": "numeric_value",
+    "range_low": "reference_low",
+    "range_high": "reference_high",
+    "range_low_code": "reference_unit",
+    "range_high_code": "reference_unit",
+    "loinc_system": "loinc_material",
+    "source_test": "local_test"
+  },
+  "defaults": {
+    "range_low_system": "http://unitsofmeasure.org",
+    "range_high_system": "http://unitsofmeasure.org"
+  }
+}

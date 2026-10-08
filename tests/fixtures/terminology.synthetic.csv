@@ -1,0 +1,3 @@
+system,code,version,display
+https://example.org/CodeSystem/lis,HB,1,Hemoglobin local test
+http://fhir.de/CodeSystem/bfarm/atc,C07AB02,,Synthetic medication example
