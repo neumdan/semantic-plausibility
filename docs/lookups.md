@@ -7,6 +7,40 @@ Two separate catalogues are supplied:
 
 The larger [KDS-derived inventory](terminologies.csv) remains available as a reference. An entry in any catalogue does **not** mean that its content is installed, freely licensed or validated by this batch runner.
 
+## Choose local files or an API
+
+Choose **per lookup**; a run can combine local labels with API validation. Laboratory input remains a separate CSV/FHIR/database export.
+
+| Route | One-time setup | Reference in TOML | During a batch |
+| --- | --- | --- | --- |
+| **A — downloaded/local data** | Download a pinned FHIR package with `package-init`, install real FHIR JSON yourself, or provide an actual CSV/SQLite catalogue | `type="fhir_artifacts"`, `"csv"` or `"sqlite"`; `path`, `systems`, `enabled=true` | Read the selected local files; no download occurs |
+| **B — API** | Choose the appropriate adapter/endpoint; obtain credentials when required | `type`, `endpoint`, `enabled=true`; `systems` for generic sources; credential environment/file references | Request and cache results from the explicitly enabled service |
+
+For A, keep installed terminology under `local/terminologies/`. A package's `[packages.NAME].path` and its `[lookups.NAME].path` must refer to the same installation. Existing FHIR artifacts need only the lookup table. CSV catalogues require `system,code`; optional `version,display` are supported. SQLite requires `codes(system,code,version,display)`.
+
+```toml
+# A: add this table after installing the selected real package.
+[lookups.loinc_de]
+enabled = true
+type = "fhir_artifacts"
+path = "local/terminologies/loinc-de-2.82.0"
+systems = ["http://loinc.org"]
+```
+
+```toml
+# B: replace the existing lookups.loinc table to select the official API.
+[lookups.loinc]
+enabled = true
+type = "loinc"
+endpoint = "https://fhir.loinc.org"
+username_env = "LOINC_FHIR_USERNAME"
+password_env = "LOINC_FHIR_PASSWORD"
+```
+
+For B, put actual credential values in ignored `.env` using those names, or use `username_file` / `password_file`. Generic FHIR sources use `token_env` / `token_file`; WHO uses client ID/secret references. Public NLM, the public FHIR test service and SemLookP need no credentials. Keep only one dedicated `type="loinc"` and one `type="ucum"` service active.
+
+**Offline or combined:** `network.mode="lookups"` permits selected APIs alongside local files. `network.mode="offline"` disables remote adapters; set `input.snapshot="local/reference-pack.json"` to reuse actual UCUM/LOINC responses, examples and verified factors. Capture this pack in a connected run with `output.lookup_pack="output/reference-pack.json"`, then transfer it with your export and any local artifacts. It covers only queries from that run; absent evidence stays unverified. A BfArM label supplement alone cannot validate arbitrary UCUM expressions or establish conversions. There is no fallback to an unconfigured API.
+
 ## Laboratory defaults
 
 | Need | Default | Configuration |
@@ -130,6 +164,6 @@ complete = false
 
 A CSV catalogue needs `system,code` and may include `version,display`. SQLite needs `codes(system,code,version,display)`. A partial list cannot prove that an absent code is invalid. Generic FHIR lookups currently support bearer tokens; the dedicated LOINC adapter supports Basic Authentication. Unsupported authentication requires an adapter or your gateway.
 
-For every enabled service, credentials must be referenced in the TOML. Put their values in `.env` or mounted secret files. Complete release imports and licence acquisition are explicit setup steps, not autonomous model tasks.
+For services requiring credentials, reference them in TOML and put their values in `.env` or mounted secret files. Complete release imports and licence acquisition are explicit setup steps, not autonomous model tasks.
 
 Catalogue documentation was reviewed on 8 October 2026. Live tests cover NLM, LOINC FHIR, BfArM public package installation and SemLookP. Protected German translation downloads and authenticated WHO lookups additionally require explicit licence acceptance/credentials and their opt-in tests; they are not claimed as tested without those prerequisites.

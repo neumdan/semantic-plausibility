@@ -17,6 +17,14 @@ Copy `pipeline.example.toml` to `pipeline.toml`. Paths are relative to that file
 
 Keep declared systems, versions, units and every reference interval. Defaults may express documented source facts; they must not invent LOINC or UCUM declarations. See the [field contract](data-contract.md) for available roles.
 
+## Select terminology evidence
+
+- **Local data:** download/install the real terminology first, then set the lookup's `type`, `path`, `systems` and `enabled=true`. `package-init` performs explicit package setup; a batch reads installed files.
+- **API:** set its `type`, `endpoint` and `enabled=true`; specify systems for generic adapters and reference credentials when required. Actual secrets belong in `.env` or `local/secrets/`.
+- **Combined:** local German labels plus NLM/LOINC API checks are selectable in the same run. For fully offline UCUM/LOINC checks also reference a captured pack in `input.snapshot` and select `network.mode="offline"`.
+
+See [the two routes with exact TOML examples](lookups.md#choose-local-files-or-an-api). The default `pipeline.example.toml` selects public APIs. `terminology.example.toml` adds optional package/API tables; extra sources remain disabled until selected. Input data, terminology evidence and report output have separate paths.
+
 ## CSV and aggregation
 
 Set `type="csv"`, map your headers, and choose:

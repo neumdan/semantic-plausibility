@@ -1,21 +1,25 @@
 %% Same node/edge contract as architecture.svg.
 flowchart TD
     INPUT["Hospital export boundary<br/>LIS / FHIR / CDS Hub → files/view<br/>TORCH/CQL or SQL selection upstream<br/>Explicit input + output selection"]
-    CONFIG["TOML + secrets<br/>Columns / native element mapping<br/>Pinned R4 / selected profile rules<br/>Grouping + distinct or items mode<br/>Explicit local or remote sources"]
+    CONFIG["TOML + secret references<br/>Map input / selected profile rules<br/>Choose local, API or both<br/>Enable sources; select editions<br/>Offline mode disables API calls"]
     NORMAL["Validate and standardise<br/>Codes + units + values + references<br/>Preserve versions/context; no rewrite"]
     GROUP["Embedded DuckDB grouping<br/>Distinct: complete guarded sets<br/>Known counts → mean/SE, median/IQR<br/>Items: retain ID / component path"]
-    REF["Real terminology sources<br/>NLM UCUM + LOINC API<br/>Pinned BfArM / FHIR packages<br/>Base codes / label supplements<br/>SemLookP names: opt-in candidates<br/>Site CSV / SQLite catalogues<br/>Real evidence; missing → unknown"]
-    CHECK["Shared laboratory check kernel<br/>Exact lookup → aliases → fit → bounds<br/>Transformations need verified factors<br/>Unknown evidence stays unknown<br/>Every partial finding stays visible"]
-    RESEARCH["Optional research module<br/>Local model only<br/>Catalogue spelling candidates<br/>Quoted terminology pages<br/>Bounded PubMed abstracts<br/>Expert applicability required"]
+    LOCAL["A · Local terminology<br/>Download once with package-init<br/>or install real JSON/CSV/SQLite<br/>Set lookup.path + systems<br/>Offline: add UCUM/LOINC pack<br/>Keep editions and file hashes"]
+    API["B · API configuration<br/>Set type, endpoint + systems<br/>Credentials: .env / secret files<br/>NLM / LOINC / own FHIR<br/>network.mode = lookups<br/>Enabled APIs called at runtime"]
+    CHECK["Same laboratory check kernel<br/>Exact code/system + alias checks<br/>UCUM syntax / LOINC unit examples<br/>Transformations: verified factors only<br/>Values / references / context<br/>Missing evidence → unverified"]
+    RESEARCH["Optional candidate evidence<br/>Local model for extraction<br/>SemLookP name candidates<br/>Quoted terminology pages<br/>Bounded PubMed abstracts<br/>Expert applicability required"]
     QC["Other MII quality checks<br/>FHIR Validator: conformance<br/>FDE: availability/completeness<br/>Separate scopes and outputs"]
-    OUTPUT["Local review artifacts<br/>CSV + HTML + summary + evidence<br/>Terminology credibility / readiness<br/>Suggested mapping / transformation<br/>Chained log + hashes + versions"]
+    OUTPUT["Local review artifacts<br/>CSV + HTML + summary + evidence<br/>Terminology credibility / readiness<br/>Suggested mapping / transformation<br/>Chained log + hashes + editions"]
     STUDY["Matched export studies<br/>LIS ↔ FHIR ↔ CDS Hub<br/>Groups + known frequencies<br/>Context changes / loss candidates"]
     EXPERT["Laboratory physician review<br/>Approve proposals in a separate copy<br/>Apply/revalidate in the site ETL"]
     INPUT --> NORMAL
     CONFIG --> NORMAL
     NORMAL --> GROUP
+    CONFIG -.-> |"setup / path"| LOCAL
+    CONFIG -.-> |"explicit selection"| API
     GROUP --> CHECK
-    REF --> CHECK
+    LOCAL --> |"local reads"| CHECK
+    API --> |"selected API calls"| CHECK
     CHECK -.-> |"optional"| RESEARCH
     CHECK --> OUTPUT
     RESEARCH -.-> |"candidate evidence"| OUTPUT
@@ -23,7 +27,7 @@ flowchart TD
     OUTPUT --> EXPERT
     QC -.-> |"complementary"| EXPERT
     classDef normal fill:#f3f7fa,stroke:#c4d5df,color:#142d42
-    class INPUT,CONFIG,NORMAL,GROUP,REF,CHECK,QC,STUDY normal
+    class INPUT,CONFIG,NORMAL,GROUP,LOCAL,API,CHECK,QC,STUDY normal
     classDef teal fill:#eef7f4,stroke:#a8cfc6,color:#142d42
     class RESEARCH,OUTPUT,EXPERT teal
     classDef error fill:#fcf1f3,stroke:#ecc7cf,color:#142d42

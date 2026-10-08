@@ -52,6 +52,8 @@ The TOML already defines `ministral-3:3b`; `.env` supplies its local URL. [Start
 
 ## German labels and other APIs
 
+Choose per lookup: **A — install/download real terminology, then reference its local `path`; B — configure an API `endpoint` and any credential references.** Both routes can be combined. The default laboratory configuration uses public APIs. [Route selection and TOML examples](docs/lookups.md#choose-local-files-or-an-api) · [Test again without overwriting earlier reports](docs/shipped-stack.md#test-again).
+
 [BfArM packages and name/API configuration](docs/lookups.md#german-packages-and-labels) add versioned German LOINC/UCUM labels locally. `package-init` installs explicitly selected editions after you accept their download conditions; ordinary batches never download packages automatically. APIs remain available alongside local artifacts.
 
 Optional SemLookP/OLS searches return name candidates for review. A separate WHO ICD-11 MMS lookup uses your OAuth credentials and a pinned release/language. The laboratory batch still assesses Observation; Condition/medication assessment is later work. [Optional configuration](terminology.example.toml).
