@@ -1,13 +1,12 @@
 config_version=3
 [general]
-PROJECT_NAME="synthetic-laboratory-study"
+PROJECT_NAME="laboratory-study-example"
 RESOURCE_TYPE="Observation"
 [input]
 type="fhir_file"
 origin="fhir"
-source_namespace="synthetic-site"
-path="../studies/fhir.bundle.json"
-snapshot="../studies/reference-pack.synthetic.json"
+source_namespace="example-site"
+path="../laboratory.bundle.json"
 granularity="individual"
 [input.context]
 loinc_system="Bld"
@@ -20,17 +19,9 @@ PROFILE="fhir-r4-lab"
 engine="duckdb"
 group_by=["code","code_system","unit","unit_system","reference_range"]
 [network]
-mode="offline"
-[lookups.local]
-enabled=true
-type="csv"
-systems=["urn:example:lis-tests"]
-path="../studies/local-codes.csv"
-complete=false
-[quality]
-concept_map="../studies/conceptmap.synthetic.json"
+mode="lookups"
 [study]
-cohort="synthetic-cohort-v1"
+cohort="example-cohort-v1"
 period_start="2026-01-01"
 period_end="2026-01-31"
 source_label="fhir"
@@ -39,3 +30,13 @@ mode="distinct"
 path="../../output/fhir.review.csv"
 include_evidence=true
 include_distribution=true
+
+[lookups.ucum]
+enabled = true
+type = "ucum"
+endpoint = "https://ucum.nlm.nih.gov/ucum-service/v1"
+
+[lookups.loinc]
+enabled = true
+type = "loinc"
+endpoint = "https://tx.fhir.org/r4"

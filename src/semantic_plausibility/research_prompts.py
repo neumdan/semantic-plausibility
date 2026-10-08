@@ -57,7 +57,7 @@ STUDY_BOUNDS = (
 
 TERMINOLOGY_CLAIMS = (
     "Copy up to ten explicit sentences about the supplied code from excerpts, including statements "
-    "about its status, display or unit. Treat the supplied code as the lookup target even if it is synthetic. "
+    "about its status, display or unit. Treat the supplied code as the lookup target without inferring an unverified identity. "
     "Return {claims:[{claim:string,excerpt:string}]}. Both the claim and its excerpt must be "
     "copied from the supplied text; the claim must occur inside the excerpt. No clinical "
     "inference. Return {claims:[]} when there is no explicit statement."

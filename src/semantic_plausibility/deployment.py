@@ -397,7 +397,7 @@ class Deployment:
             if source["kind"] == "postgres" and action in {"execute", "connections"}:
                 updates["SQC_CFG_DB_DSN"] = self.database_dsn()
             models_file = None
-            if enabled or action in {"model-init", "model-test"}:
+            if enabled or action == "model-init":
                 if selected_model not in self.data.get("models", {}):
                     raise ValueError("Unknown configured model alias")
                 row = dict(self.data["models"][selected_model])

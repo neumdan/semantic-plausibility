@@ -219,18 +219,6 @@ def initialise_model(path, *, model_alias=None, attempts=30, sleep_seconds=1, pr
         }
 
 
-def model_contract_test(path, *, model_alias=None, output=None):
-    from .model_smoke import model_test, write_model_report
-
-    deployment = load_deployment(path)
-    with deployment.prepare(model_alias=model_alias, action="model-test") as prepared:
-        destination = Path(output) if output else prepared.output / "model-test"
-        report = model_test(prepared.models_file, prepared.model_alias, destination)
-        report["configuration_sha256"] = deployment.sha256
-        write_model_report(report, destination)
-        return report
-
-
 def sync_catalogue(path):
     from .unit_catalog import sync_units
 

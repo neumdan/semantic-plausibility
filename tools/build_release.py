@@ -34,7 +34,6 @@ def public_file(path: Path, root: Path) -> bool:
     relative = path.relative_to(root)
     if (
         relative.parts[0] == "docs"
-        and relative.parts[1] != "demo"
         and relative.as_posix().removeprefix("docs/") not in PUBLIC_DOCS
     ):
         return False

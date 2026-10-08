@@ -6,7 +6,7 @@ Copy `pipeline.example.toml` to `pipeline.toml`. Paths are relative to that file
 | --- | --- |
 | `input` | CSV, FHIR file, PostgreSQL or SQLite; location and input granularity |
 | `input.columns` | Semantic role → actual CSV header / database column |
-| `input.snapshot` | Local reference evidence; the supplied pack is synthetic |
+| `input.snapshot` | Optional lookup pack captured from real services |
 | `specification` | FHIR R4 and the selected deployed profile/policy |
 | `aggregation` | Optional exact-value grouping; other semantic qualifiers are always guarded |
 | `network` / `lookups` | Offline mode or explicit terminology APIs/lists |
@@ -63,13 +63,13 @@ Put the connection string in ignored `.env`: `LAB_DB_DSN=postgresql://USER:PASSW
 
 Alternatively supply `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER_ENV`, `DB_PASSWORD_ENV` or `DB_PASSWORD_FILE`, and `DB_SSLMODE`. An explicit `PATH_TO_DB_CONFIG_TOML` reuses flat CDS Toolchain `DB_*` fields; `DB_USER_KEY`/`DB_PASSWORD_KEY` select its credential keys. Choose one connection method.
 
-SQLite uses `type="sqlite"`, `input.path="local/lab.sqlite"`, and `database.DB_TABLE="lab"`; it opens read-only. DuckDB remains the grouping engine. The [study demo](studies.md) creates a runnable synthetic SQLite example.
+SQLite uses `type="sqlite"`, `input.path="local/lab.sqlite"`, and `database.DB_TABLE="lab"`; it opens read-only. DuckDB remains the grouping engine. Supply a site-defined table/view with the same selected fields; no CDS Hub schema is assumed.
 
 ## Profile and evidence
 
 International fallback is FHIR R4. For installed MII/NUM profiles, set `specification.STRUCTURE_DEFINITION` to a resolved R4 Observation snapshot and record `IG_PACKAGE`, `IG_VERSION`, `IG_CANONICAL`. Alternatively use `PROFILE_FILE` for a reviewed selected-element policy; choose one. [examples/lab/mii-lis.toml](../examples/lab/mii-lis.toml) demonstrates the pinned MII snapshot. This imports selected semantic rules, not full IG validation.
 
-`network.mode="offline"` uses local evidence only. For remote lookups set `"lookups"` and explicitly enable each configured source. [Terminology configuration](lookups.md) · [Optional local research](research.md).
+`network.mode="lookups"` contacts the explicitly enabled real sources. `network.mode="offline"` uses installed real artifacts or a captured lookup pack only; missing evidence remains unverified. For remote lookups set `"lookups"` and explicitly enable each configured source. [Terminology configuration](lookups.md) · [Optional local research](research.md).
 
 ```sh
 uv run --no-sync plausibility config-check --config pipeline.toml

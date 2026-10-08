@@ -12,7 +12,7 @@ The larger [KDS-derived inventory](terminologies.csv) remains available as a ref
 | Need | Default | Configuration |
 | --- | --- | --- |
 | Unit grammar and documented linear conversion | NLM UCUM | `lookups.ucum.endpoint` |
-| LOINC identity and example units | LOINC FHIR | `username_env` and `password_env`, or corresponding secret files |
+| LOINC identity and example units | Public FHIR test server; official/site server for studies | `username_env` and `password_env`, or corresponding secret files |
 | Local/other code systems | Own FHIR server or CSV/SQLite | `systems`, `endpoint`, `token_env`/`token_file`, or `path` |
 | Quoted lookup-page evidence | Configured website / LOINC page | `research.enabled=true`, model and catalogue |
 | Study evidence | PubMed abstracts | `research.scope="studies"`, optional `API_KEY_ENV` |
@@ -55,4 +55,4 @@ A CSV catalogue needs `system,code` and may include `version,display`. SQLite ne
 
 For every enabled service, credentials must be referenced in the TOML. Put their values in `.env` or mounted secret files. Complete release imports and licence acquisition are explicit setup steps, not autonomous model tasks.
 
-Catalogue documentation was reviewed on 6 October 2026. Availability, edition coverage and credentials must be checked for the actual deployment; not every listed service was contacted during the synthetic tests.
+Catalogue documentation was reviewed on 6 October 2026. Availability, edition coverage and credentials must be checked for the actual deployment; not every listed service was contacted by a live integration test.

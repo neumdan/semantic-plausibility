@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "semantic-plausibility"
-version = "0.9.1"
+version = "0.9.2"
 description = "Local, auditable semantic reviews of distinct laboratory exports"
 readme = "README.md"
 requires-python = ">=3.14,<3.15"

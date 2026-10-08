@@ -616,7 +616,6 @@ def _review_export(config):
                     if config.network_mode == "offline"
                     else "configured_lookup_services"
                 )
-                demo = "synthetic" in kind.casefold()
                 phase = "input_preflight"
                 if config.input_type == "csv":
                     validate_csv(config, source["path"])
@@ -762,7 +761,7 @@ def _review_export(config):
                             row["value_" + field] = stats[field] if stats[field] is not None else ""
                         row["measurement_path"] = metadata["item_path"]
                         row.pop("item_path", None)
-                        row.update(grade(row, detail, demo=demo))
+                        row.update(grade(row, detail))
                         proposals = source_proposals(config, checker, payload)
                         row.update(
                             findings_json=encoded(
@@ -818,7 +817,6 @@ def _review_export(config):
                     "reference_pack_sha256": _input_hash(snapshot) if snapshot else None,
                     "reference_artifacts": artifacts,
                     "evidence_kind": kind,
-                    "synthetic_demo": demo,
                     "network_mode": config.network_mode,
                     "input_records": accounting["individual_records"] + accounting["distinct_records"],
                     "selected_items": accounting["semantic_items_seen"],
@@ -839,6 +837,11 @@ def _review_export(config):
                     "study": config.data.get("study", {}),
                     "export_manifest": manifest,
                     "specification": config.data.get("specification", {}),
+                    "lookup_sources": {"ucum": checker.ucum.source, "loinc": checker.loinc.source},
+                    "loinc_editions": sorted({
+                        term.version for (operation, _), term in checker.loinc.cache.items()
+                        if operation == "lookup" and isinstance(term, LoincTerm) and term.version
+                    }),
                     "lookup_errors": checker.ucum.errors + checker.loinc.errors,
                     "imported_profile": imported_policy,
                     "elapsed_seconds": round(time.monotonic() - started, 4),
@@ -851,7 +854,7 @@ def _review_export(config):
                     (folder / "lookup-pack.json").write_text(
                         json.dumps(
                             reference_pack(
-                                checker, "synthetic_demo" if demo else "captured_lookup_responses"
+                                checker, "captured_lookup_responses"
                             ),
                             indent=2,
                             default=str,

@@ -1,6 +1,0 @@
-id,code,raw_unit,unit_code,unit_system,value,reference_low,reference_high,reference_unit,material,local_test
-hb-1,718-7,g/dL,g/dL,http://unitsofmeasure.org,14,12,16,g/dL,Bld,HB
-hb-2,718-7,g/dL,g/dL,http://unitsofmeasure.org,18.5,12,16,g/dL,Bld,HB
-hb-3,718-7,g/dl,g/dl,http://unitsofmeasure.org,14,12,16,g/dL,Bld,HB
-hb-4,718-7,g/L,g/L,http://unitsofmeasure.org,140,120,160,g/L,Bld,HB
-wbc-1,6690-2,10^6,10^6,http://unitsofmeasure.org,6,4,10,10^6,Bld,WBC

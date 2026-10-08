@@ -30,7 +30,7 @@
 </g>
 <g data-node="CHECK"><rect x="130" y="425" width="840" height="106" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
 <text x="146" y="454" class="heading">Exact checks and optional evidence candidates</text>
-<text x="146" y="482" class="body">Local pack / configured terminology → code-unit fit → numbers/reference consistency</text>
+<text x="146" y="482" class="body">Real configured terminology → code-unit fit → numbers/reference consistency</text>
 <text x="146" y="507" class="body">Reviewable coding/quantity proposals with independently supported transformations</text>
 </g>
 <g data-node="OUT"><rect x="130" y="595" width="840" height="132" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>

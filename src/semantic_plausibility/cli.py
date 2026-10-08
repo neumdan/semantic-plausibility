@@ -32,19 +32,24 @@ def main(argv: list[str] | None = None) -> int:
     for name, help_text in (
         ("model-init", "Provision the configured local Ollama model"),
         ("catalog-init", "Prepare the configured local unit catalogue"),
-        ("model-test", "Check the configured model with synthetic extraction cases"),
     ):
         command = sub.add_parser(name, help=help_text)
         command.add_argument("--config", type=Path, default=Path("pipeline.toml"))
         if name != "catalog-init":
             command.add_argument("--model-alias", default=None)
-        if name == "model-test":
-            command.add_argument("--output", type=Path, default=Path("output/model-check"))
     args = parser.parse_args(argv)
     try:
         if args.command == "batch":
-            from .batch import run_batch
+            from .batch import BatchConfiguration, run_batch
 
+            configuration = BatchConfiguration(args.config)
+            print(f"Input: {configuration.input_type}; {configuration.input.get('path', 'configured database view')}", flush=True)
+            print(f"Grouping: {configuration.output.get('mode', 'distinct')}; network: {configuration.network_mode}", flush=True)
+            for name, lookup in configuration.data.get("lookups", {}).items():
+                if lookup.get("enabled", False):
+                    print(f"Lookup {name}: {lookup.get('endpoint', lookup.get('path', 'configured source'))}", flush=True)
+            print("Local-model research: " + ("enabled" if configuration.data.get("research", {}).get("enabled", False) else "disabled"), flush=True)
+            print("Processing: read -> group -> terminology/fit -> numeric/reference checks -> report", flush=True)
             result = run_batch(args.config)
             print(f"{result.input_records} input rows -> {result.distinct_tuples} laboratory review rows.")
             print("Status counts: " + json.dumps(result.statuses, sort_keys=True))
@@ -96,15 +101,6 @@ def main(argv: list[str] | None = None) -> int:
             from .deployment_checks import sync_catalogue
 
             print(json.dumps(sync_catalogue(args.config), indent=2))
-        elif args.command == "model-test":
-            from .deployment_checks import model_contract_test
-
-            report = model_contract_test(args.config, output=args.output, model_alias=args.model_alias)
-            print(
-                f"Model {report['model']}: {report['passed']}/{report['total']} synthetic extraction cases passed."
-            )
-            print(f"Results: {args.output}.csv and {args.output}.json; no clinical accuracy claim.")
-            return 1 if report["failed"] else 0
         return 0
     except (ValueError, OSError, json.JSONDecodeError) as exc:
         parser.error(str(exc))

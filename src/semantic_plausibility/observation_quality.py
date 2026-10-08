@@ -7,7 +7,7 @@ can be called before FHIR persistence, during ingest, or after retrieval.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Protocol
 import re
@@ -33,6 +33,7 @@ class LoincTerm:
     source: str = ""
     version: str = ""
     time_aspect: str = ""
+    part_codes: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

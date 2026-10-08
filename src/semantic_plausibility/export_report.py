@@ -197,7 +197,7 @@ def semantic_signature(payload):
     return hashlib.sha256(encoded(canonical(data)).encode()).hexdigest()
 
 
-def grade(row, evidence, *, demo=False):
+def grade(row, evidence):
     check = evidence["report"]["measurements"][0]
     stats = evidence["observed_values"]
     ranges = evidence.get("reference_metadata", [])
@@ -233,7 +233,7 @@ def grade(row, evidence, *, demo=False):
         else "unverified"
     )
     return {
-        "lookup_credibility": "synthetic_demo_only" if demo else credibility,
+        "lookup_credibility": credibility,
         "code_verified": fields["code"],
         "unit_verified": fields["unit"],
         "value_numeric_ready": fields["numeric_value_or_bounds"],
@@ -289,7 +289,7 @@ def write_html(path, rows, summary, csv_name, log_name):
 section{{background:white;padding:24px;margin:18px 0;border:1px solid #d5e1e8;border-radius:8px}}h1,h2{{line-height:1.2}}a{{color:#176c63}}table{{border-collapse:collapse;font-size:13px;white-space:nowrap}}th,td{{padding:9px;text-align:left;border-bottom:1px solid #d5e1e8}}th{{background:#edf5f3}}.scroll{{overflow:auto}}.note{{border-left:3px solid #176c63;padding:14px;background:#eef7f4}}code{{font-family:monospace}}</style>
 <main><h1>{title}</h1><p>Local batch · {escape(summary["mode"])} · {escape(summary["run_id"])}</p>
 <section><h2>{percent} numerically ready laboratory sets</h2><p>{readiness["numerator"]} / {readiness["denominator"]} selected groups. {counts}</p>
-<p class="note">{escape(READINESS_DEFINITION)}</p><p>Evidence mode: <strong>{escape(summary["evidence_kind"])}</strong>. Research evidence is reported separately from numerical completeness. Synthetic evidence is for demonstration only.</p><ul>{definitions}</ul>
+<p class="note">{escape(READINESS_DEFINITION)}</p><p>Evidence mode: <strong>{escape(summary["evidence_kind"])}</strong>. Research evidence is reported separately from numerical completeness.</p><ul>{definitions}</ul>
 <p>Observation-weighted readiness: {escape(str(summary.get("weighted_readiness")))}. Unknown source frequencies stay unknown.</p></section>
 <section><h2>Review each set</h2><p><a href="{escape(csv_name, quote=True)}">Full review CSV</a> · <a href="{escape(log_name, quote=True)}">Auditable run log</a>. CSV also retains full reference sets, proposals and expert review fields.</p>
 <div class="scroll"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div><p>Preview: {len(rows)} rows; the CSV contains every selected item/group.</p></section>

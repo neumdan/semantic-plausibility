@@ -437,6 +437,7 @@ class FhirQualityPipeline:
                 "system": term.system,
                 "scale": term.scale,
                 "method": term.method,
+                "unresolved_part_codes": term.part_codes,
             }
             if term
             else None

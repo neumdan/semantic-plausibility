@@ -1,61 +1,35 @@
-# Code, audit and development
+# Process, code and verification
 
-## Public library
+One CLI/library invocation reads an export, writes local artifacts and exits.
 
-```python
-from semantic_plausibility import run_batch, compare_reports, verify_audit
-
-result = run_batch("pipeline.toml")
-print(result.csv, result.report, result.summary, result.log)
-print(result.input_records, result.distinct_tuples, result.statuses)
-verify_audit(result.log)
-# Matched declared cohort/period and distinct reports are required:
-# compare_reports("lis.csv", ["fhir.csv", "hub.csv"], "output/comparison")
-```
-
-A successful `BatchResult` identifies complete local artifacts. Invalid configuration/input raises an error; failures during a run retain a redacted failure audit. The batch exits 0 when a report completes, including rows labelled `error`; exit 2 means the run failed.
-
-## Follow the code
-
-| Module | Responsibility |
+| Step | Implementation |
 | --- | --- |
-| `batch.py` | TOML contract, role mapping, CSV/SQL selection and `run_batch` entry |
-| `export_review.py` | Orchestration: prepare → standardize → group → check → publish |
-| `export_grouping.py` | DuckDB grouping and frequency-aware decimal statistics |
-| `audit.py` / `fhir_quality_pipeline.py` | Code/unit/profile checks and laboratory findings |
-| `snapshot_services.py` / `terminology_router.py` | Local evidence and explicitly configured lookup adapters |
-| `recommendations.py` | Review proposals, verified transformations and separate range findings |
-| `export_report.py` | CSV projection, readiness definitions, HTML and audit log |
-| `study_compare.py` | Distinct-report comparison and artifact integrity |
-| `profile_import.py` | Selected rules from an installed resolved Observation snapshot |
-| `observation_services.py` / `unit_catalog.py` / `model_schemas.py` | Optional retrieved evidence, catalogue candidates and grounded model replies |
+| Parse TOML, source roles, selected R4 rules | `batch.py`, `profile_import.py`, `profile_config.py` |
+| Read CSV/FHIR/SQLite/PostgreSQL | `audit.py`, `batch_quality.py`, `db_source.py`, `export_review.py` |
+| Guarded grouping and weighted statistics | `export_grouping.py` (embedded DuckDB) |
+| Real UCUM syntax/factors and LOINC metadata | `observation_services.py` |
+| Additional configured CodeSystems/ValueSets | `terminology_router.py`, `terminology_validation.py` |
+| Code–unit fit, references and recommendations | `fhir_quality_pipeline.py`, `recommendations.py` |
+| Optional local-model extraction and guards | `research_prompts.py`, `model_schemas.py`, `unit_catalog.py` |
+| CSV/HTML, audit and comparisons | `export_report.py`, `study_compare.py` |
 
-## Stack and controls
+The command prints input, active lookup sources and model enablement. The CSV/evidence file contain row-level findings; the summary records source versions, timing, coverage and failed lookup operations. The audit is a redacted hash chain with artifact hashes. Detailed reports can contain sensitive measurements.
 
-Python **3.14** (checked 3.14.8); core **DuckDB 1.5.6**; optional **psycopg/psycopg-binary 3.3.6**. Development uses locked **Ruff 0.16.10**. Container: Python 3.14.8-slim, uv 0.11.24; optional Ollama 0.34.1. `pyproject.toml` defines the packages, `uv.lock` pins them, and each report records installed versions. No LangChain/JIT/compiler is needed for this workflow.
+Lookup results are cached per run. Three consecutive request failures open a source circuit; affected findings stay unverified. Model inputs exclude measured values and identifiers, permit only local/LAN endpoints, bound response sizes and require supporting quotations. No automatic coding/value rewrite occurs.
 
-Database reads are read-only. DuckDB uses two threads and a 512 MB engine budget; extension downloads/loading are disabled. Frequencies are weighted without expanding repeated rows. Python histogram memory depends on unique numeric values per group. The HTML preview is limited to 2,000 rows; CSV remains complete.
+## Libraries
 
-Lookups are cached. A failed service abstains; three consecutive failures stop further calls to that connected source. Missing/partial evidence cannot prove invalidity. Model replies must satisfy schemas and source-quotation checks; candidates never erase deterministic errors. HTTP responses are bounded and redirects are not followed. Models are local/LAN only; secrets stay outside reports.
+Python 3.14; DuckDB 1.5.6; optional psycopg/psycopg-binary 3.3.6; uv 0.11.24 in the Python 3.14.8-slim container. Versions are locked and reported per run. Ollama is an optional separate service. No agent orchestration framework is needed.
 
-## Audit
-
-The log records phases, versions, configuration/input/reference hashes, counters and redacted failure types. It avoids raw IDs/values/secrets. Detailed local CSV/evidence may contain sensitive measurement information. ID removal is not anonymisation.
-
-```sh
-plausibility verify output/review.audit.jsonl
-```
-
-Verification checks the hash chain and completed artifact hashes; it establishes integrity, not authorship or clinical truth. A prefix lock prevents concurrent writers. Temporary files are cleaned up; the summary publishes last as the completion marker. Edit expert decisions in a separate CSV copy.
-
-## Test and publish
+## Tests
 
 ```sh
 uv sync --locked --no-editable --extra postgres --group dev
 uv run --no-sync ruff check src tests tools
-uv run --no-sync python -m unittest discover -s tests -q
-uv build --wheel
-uv run --no-sync python tools/build_release.py
+uv run --no-sync python -m unittest discover -s tests -v
+SQC_LIVE_TESTS=1 uv run --no-sync python -m unittest discover -s tests -v
 ```
 
-CI runs the same checks plus the offline example and three-source study. The public ZIP excludes private configuration/data and bundles the tested wheel. [Verification record](test-results.json) · [MII/FDPG scope](mii-quality.md) · [Study protocol](studies.md).
+Core tests check grouping, input/output contracts, profile import, audit integrity and schema/security guards without claiming terminology validity. Live tests contact NLM and the public FHIR terminology server, check actual returned examples/versions/factors, and replay only a lookup pack captured from those real responses. There are no mock terminology/model servers or fabricated lookup fixtures. Service failures fail the live tests; they are not reported as successful verification.
+
+Run from a fresh output folder. PostgreSQL/hospital integration and local-model clinical accuracy need site-specific studies. The application complements MII FHIR conformance/availability checks; it is not a FHIR validator.

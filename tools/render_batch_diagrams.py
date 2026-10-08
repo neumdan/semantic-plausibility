@@ -45,11 +45,11 @@ def write(name, title, height, nodes, edges, labels=()):
 
 
 write('architecture', 'Local laboratory export review — architecture', 1180, [
- ('INPUT',350,20,400,132,['Hospital export boundary','LIS / FHIR / CDS Hub → files/view','TORCH/CQL or SQL selection upstream','Matched scope + export manifest'],'normal'),
+ ('INPUT',350,20,400,132,['Hospital export boundary','LIS / FHIR / CDS Hub → files/view','TORCH/CQL or SQL selection upstream','Explicit input + output selection'],'normal'),
  ('CONFIG',20,210,290,157,['TOML + secrets','Columns / native element mapping','Pinned R4 / selected profile rules','Grouping + distinct or items mode','Explicit local or remote sources'],'normal'),
  ('NORMAL',350,210,400,106,['Validate and standardise','Codes + units + values + references','Preserve versions/context; no rewrite'],'normal'),
  ('GROUP',350,380,400,132,['Embedded DuckDB grouping','Distinct: complete guarded sets','Known counts → mean/SE, median/IQR','Items: retain ID / component path'],'normal'),
- ('REF',20,580,290,182,['Local reference evidence','Pack: UCUM + LOINC + factors','CodeSystem / ValueSet artifacts','Versioned CSV / SQLite lists','Default offline; no HTTP fallback','Optional explicitly enabled APIs'],'normal'),
+ ('REF',20,580,290,182,['Real terminology sources','NLM UCUM + LOINC FHIR','Versioned CodeSystem artifacts','Site CSV / SQLite catalogues','Capture actual lookup responses','Unavailable stays unverified'],'normal'),
  ('CHECK',350,580,400,157,['Shared laboratory check kernel','Exact lookup → fit → numeric bounds','Transformations need verified factors','Unknown evidence stays unknown','Every partial finding stays visible'],'normal'),
  ('RESEARCH',790,580,290,182,['Optional research module','Local model only','Catalogue spelling candidates','Quoted terminology pages','Bounded PubMed abstracts','Expert applicability required'],'teal'),
  ('QC',20,835,290,132,['Other MII quality checks','FHIR Validator: conformance','FDE: availability/completeness','Separate scopes and outputs'],'normal'),
@@ -87,6 +87,6 @@ write('batch-flow','Source exports → guarded aggregation → review artifacts'
  ('FHIR',560,20,250,106,['FHIR R4 export','Bundle / NDJSON files','TORCH / CQL upstream'],'normal'),
  ('CSV',830,20,250,106,['Export contract','Individual or distinct','Real count only if known'],'normal'),
  ('GROUP',130,225,840,132,['One selected semantic representation','code + code_system + value/bounds + unit + unit_system + full reference set','DuckDB: distinct guarded sets; optional items with ID/path','Keep status, versions, comparator, specimen/method and interval qualifiers'],'normal'),
- ('CHECK',130,425,840,106,['Exact checks and optional evidence candidates','Local pack / configured terminology → code-unit fit → numbers/reference consistency','Reviewable coding/quantity proposals with independently supported transformations'],'teal'),
+ ('CHECK',130,425,840,106,['Exact checks and optional evidence candidates','Real configured terminology → code-unit fit → numbers/reference consistency','Reviewable coding/quantity proposals with independently supported transformations'],'teal'),
  ('OUT',130,595,840,132,['Local CSV report + HTML + summary + evidence + audit log','Original sets + eligible distributions + separate checks + readiness ratio','Compare matched LIS / FHIR / CDS Hub exports; physician review before mapping','No upload, message interception or aggregate-to-patient resource generation'],'teal')],[
  ('LIS','GROUP','M145 126 V180 H550 V222','',False),('HUB','GROUP','M415 126 V180 H550 V222','',False),('FHIR','GROUP','M685 126 V180 H550 V222','',False),('CSV','GROUP','M955 126 V180 H550 V222','',False),('GROUP','CHECK','M550 357 V422','',False),('CHECK','OUT','M550 531 V592','',False)])

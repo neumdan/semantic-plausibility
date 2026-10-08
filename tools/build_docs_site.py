@@ -24,7 +24,6 @@ PUBLIC_DOCS = {
     "decision-flow.mmd",
     "batch-flow.svg",
     "batch-flow.mmd",
-    "test-results.json",
 }
 
 
@@ -34,8 +33,9 @@ def build_site(root, output):
     (output / "docs").mkdir(parents=True)
     for name in sorted(PUBLIC_DOCS):
         shutil.copyfile(root / "docs" / name, output / "docs" / name)
-    shutil.copytree(root / "docs" / "demo", output / "docs" / "demo")
     shutil.copytree(root / "examples" / "studies", output / "examples" / "studies")
+    for name in ("laboratory.csv", "laboratory.bundle.json"):
+        shutil.copyfile(root / "examples" / name, output / "examples" / name)
     shutil.copytree(root / "examples" / "lab", output / "examples" / "lab")
     shutil.copytree(root / "examples" / "profiles", output / "examples" / "profiles")
     for name in ("pipeline.example.toml", "README.md", "LICENSE"):

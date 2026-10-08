@@ -216,10 +216,17 @@ class LoincFhirClient:
         payload = response.json()
         if (
             not isinstance(payload, dict)
+            or payload.get("resourceType") != "Parameters"
             or not isinstance(payload.get("parameter"), list)
             or not payload["parameter"]
         ):
             raise ValueError("LOINC lookup returned no usable Parameters evidence")
+        returned_code = next((entry.get("valueCode") for entry in payload["parameter"]
+                              if entry.get("name") == "code"), None)
+        returned_system = next((entry.get("valueUri") for entry in payload["parameter"]
+                                if entry.get("name") == "system"), None)
+        if returned_code and returned_code != code or returned_system and returned_system != "http://loinc.org":
+            raise ValueError("LOINC lookup returned another code/system")
         returned_version = next(
             (
                 entry.get("valueString", "")
@@ -232,6 +239,7 @@ class LoincFhirClient:
             self._cache[cache_key] = None
             return None
         properties: dict[str, list[str]] = {}
+        part_codes: dict[str, str] = {}
         display = ""
         for entry in payload.get("parameter", []):
             if entry.get("name") == "display":
@@ -241,6 +249,11 @@ class LoincFhirClient:
             parts = {part.get("name"): part for part in entry.get("part", [])}
             key = (parts.get("code") or {}).get("valueCode")
             value_part = parts.get("value") or {}
+            part_code = value_part.get("valueCode") or (value_part.get("valueCoding") or {}).get("code")
+            if key and isinstance(part_code, str) and part_code.startswith("LP"):
+                # Some real servers expose LOINC part identifiers rather than axis text.
+                # Preserve them; do not compare an unresolved part ID with a specimen label.
+                part_codes[key] = part_code
             value = (
                 value_part.get("valueString") or (value_part.get("valueCoding") or {}).get("display") or ""
             )
@@ -271,6 +284,7 @@ class LoincFhirClient:
             time_aspect=one("TIME_ASP"),
             example_units=many("EXAMPLE_UNITS"),
             source=response.url,
+            part_codes=part_codes,
         )
         self._cache[cache_key] = term
         return term

@@ -1,9 +1,5 @@
-# Examples
+# Example inputs
 
-All clinical-looking data and reference intervals here are **synthetic**.
+`laboratory.csv` contains 8 illustrative input rows and `laboratory.bundle.json` the equivalent 84 individual FHIR Observations. Measurement values/reference intervals are examples, not clinical recommendations. Neither file contains lookup verdicts.
 
-- `studies/`: distinct LIS CSV, equivalent FHIR Bundle, reference pack, local codes/ConceptMap and illustrative SQL/CQL extraction.
-- `lab/`: current TOML configurations for LIS CSV, FHIR files, mapped PostgreSQL and the pinned MII laboratory snapshot.
-- `profiles/`: attributed published MII Laboratory 2026.0.3 snapshot and its provenance.
-
-Start with `pipeline.example.toml` in the project root. Regenerate the synthetic comparison with `python tools/run_study_demo.py --out output/study-demo`. Replace synthetic reference evidence before reviewing real exports.
+The default configuration contacts real NLM UCUM and FHIR LOINC services. `lab/` contains source/profile configurations; `profiles/` preserves the attributed pinned MII snapshot. `studies/` contains upstream SQL/CQL selection examples and example export-selection manifests. No code mappings or terminology responses are invented.

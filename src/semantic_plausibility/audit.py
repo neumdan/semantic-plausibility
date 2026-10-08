@@ -21,7 +21,7 @@ from .observation_quality import LoincTerm
 from .observation_services import services_from_environment
 from .profile_config import InputProfile, load_profile
 from .unit_catalog import UnitSpelling, spelling_columns, FiniteUnitCodeSource
-from .snapshot_services import SnapshotLoinc, SnapshotUcum, load_snapshot
+from .snapshot_services import SnapshotLoinc, SnapshotUcum
 from .terminology_router import TerminologyRouter, load_sources, router_from_environment
 
 
@@ -105,7 +105,7 @@ CSV_FIELDS = [
     "experten_richtig",
     "experten_notiz",
 ]
-SCOPE = "lab_code_unit_context_reference_bounds_and_extrema; medication_identity_and_quantity_syntax; other_resources_coded_elements_and_quantity_syntax; clinical intervals require expert evidence review"
+SCOPE = "laboratory_code_unit_context_reference_bounds_and_values; clinical intervals require actual evidence and expert review"
 
 
 def encoded(value: Any) -> str:
@@ -295,9 +295,13 @@ class OfflineUcum(SnapshotUcum):
 
 
 def offline_services(path: Path) -> tuple[Any, Any]:
-    if path.suffix.lower() == ".csv":
-        return load_snapshot(path)
     data = json.loads(path.read_text(encoding="utf-8"))
+    if data.get("evidence_kind") != "captured_lookup_responses" or not data.get("captured_at"):
+        raise ValueError("Use a captured real lookup pack; manually declared or demonstration verdicts are unsupported")
+    provenance = data.get("provenance", {})
+    if any(not isinstance(provenance.get(key), str) or not provenance[key].startswith("https://")
+           for key in ("ucum_source", "loinc_source")):
+        raise ValueError("Captured lookup pack needs its real UCUM and LOINC source endpoints")
     if not isinstance(data.get("ucum"), dict) or not isinstance(data.get("loinc"), list):
         raise ValueError("Evidence snapshot needs ucum verdicts and loinc terms")
     if any(
