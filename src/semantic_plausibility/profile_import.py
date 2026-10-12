@@ -50,6 +50,8 @@ def import_structure_definition(path: Path) -> dict:
                 rules.setdefault(quantity, {})["require_system"] = True
             if source_path == quantity + ".code" and element.get("min", 0) > 0:
                 rules.setdefault(quantity, {})["require_code"] = True
+            if source_path == quantity + ".unit" and element.get("min", 0) > 0:
+                rules.setdefault(quantity, {})["require_unit"] = True
         if element.get("constraint") and any(source_path.startswith(target) for target in selected):
             limitations.extend({"element": element.get("id", source_path), "constraint": c.get("key"),
                                 "expression": c.get("expression"), "state": "requires_full_fhir_validator"}

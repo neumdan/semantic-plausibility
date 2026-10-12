@@ -49,7 +49,7 @@ path = "local/terminology"
 systems = ["http://loinc.org", "http://snomed.info/sct"]
 ```
 
-The unchanged published **MII Laboratory 2026.0.3** resolved snapshot is included under `examples/profiles/`, with attribution and SHA. Run `plausibility batch --config examples/lab/mii-lis.toml` to exercise it on the illustrative measurement input with real terminology services. For your institution, copy the active, nonexperimental Observation **resolved snapshot** from its pinned installed package. The importer projects selected code bindings, fixed/pattern quantity systems, required code/system fields and selected explicit prohibitions. It records canonical/version/SHA and unsupported FHIRPath constraints in `summary.imported_profile`. Use `PROFILE_FILE` instead for a reviewed selected-element policy; do not configure both.
+The unchanged published **MII Laboratory 2026.0.3** resolved snapshot is included under `examples/profiles/`, with attribution and SHA. Run `run-plausibility-check --config examples/lab/mii-lis.toml` to exercise it on the illustrative measurement input with real terminology services. For your institution, copy the active, nonexperimental Observation **resolved snapshot** from its pinned installed package. The importer projects selected code bindings, fixed/pattern quantity systems, required code/system fields and selected explicit prohibitions. It records canonical/version/SHA and unsupported FHIRPath constraints in `summary.imported_profile`. Use `PROFILE_FILE` instead for a reviewed selected-element policy; do not configure both.
 
 **Import scope is deliberately partial:** whole-resource cardinalities, complete slicing, invariants, reference target conformance, demographic applicability and other IG rules require the full validator. A package name or `meta.profile` declaration is provenance, not proof. Unspecified selected rules use the implemented R4 fallback; supported explicit prohibitions are retained.
 
@@ -70,3 +70,9 @@ Report `numerator / all selected output groups` and, when every source frequency
 “Ready” does **not** establish that a supplied reference interval is correct for the specimen, assay, age, sex or population. Specimen/method compatibility is assessed only for supplied resolved context; native Specimen codes are retained without automatically equating SNOMED to a LOINC axis. `clinical_*_evidence` stays separate. Out-of-reference values are descriptive; pathological results may be perfectly correct.
 
 An approved unit conversion still needs application/revalidation in ETL. The report does not manufacture patient Observations from aggregate means. `fhir_mapping_proposal_json` describes a plan and missing resource context, not a conformant patient resource.
+
+## Evidence and reviewed mappings
+
+The default examples now start with the pinned MII Laboratory 2026.0.3 snapshot. Local LIS code/unit membership is assessed independently; target coding is proposed according to the selected bindings and quantitative unit constraints. LOINC is preferred in this snapshot's code binding; UCUM is fixed for the value Quantity. Versioned supplied ValueSets support system routing, not automatic filter expansion or complete IG conformance.
+
+`research-evidence` consumes the audited export, retrieves bounded reported-practice evidence and writes its prompts/search trace. Clinician decisions enter a scoped registry; future checks reverify compatible approvals. [Requirements](requirements.md) · [Review workflow](research.md#clinician-feedback). FDPG study access remains a future authorised provider/export integration.

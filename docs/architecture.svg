@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1300" viewBox="0 0 1100 1300" role="img" aria-labelledby="title desc">
-<title id="title">Local files or APIs — laboratory review architecture</title><desc id="desc">Hospital export boundary; TOML + secret references; Validate and standardise; Embedded DuckDB grouping; A · Local terminology; B · API configuration; Same laboratory check kernel; Optional candidate evidence; Other MII quality checks; Local review artifacts; Matched export studies; Laboratory physician review</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1330" viewBox="0 0 1100 1330" role="img" aria-labelledby="title desc">
+<title id="title">Laboratory checks, separate evidence and clinician feedback</title><desc id="desc">Hospital export boundary; TOML + secret references; Validate and standardise; Embedded DuckDB grouping; A · Local terminology; B · API configuration; Same laboratory check kernel; Separate evidence research; Other MII quality checks; Checked export and proposals; Matched export studies; Scoped mapping registry; Laboratory physician review</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#537487"/></marker></defs>
 <style>text{font-family:Arial,sans-serif;fill:#142d42}.heading{font-size:19px;font-weight:700}.body{font-size:17px}.label{font-size:14px;fill:#526978}</style><rect width="1100" height="100%" fill="white"/>
 <g data-node="INPUT"><rect x="350" y="20" width="400" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
@@ -44,19 +44,19 @@
 </g>
 <g data-node="CHECK"><rect x="350" y="680" width="400" height="182" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
 <text x="366" y="709" class="heading">Same laboratory check kernel</text>
-<text x="366" y="737" class="body">Exact code/system + alias checks</text>
-<text x="366" y="762" class="body">UCUM syntax / LOINC unit examples</text>
-<text x="366" y="787" class="body">Transformations: verified factors only</text>
-<text x="366" y="812" class="body">Values / references / context</text>
+<text x="366" y="737" class="body">Source code / unit / reference checks</text>
+<text x="366" y="762" class="body">Target profile systems and bindings</text>
+<text x="366" y="787" class="body">LOINC axes / verified UCUM factors</text>
+<text x="366" y="812" class="body">Preserve whole-set context</text>
 <text x="366" y="837" class="body">Missing evidence → unverified</text>
 </g>
 <g data-node="RESEARCH"><rect x="790" y="680" width="290" height="182" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="806" y="709" class="heading">Optional candidate evidence</text>
-<text x="806" y="737" class="body" style="font-size:16px">Local model for extraction</text>
-<text x="806" y="762" class="body" style="font-size:16px">SemLookP name candidates</text>
-<text x="806" y="787" class="body" style="font-size:16px">Quoted terminology pages</text>
-<text x="806" y="812" class="body" style="font-size:16px">Bounded PubMed abstracts</text>
-<text x="806" y="837" class="body" style="font-size:16px">Expert applicability required</text>
+<text x="806" y="709" class="heading">Separate evidence research</text>
+<text x="806" y="737" class="body" style="font-size:16px">Name search → exact candidates</text>
+<text x="806" y="762" class="body" style="font-size:16px">Cached per LOINC / edition</text>
+<text x="806" y="787" class="body" style="font-size:16px">PubMed + Europe PMC + pages</text>
+<text x="806" y="812" class="body" style="font-size:16px">Quoted values / units / ranges</text>
+<text x="806" y="837" class="body" style="font-size:16px">Exact prompts / query trace</text>
 </g>
 <g data-node="QC"><rect x="20" y="935" width="290" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
 <text x="36" y="964" class="heading">Other MII quality checks</text>
@@ -65,10 +65,10 @@
 <text x="36" y="1042" class="body" style="font-size:16px">Separate scopes and outputs</text>
 </g>
 <g data-node="OUTPUT"><rect x="350" y="935" width="400" height="157" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="366" y="964" class="heading">Local review artifacts</text>
+<text x="366" y="964" class="heading">Checked export and proposals</text>
 <text x="366" y="992" class="body">CSV + HTML + summary + evidence</text>
-<text x="366" y="1017" class="body">Terminology credibility / readiness</text>
-<text x="366" y="1042" class="body">Suggested mapping / transformation</text>
+<text x="366" y="1017" class="body">Source and target checks separate</text>
+<text x="366" y="1042" class="body">Mapping + reference transformations</text>
 <text x="366" y="1067" class="body">Chained log + hashes + editions</text>
 </g>
 <g data-node="STUDY"><rect x="790" y="935" width="290" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
@@ -77,10 +77,16 @@
 <text x="806" y="1017" class="body" style="font-size:16px">Groups + known frequencies</text>
 <text x="806" y="1042" class="body" style="font-size:16px">Context changes / loss candidates</text>
 </g>
+<g data-node="REGISTRY"><rect x="20" y="1160" width="290" height="132" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="36" y="1189" class="heading">Scoped mapping registry</text>
+<text x="36" y="1217" class="body" style="font-size:16px">Source + profile + set scope</text>
+<text x="36" y="1242" class="body" style="font-size:16px">Recheck targets in later runs</text>
+<text x="36" y="1267" class="body" style="font-size:16px">Retain history and revocation</text>
+</g>
 <g data-node="EXPERT"><rect x="350" y="1160" width="400" height="106" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
 <text x="366" y="1189" class="heading">Laboratory physician review</text>
-<text x="366" y="1217" class="body">Approve proposals in a separate copy</text>
-<text x="366" y="1242" class="body">Apply/revalidate in the site ETL</text>
+<text x="366" y="1217" class="body">Decision + reviewer + time + evidence</text>
+<text x="366" y="1242" class="body">Apply/revalidate approved site plans</text>
 </g>
 <path data-edge="INPUT-NORMAL" d="M550 152 V207" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
 <path data-edge="CONFIG-NORMAL" d="M310 263 H347" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
@@ -90,9 +96,11 @@
 <path data-edge="GROUP-CHECK" d="M550 512 V677" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
 <path data-edge="LOCAL-CHECK" d="M310 570 H330 V750 H347" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
 <path data-edge="API-CHECK" d="M935 562 V630 H690 V677" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="CHECK-RESEARCH" d="M750 750 H787" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="OUTPUT-RESEARCH" d="M750 983 H775 V775 H787" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
 <path data-edge="CHECK-OUTPUT" d="M550 862 V932" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="RESEARCH-OUTPUT" d="M935 862 V900 H650 V932" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="RESEARCH-EXPERT" d="M1080 770 H1090 V1125 H700 V1157" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="EXPERT-REGISTRY" d="M350 1214 H313" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="REGISTRY-CHECK" d="M20 1220 H5 V770 H347" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
 <path data-edge="OUTPUT-STUDY" d="M750 1000 H787" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
 <path data-edge="OUTPUT-EXPERT" d="M550 1092 V1157" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
 <path data-edge="QC-EXPERT" d="M165 1067 V1120 H400 V1157" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>

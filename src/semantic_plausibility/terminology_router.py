@@ -51,7 +51,8 @@ class CsvCodeSource:
         return {
             "state": state,
             "source": str(self.path),
-            "metadata": {"display": row.get("display", ""), "version": row.get("version", "")}
+            "metadata": {key: row.get(key, "") for key in ("display", "version", "definition",
+                "expected_unit_code", "expected_unit_system", "specimen", "method")}
             if row
             else None,
         }
@@ -350,6 +351,7 @@ class TerminologyRouter:
                 raise ValueError("Each terminology source needs explicit systems")
             kind = entry.get("kind")
             source = make_source(entry, llm=llm)
+            source.role = entry.get("role", "primary" if kind == "fhir" else "optional" if kind in {"ols", "website"} else "source")
             self.sources.append((set(systems), source, kind == "website"))
 
     def close(self) -> None:
@@ -368,7 +370,7 @@ class TerminologyRouter:
         errors: list[str] = []
         negative = None
         unknown = None
-        for systems, source, website in self.sources:
+        for systems, source, website in sorted(self.sources, key=lambda item: {"primary": 0, "source": 1, "optional": 2}.get(getattr(item[1], "role", "source"), 1)):
             if system not in systems:
                 continue
             try:
@@ -380,6 +382,8 @@ class TerminologyRouter:
             except Exception as exc:
                 errors.append(f"{type(source).__name__}: {exc}")
                 continue
+            if getattr(source, "role", "source") == "primary" and result["state"] in {"valid", "invalid"}:
+                return {**result, "candidates": candidates, "errors": errors, "authority_role": "primary"}
             if result["state"] == "valid":
                 return {**result, "candidates": candidates, "errors": errors}
             if result["state"] == "invalid" and negative is None:

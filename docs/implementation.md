@@ -1,6 +1,6 @@
 # Process, code and verification
 
-One CLI/library invocation reads an export, writes local artifacts and exits.
+The named check reads an export, writes local artifacts and exits. Evidence research and clinician review import are separate commands.
 
 | Step | Implementation |
 | --- | --- |
@@ -11,7 +11,10 @@ One CLI/library invocation reads an export, writes local artifacts and exits.
 | Additional configured CodeSystems/ValueSets | `terminology_router.py`, `terminology_validation.py` |
 | Pinned package setup / aliases / optional OLS and WHO APIs | `terminology_packages.py`, `name_checks.py`, `terminology_apis.py`; `lookup` inspects one source |
 | Code–unit fit, references and recommendations | `fhir_quality_pipeline.py`, `recommendations.py` |
-| Optional local-model extraction and guards | `research_prompts.py`, `model_schemas.py`, `unit_catalog.py` |
+| Optional local-model extraction, code/name proposals and guards | `laboratory_suggestions.py`, `research_prompts.py`, `model_schemas.py`, `unit_catalog.py` |
+| Profile-derived service plan | `profile_lookups.py`; primary/source/optional routes |
+| Clinician decisions and scoped reuse | `review_feedback.py`; append history, target rechecks and context guards |
+| Separate evidence dossier and prompt/query trace | `evidence_research.py`; audited export, bounded PubMed/Europe PMC retrieval |
 | CSV/HTML, audit and comparisons | `export_report.py`, `study_compare.py` |
 
 The command prints input, active lookup sources and model enablement. The CSV/evidence file contain row-level findings; the summary records source versions, timing, coverage and failed lookup operations. The audit is a redacted hash chain with artifact hashes. Detailed reports can contain sensitive measurements.

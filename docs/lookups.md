@@ -49,7 +49,7 @@ For B, put actual credential values in ignored `.env` using those names, or use 
 | LOINC identity and example units | Public FHIR test server; official/site server for studies | `username_env` and `password_env`, or corresponding secret files |
 | Local/other code systems | Own FHIR server or CSV/SQLite | `systems`, `endpoint`, `token_env`/`token_file`, or `path` |
 | Quoted lookup-page evidence | Configured website / LOINC page | `research.enabled=true`, model and catalogue |
-| Study evidence | PubMed abstracts | `research.scope="studies"`, optional `API_KEY_ENV` |
+| Study evidence | PubMed / Europe PMC abstracts | `research.scope="studies"`, `research.sources`, optional PubMed `API_KEY_ENV` |
 
 NLM exposes unit validation and conversion services. A mathematically supported factor is required before proposing a value/reference transformation. [NLM documentation](https://ucum.nlm.nih.gov/ucum-service.html).
 
@@ -80,9 +80,12 @@ cp -n terminology.example.toml terminology.toml
 3. Install the selected packages, then enable the corresponding `[lookups.loinc_de]` / `[lookups.ucum_de]` artifact sources. Their `path` must equal the installation path.
 
 ```sh
-uv run --no-sync --env-file .env plausibility package-init --config terminology.toml
+uv run --no-sync --env-file .env run-plausibility-check package-init --config terminology.toml
 # Or, with the read/write local volume used only for installation:
-SQC_CONFIG_FILE=terminology.toml podman compose --profile terminology run --rm --build package-init
+# For containers, set SQC_CONFIG_FILE=terminology.toml in .env first.
+podman-compose --profile terminology run --rm --build package-init
+# Docker alternative:
+docker compose --profile terminology run --rm --build package-init
 ```
 
 Ordinary `batch` runs never download packages. `package-init` checks the publisher SHA-1, records SHA-256, preserves the original archive/licence files and installs atomically. Repeated installation verifies the existing files. Dependencies are recorded, not automatically downloaded. Package version and CodeSystem version can differ; code checks use the CodeSystem edition. Installed contents stay under ignored `local/`; transfer this folder to a disconnected review machine. For offline LOINC axes/units and UCUM syntax/factors, also supply a pack captured from real APIs; a translation package alone is insufficient.
@@ -115,9 +118,9 @@ Native FHIR preserves both fields. Source names remain in guarded groups; differ
 For example, the real FHIR LOINC lookup for `718-7` supports “Hämoglobin” and “Hb”; “Glucose” is not an established alias for that code. Alias agreement does not prove that the source measurement used the right specimen, property, time, scale or method. UCUM describes units; it does not identify the measured analyte. A translation cannot establish a conversion factor.
 
 ```sh
-uv run --no-sync --env-file .env plausibility lookup --config pipeline.toml --lookup loinc --code 718-7 --name 'Hämoglobin'
+uv run --no-sync --env-file .env run-plausibility-check lookup --config pipeline.toml --lookup loinc --code 718-7 --name 'Hämoglobin'
 # After installing/enabling the German package, reverse-search its real aliases:
-uv run --no-sync --env-file .env plausibility lookup --config terminology.toml --lookup loinc_de --name 'Hämoglobin'
+uv run --no-sync --env-file .env run-plausibility-check lookup --config terminology.toml --lookup loinc_de --name 'Hämoglobin'
 ```
 
 Reverse package lookup returns up to ten exact label/translation candidates, retaining their code, canonical system, language and edition. Multiple matches stay ambiguous. It neither supplies a missing LOINC axis nor approves a local LIS-to-LOINC mapping. Search indexes are built lazily and remain local.
@@ -127,7 +130,7 @@ Reverse package lookup returns up to ten exact label/translation candidates, ret
 Enable `[lookups.semlook]` in the optional TOML to query the real [SemLookP OLS API](https://semanticlookup.zbmed.de/about/api) at `https://semanticlookup.zbmed.de/ols/api`. Select an explicit `ontology` and `limit`; no API credential is needed for the public service. The adapter caches bounded searches. It returns quoted labels, IRIs and response hashes as **candidates**; a LOINC coding candidate is included only when the result's LOINC IRI and identifier agree. Every candidate still needs exact code/version and clinical-context review. German coverage varies; no automatic model translation is invented.
 
 ```sh
-uv run --no-sync --env-file .env plausibility lookup --config terminology.toml --lookup semlook --name hemoglobin
+uv run --no-sync --env-file .env run-plausibility-check lookup --config terminology.toml --lookup semlook --name hemoglobin
 ```
 
 In a batch, configured name searches run only for supplied, unresolved analyte labels, independently of optional model research. Add your local LIS canonical to `systems` if you explicitly want its names searched for LOINC candidates. The underlying model stays local; the enabled API receives the terminology name, never a measurement value or resource ID.
@@ -139,7 +142,7 @@ The [TS4NFDI Terminology Service Suite](https://github.com/ts4nfdi/terminology-s
 The optional `[lookups.icd11]` uses `type="who_icd"`, canonical `http://id.who.int/icd/release/11/mms`, a pinned `release`, `language`, API endpoint and OAuth endpoint. Set `WHO_ICD_CLIENT_ID` and `WHO_ICD_CLIENT_SECRET` in ignored `.env`, or use `client_id_file` / `client_secret_file`. Register for credentials at the [WHO ICD API](https://icd.who.int/icdapi); [authentication uses client credentials and scope `icdapi_access`](https://icd.who.int/docs/icd-api/API-Authentication/).
 
 ```sh
-uv run --no-sync --env-file .env plausibility lookup --config terminology.toml --lookup icd11 --code 1A00 --version 2026-01
+uv run --no-sync --env-file .env run-plausibility-check lookup --config terminology.toml --lookup icd11 --code 1A00 --version 2026-01
 ```
 
 The adapter confirms the release, exact stem code and entity, requests `API-Version: v2`, uses HTTPS and caches the short-lived OAuth token in memory. WHO MMS is distinct from uncoded Foundation entities and from ICD-10-GM. Postcoordination stays unverified in this first adapter; no code simplification is applied. English is the example default; [WHO marks German in 2026-01 as prerelease](https://icd.who.int/docs/icd-api/SupportedClassifications/). This is a standalone terminology lookup, not implemented diagnosis/severity/Condition assessment.

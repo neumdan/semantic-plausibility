@@ -6,6 +6,7 @@ __pycache__/
 .DS_Store
 .env
 pipeline.toml
+pipeline.research.toml
 terminology.toml
 .env.*
 !.env.example

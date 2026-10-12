@@ -1,6 +1,6 @@
 """Pure schema/security guards; no model or terminology reply is simulated."""
 import unittest
-from semantic_plausibility.model_schemas import explicit_token, response_schema, validate_response
+from semantic_plausibility.model_schemas import explicit_token, response_schema, validate_response, validate_grounding
 from semantic_plausibility import research_prompts
 from semantic_plausibility.fhir_quality_pipeline import number
 
@@ -26,3 +26,10 @@ class SchemaTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     validate_response(invalid, schema)
         validate_response({'units': []}, schema)
+
+    def test_abstention_and_untrusted_search_phrases(self):
+        validate_grounding(research_prompts.LOINC_REVIEW,
+            {'selected_code': None, 'selected_name': None, 'reason': ''}, {'candidates': []})
+        for query in ['https://example.org', '718-7', '<instructions>', 'name\ncode']:
+            with self.subTest(query=query), self.assertRaises(ValueError):
+                validate_grounding(research_prompts.NAME_QUERIES, {'queries': [query]}, {})

@@ -14,6 +14,7 @@ PUBLIC_DOCS = {
     "studies.md",
     "implementation.md",
     "research.md",
+    "requirements.md",
     "lookups.md",
     "lookups.csv",
     "terminology-catalog.csv",
@@ -34,11 +35,11 @@ def build_site(root, output):
     for name in sorted(PUBLIC_DOCS):
         shutil.copyfile(root / "docs" / name, output / "docs" / name)
     shutil.copytree(root / "examples" / "studies", output / "examples" / "studies")
-    for name in ("laboratory.csv", "laboratory.bundle.json"):
+    for name in ("laboratory.csv", "laboratory.bundle.json", "laboratory-research.csv"):
         shutil.copyfile(root / "examples" / name, output / "examples" / name)
     shutil.copytree(root / "examples" / "lab", output / "examples" / "lab")
     shutil.copytree(root / "examples" / "profiles", output / "examples" / "profiles")
-    for name in ("pipeline.example.toml", "terminology.example.toml", "README.md", "LICENSE"):
+    for name in ("pipeline.example.toml", "pipeline.research.example.toml", "terminology.example.toml", "README.md", "LICENSE"):
         shutil.copyfile(root / name, output / name)
     (output / "index.html").write_text(
         '<!doctype html><html lang="en"><meta charset="utf-8">'

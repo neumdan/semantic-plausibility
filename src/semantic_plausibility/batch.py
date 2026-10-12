@@ -19,6 +19,10 @@ ROLE_ALIASES = {
     "reference_unit": "range_low_code",
     "reference_unit_system": "range_low_system",
     "specimen": "loinc_system",
+    "component": "loinc_component",
+    "property": "loinc_property",
+    "time_aspect": "loinc_time_aspect",
+    "scale": "loinc_scale",
     "source_id": "id",
     "value_comparator": "comparator",
 }
@@ -63,13 +67,18 @@ class BatchResult:
 class BatchConfiguration:
     """Validate operator settings and normalize source roles; no data/network access."""
 
-    def __init__(self, path):
+    def __init__(self, path, *, research=None, output_path=None):
         self.path = Path(path).resolve()
         self.root = self.path.parent
         try:
             self.data = tomllib.loads(self.path.read_text())
         except tomllib.TOMLDecodeError, UnicodeError:
             raise ValueError("Invalid batch TOML configuration") from None
+        self.operation = "batch" if research is None else "research-evidence" if research else "check"
+        if research is not None:
+            self.data.setdefault("research", {})["enabled"] = research
+        if output_path is not None:
+            self.data.setdefault("output", {})["path"] = str(output_path)
         data = table(
             self.data,
             "batch",
@@ -138,6 +147,7 @@ class BatchConfiguration:
                 "IG_VERSION",
                 "IG_CANONICAL",
                 "STRUCTURE_DEFINITION",
+                "VALUE_SETS",
             },
         )
         if spec.get("FHIR_VERSION", "4.0.1") != "4.0.1":
@@ -145,6 +155,8 @@ class BatchConfiguration:
                 "This runner implements FHIR R4 (4.0.1); other versions need an upstream adapter"
             )
         self.profile = spec.get("PROFILE", "auto")
+        if not isinstance(spec.get("VALUE_SETS", []), list) or any(not isinstance(value, str) for value in spec.get("VALUE_SETS", [])):
+            raise ValueError("specification.VALUE_SETS must be paths to installed real ValueSets")
         aggregation = table(data.get("aggregation", {}), "aggregation", {"engine", "group_by"})
         if aggregation.get("engine", "duckdb") != "duckdb":
             raise ValueError(
@@ -188,7 +200,7 @@ class BatchConfiguration:
         if type(self.output.get("include_distribution", True)) is not bool:
             raise ValueError("include_distribution must be true or false")
         table(data.get("study", {}), "study", {"cohort", "period_start", "period_end", "source_label"})
-        table(data.get("quality", {}), "quality", {"concept_map"})
+        table(data.get("quality", {}), "quality", {"concept_map", "review_registry"})
         self.database = table(
             data.get("database", {}),
             "database",
@@ -274,6 +286,10 @@ class BatchConfiguration:
             "reference_ranges_json",
             "source_test",
             "loinc_system",
+            "loinc_component",
+            "loinc_property",
+            "loinc_time_aspect",
+            "loinc_scale",
             "method",
             "method_json",
             "modifier_extensions_json",
@@ -317,7 +333,7 @@ class BatchConfiguration:
         research = table(
             data.get("research", {}),
             "research",
-            {"enabled", "scope", "unit_catalog", "pubmed", "loinc_website_base_url"},
+            {"enabled", "scope", "unit_catalog", "pubmed", "loinc_website_base_url", "sources", "europe_pmc", "max_articles_per_loinc"},
         )
         if type(research.get("enabled", False)) is not bool:
             raise ValueError("research.enabled must be true or false")
@@ -326,6 +342,13 @@ class BatchConfiguration:
             "research.pubmed",
             {"API_KEY_ENV", "API_KEY_FILE", "EMAIL", "MAX_RESULTS", "BASE_URL"},
         )
+        sources = research.get("sources", ["pubmed"])
+        if not isinstance(sources, list) or not set(sources) <= {"pubmed", "europe_pmc"} or len(sources) != len(set(sources)):
+            raise ValueError("research.sources must select pubmed and/or europe_pmc without duplicates")
+        table(research.get("europe_pmc", {}), "research.europe_pmc", {"BASE_URL", "MAX_RESULTS"})
+        budget = research.get("max_articles_per_loinc", 3)
+        if type(budget) is not int or not 1 <= budget <= 12:
+            raise ValueError("research.max_articles_per_loinc must be 1..12")
         terminology = self.lookup_settings(data.get("lookups", {}))
         if self.network_mode == "offline":
             if research.get("enabled", False):
@@ -377,6 +400,12 @@ class BatchConfiguration:
             if key == "BASE_URL"
             else "max_results": value
             for key, value in pubmed.items()
+        }
+        translated["research"]["sources"] = sources
+        translated["research"]["max_articles_per_loinc"] = budget
+        translated["research"]["europe_pmc"] = {
+            "base_url": research.get("europe_pmc", {}).get("BASE_URL", "https://www.ebi.ac.uk/europepmc/webservices/rest"),
+            "max_results": research.get("europe_pmc", {}).get("MAX_RESULTS", 3),
         }
         self.deployment = Deployment(self.path, data=translated)
 
@@ -432,6 +461,7 @@ class BatchConfiguration:
                 "lookup",
                 {
                     "enabled",
+                    "role",
                     "type",
                     "systems",
                     "endpoint",
@@ -461,8 +491,12 @@ class BatchConfiguration:
                 raise ValueError("lookup.enabled must be true or false")
             if not row.get("enabled", False):
                 continue
+            if row.get("role", "primary") not in {"primary", "source", "optional"}:
+                raise ValueError("lookup.role must be primary, source or optional")
             kind = row.get("type")
             if kind in {"ucum", "loinc"}:
+                if row.get("role", "primary") != "primary":
+                    raise ValueError("Dedicated UCUM/LOINC services are primary; configure generic optional sources for cross-checks")
                 if kind in result:
                     raise ValueError("Choose one active UCUM service and one active LOINC service")
                 result[kind] = {
@@ -511,6 +545,7 @@ class BatchConfiguration:
                             if key
                             in {
                                 "systems",
+                                "role",
                                 "endpoint",
                                 "token_env",
                                 "token_file",
@@ -626,3 +661,9 @@ def run_batch(path: str | Path) -> BatchResult:
     from .export_review import review_export
 
     return review_export(BatchConfiguration(path))
+
+
+def run_plausibility_check(path: str | Path) -> BatchResult:
+    """Deterministic source/target checks and approved mapping reuse; no model research."""
+    from .export_review import review_export
+    return review_export(BatchConfiguration(path, research=False))

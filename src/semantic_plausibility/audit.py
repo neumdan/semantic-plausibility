@@ -408,6 +408,9 @@ class Checker:
         )
         self.approvals = _approvals(approvals)
         self.evidence_mode = "offline_snapshot" if snapshot else "configured_services"
+        from .laboratory_suggestions import LaboratorySuggestions
+
+        self.suggestions = LaboratorySuggestions(getattr(self.evidence, "llm", None)) if research else None
 
     def profile_for(self, kind: str) -> InputProfile:
         if kind != "Observation":
@@ -439,6 +442,7 @@ class Checker:
             profile=profile,
             terminology=self.terminology,
             spelling=self.spelling,
+            suggestions=self.suggestions,
         )
         report = pipeline.check(
             obs,
@@ -446,12 +450,16 @@ class Checker:
             **{
                 key: value
                 for key, value in payload["context"].items()
-                if key in {"source_test", "loinc_system", "method"}
+                if key in {"source_test", "loinc_system", "method", "source_axes"}
             },
         )
         item = report["measurements"][0]
+        from .recommendations import source_reference_checks
+        item["source_reference_checks"] = source_reference_checks(payload, stats, item["unit_check"])
         ranges = item["reference_checks"]
         findings: list[tuple[str, str]] = []
+        if "mismatch" in item.get("additional_axis_fits", {}).values():
+            findings.append(("unclear", "A supplied component/property/time/scale descriptor conflicts with the resolved LOINC axis."))
         if any(check["state"] in {"unverified", "alias_version_unverified"} for check in item["name_checks"]):
             findings.append(("unclear", "Analytbezeichnung ist für diesen Code und diese Version nicht eindeutig belegt; fachlich prüfen."))
         if item["unit_label_check"]["state"] in {"unverified", "alias_version_unverified"}:

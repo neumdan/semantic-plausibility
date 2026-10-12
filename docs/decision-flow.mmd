@@ -12,10 +12,11 @@ flowchart TD
     MATCH["Documented unchanged fit<br/>Continue to values/references<br/>Clinical applicability remains<br/>a separate review question"]
     CONVERT["Verified linear conversion<br/>Propose target + numeric factor<br/>Check each reference bound too<br/>Never rewrite source values"]
     AMBIG["Ambiguous / mismatch<br/>10*6 without a denominator<br/>First example is a candidate<br/>No guessed transformation"]
-    RESEARCH["Explicit candidate sources and optional local research<br/>SemLookP names; catalogue → local model → quoted lookup pages → PubMed candidates<br/>Candidate searches are opt-in; offline mode has no remote research"]
+    RESEARCH["Explicit candidate sources and optional local research<br/>Names → real search → exact candidate + unit/axes → model choice or abstention<br/>Catalogue spellings; quoted page/study intervals; offline has no remote research"]
     NUMERIC["Values and reference metadata<br/>Finite numbers, ordered bounds, supplied units and interval context<br/>Out-of-reference is descriptive; it is not automatically a data error<br/>Evidence of clinical plausibility requires method/population review"]
     OUTPUT["Write separate checks, credibility and explicit readiness denominators<br/>Priority: error → unclear → suggestion → passed<br/>Readiness is a numeric semantic proxy, not MII certification or clinical approval"]
-    REVIEW["Expert adjudication → approved site mapping → formal FHIR validation<br/>Patient Observations are never generated from aggregate means"]
+    REVIEW["Clinician adjudication of the entire set<br/>Record approval / rejection / defer / revoke with reviewer, evidence and time<br/>Apply approved site transformations in ETL; validate actual FHIR resources"]
+    REGISTRY["Versioned source and profile scope for future mappings<br/>Recheck target code / unit / factor and each reference bound on reuse<br/>Changed context / catalogue / profile or revocation prevents automatic reuse"]
     INPUT --> SOURCE
     SOURCE --> |"A"| LOCAL
     SOURCE --> |"B"| API
@@ -30,15 +31,18 @@ flowchart TD
     FIT --> MATCH
     FIT --> CONVERT
     FIT --> AMBIG
-    MATCH --> RESEARCH
-    CONVERT --> RESEARCH
-    AMBIG --> RESEARCH
-    RESEARCH --> NUMERIC
+    MATCH --> NUMERIC
+    CONVERT --> NUMERIC
+    AMBIG --> NUMERIC
     NUMERIC --> OUTPUT
-    OUTPUT --> REVIEW
+    OUTPUT -.-> |"optional evidence pass"| RESEARCH
+    OUTPUT -.-> |"direct review"| REVIEW
+    RESEARCH --> REVIEW
+    REVIEW --> REGISTRY
+    REGISTRY -.-> |"reviewed reuse"| LOOKUP
     classDef normal fill:#f3f7fa,stroke:#c4d5df,color:#142d42
     class INPUT,SOURCE,LOCAL,API,LOOKUP,UNKNOWN,FIT,CONVERT,AMBIG,NUMERIC,REVIEW normal
     classDef teal fill:#eef7f4,stroke:#a8cfc6,color:#142d42
-    class KNOWN,MATCH,RESEARCH,OUTPUT teal
+    class KNOWN,MATCH,RESEARCH,OUTPUT,REGISTRY teal
     classDef error fill:#fcf1f3,stroke:#ecc7cf,color:#142d42
     class INVALID error

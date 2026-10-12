@@ -36,6 +36,7 @@ from .export_report import (
 from .support import _csv_text, _input_hash, read_contexts
 from .observation_quality import LoincTerm
 from .terminology_router import TerminologyRouter, artifact_files, load_sources
+from .review_feedback import REVIEW_FIELDS, ReviewRegistry
 
 EXTRA_FIELDS = [
     "semantic_signature",
@@ -74,6 +75,21 @@ EXTRA_FIELDS = [
     "name_check",
     "unit_label_check",
     "name_evidence_json",
+    "suggested_name",
+    "canonical_name",
+    "suggestion_state",
+    "laboratory_suggestions_json",
+    "reference_candidates_json",
+    "study_evidence_json",
+    "reported_measurements_json",
+    "source_code_check",
+    "source_unit_check",
+    "source_code_unit_fit",
+    "source_reference_check_json",
+    "mapping_review_state",
+    "approved_mapping_ready",
+    "clinician_mapping_json",
+    *REVIEW_FIELDS,
 ]
 
 
@@ -389,6 +405,7 @@ def reference_artifacts(config):
         "profile": config.data.get("specification", {}).get("STRUCTURE_DEFINITION")
         or config.data.get("specification", {}).get("PROFILE_FILE"),
         "concept_map": config.data.get("quality", {}).get("concept_map"),
+        "review_registry": config.data.get("quality", {}).get("review_registry"),
         "unit_catalog": config.data.get("research", {}).get("unit_catalog")
         if config.data.get("research", {}).get("enabled")
         else None,
@@ -400,11 +417,15 @@ def reference_artifacts(config):
             if entry.get("enabled") and entry.get("type") in {"csv", "sqlite", "fhir_artifacts"}
         }
     )
+    paths.update({"value_set:" + str(index): name for index, name in enumerate(config.data.get("specification", {}).get("VALUE_SETS", []))})
     artifacts = []
     for role, value in paths.items():
         if not value:
             continue
         path = config.path_value(value)
+        if role == "review_registry" and not path.exists():
+            artifacts.append({"role": role, "state": "not_yet_created"})
+            continue
         files = artifact_files(path) if path.is_dir() else [path]
         if path.is_dir() and (path / "installation.json").exists():
             files.append(path / "installation.json")
@@ -464,9 +485,62 @@ def review_export(config):
         lock.unlink(missing_ok=True)
 
 
+def configured_checker(config, prepared, *, profile=None, research=None, options=None):
+    options = options or prepared.audit.checker_options()
+    enabled = config.data.get("research", {}).get("enabled", False) if research is None else research
+    if config.network_mode == "offline":
+        clients = (
+            offline_services(prepared.audit.snapshot)
+            if prepared.audit.snapshot
+            else (UnknownUcum(), UnknownLoinc())
+        )
+        entries = (
+            load_sources(prepared.audit.terminology_sources)
+            if prepared.audit.terminology_sources
+            else []
+        )
+        checker = Checker(
+            **{**options, "snapshot": None},
+            ucum=ReliableLookup(clients[0], circuit_breaker=False),
+            loinc=ReliableLookup(clients[1], circuit_breaker=False),
+            terminology=TerminologyRouter(entries),
+        )
+    else:
+        if prepared.audit.snapshot:
+            raise ValueError("Choose offline reference pack OR connected lookups, not both")
+        checker = Checker(
+            **{
+                **options,
+                "research": enabled,
+                "models_file": prepared.models_file,
+                "model_alias": prepared.model_alias,
+                "research_scope": prepared.scope,
+            }
+        )
+        active_types = {
+            entry.get("type")
+            for entry in config.data.get("lookups", {}).values()
+            if entry.get("enabled", False)
+        }
+        if "ucum" not in active_types:
+            checker.ucum = UnknownUcum()
+        if "loinc" not in active_types:
+            checker.loinc = UnknownLoinc()
+        checker.ucum, checker.loinc = ReliableLookup(checker.ucum), ReliableLookup(checker.loinc)
+        if checker.spelling:
+            checker.spelling.ucum = checker.ucum
+    if profile is not None:
+        checker.custom = profile
+    checker.review_catalogue_fingerprint = [row for row in reference_artifacts(config)
+        if row["role"].startswith(("lookup:", "value_set:")) or row["role"] == "reference_pack"]
+    return checker
+
+
 def _review_export(config):
     local_model_only(config)
     target = config.path_value(config.output.get("path", "output/laboratory-review.csv"))
+    registry_path = config.data.get("quality", {}).get("review_registry")
+    registry = ReviewRegistry(config.path_value(registry_path)) if registry_path else None
     paths = {
         "csv": target,
         "summary": target.with_suffix(".summary.json"),
@@ -492,6 +566,7 @@ def _review_export(config):
                 config.input.get("manifest"),
                 config.data.get("specification", {}).get("STRUCTURE_DEFINITION"),
                 config.data.get("quality", {}).get("concept_map"),
+                config.data.get("quality", {}).get("review_registry"),
             )
             if value
         ],
@@ -501,6 +576,7 @@ def _review_export(config):
         for entry in config.data.get("lookups", {}).values()
         if entry.get("path")
     )
+    protected.update(config.path_value(name) for name in config.data.get("specification", {}).get("VALUE_SETS", []))
     protected.update(
         config.path_value(value)
         for value in (
@@ -536,6 +612,7 @@ def _review_export(config):
                 configuration_sha256=config.deployment.sha256,
                 network_mode=config.network_mode,
                 mode=config.output.get("mode", "distinct"),
+                operation=config.operation,
             )
             with environment(updates), config.deployment.prepare() as prepared:
                 options = prepared.audit.checker_options()
@@ -554,47 +631,7 @@ def _review_export(config):
                     policy_file.write_text(json.dumps(policy))
                     options["profile_config"] = policy_file
                 enabled = config.data.get("research", {}).get("enabled", False)
-                if config.network_mode == "offline":
-                    clients = (
-                        offline_services(prepared.audit.snapshot)
-                        if prepared.audit.snapshot
-                        else (UnknownUcum(), UnknownLoinc())
-                    )
-                    entries = (
-                        load_sources(prepared.audit.terminology_sources)
-                        if prepared.audit.terminology_sources
-                        else []
-                    )
-                    checker = Checker(
-                        **{**options, "snapshot": None},
-                        ucum=ReliableLookup(clients[0], circuit_breaker=False),
-                        loinc=ReliableLookup(clients[1], circuit_breaker=False),
-                        terminology=TerminologyRouter(entries),
-                    )
-                else:
-                    if prepared.audit.snapshot:
-                        raise ValueError("Choose offline reference pack OR connected lookups, not both")
-                    checker = Checker(
-                        **{
-                            **options,
-                            "research": enabled,
-                            "models_file": prepared.models_file,
-                            "model_alias": prepared.model_alias,
-                            "research_scope": prepared.scope,
-                        }
-                    )
-                    active_types = {
-                        entry.get("type")
-                        for entry in config.data.get("lookups", {}).values()
-                        if entry.get("enabled", False)
-                    }
-                    if "ucum" not in active_types:
-                        checker.ucum = UnknownUcum()
-                    if "loinc" not in active_types:
-                        checker.loinc = UnknownLoinc()
-                    checker.ucum, checker.loinc = ReliableLookup(checker.ucum), ReliableLookup(checker.loinc)
-                    if checker.spelling:
-                        checker.spelling.ucum = checker.ucum
+                checker = configured_checker(config, prepared, options=options, research=enabled)
                 # Load policies early, before an expensive source scan.
                 selected_profile = checker.profile_for("Observation")
                 declared_canonical = config.data.get("specification", {}).get("IG_CANONICAL")
@@ -605,6 +642,8 @@ def _review_export(config):
                 ):
                     raise ValueError("Declared IG canonical differs from the selected policy/profile")
                 artifacts = reference_artifacts(config)
+                from .profile_lookups import terminology_plan
+                routes = terminology_plan(config, selected_profile)
                 log.event("reference_artifacts", artifacts=artifacts, imported_profile=imported_policy)
                 source = prepared.source
                 input_hash = (
@@ -697,7 +736,7 @@ def _review_export(config):
                     key
                     for key in EXTRA_FIELDS
                     if mode == "items"
-                    or key not in {"source_id", "source_ref", "measurement_path", "source_namespace"}
+                    or key not in {"source_id", "source_ref", "measurement_path"}
                 ]
                 preview, statuses, total, ready, weighted_ready, weighted_total, unknown_frequency = (
                     [],
@@ -717,6 +756,7 @@ def _review_export(config):
                         "reference_numeric_ready",
                     )
                 }
+                approved_count = 0
                 csv_file, evidence_file = folder / "review.csv", folder / "evidence.jsonl"
                 with (
                     csv_file.open("w", encoding="utf-8-sig", newline="") as output,
@@ -735,6 +775,7 @@ def _review_export(config):
                         }
                         row = review_row(raw_row, detail, config)
                         measurement = detail.get("report", {}).get("measurements", [{}])[0]
+                        source_checks = measurement.get("source_code_checks", [])
                         names = measurement.get("name_checks", [])
                         unit_label = measurement.get("unit_label_check", {})
                         row.update(
@@ -744,6 +785,10 @@ def _review_export(config):
                             name_evidence_json=encoded({"analyte": names, "unit": unit_label}),
                         )
                         row["profile"] = selected_profile.name
+                        row.update(source_code_check=";".join(check["state"] for check in source_checks) or "unknown",
+                                   source_unit_check=measurement.get("unit_check", {}).get("state", "unknown"),
+                                   source_code_unit_fit=";".join(measurement.get("source_code_unit_fit", [])))
+                        row["source_reference_check_json"] = encoded(measurement.get("source_reference_checks", []))
                         if not row["ig_canonical"]:
                             row["ig_canonical"] = selected_profile.canonical
                         if row["status"] == "passed" and (
@@ -778,6 +823,23 @@ def _review_export(config):
                         row.pop("item_path", None)
                         row.update(grade(row, detail))
                         proposals = source_proposals(config, checker, payload)
+                        suggestions = measurement.get("laboratory_suggestions") or {}
+                        selected_code = suggestions.get("selected_code")
+                        selected_candidate = next((candidate for candidate in suggestions.get("coding_candidates", []) if candidate["code"] == selected_code), None)
+                        if selected_candidate and not row["suggested_unit"]:
+                            row["suggested_unit"] = selected_candidate["unit_fit"].get("target") or ""
+                        for candidate in suggestions.get("coding_candidates", []):
+                            proposals.append({
+                                "source_system": row["code_system"], "source_code": row["code"],
+                                "target_system": candidate["system"], "target_code": candidate["code"],
+                                "target_version": candidate["version"], "target_verified": True,
+                                "equivalence": "not_established", "source": candidate["source"],
+                                "method": "retrieved_candidate_exact_lookup",
+                                "model_selected": candidate["code"] == selected_code,
+                                "unit_fit": candidate["unit_fit"], "review_required": True,
+                            })
+                        unambiguous = next((p for p in proposals if p["target_code"] == selected_code), None) if selected_code else (
+                            proposals[0] if len(proposals) == 1 and proposals[0].get("equivalence") in {"equal", "equivalent"} else None)
                         row.update(
                             findings_json=encoded(
                                 [
@@ -794,12 +856,37 @@ def _review_export(config):
                                 ]
                             ),
                             coding_proposal_json=encoded(proposals),
-                            suggested_code=proposals[0]["target_code"] if len(proposals) == 1 else "",
-                            suggested_code_system=proposals[0]["target_system"]
-                            if len(proposals) == 1
-                            else "",
+                            suggested_code=unambiguous["target_code"] if unambiguous else "",
+                            suggested_code_system=unambiguous["target_system"] if unambiguous else "",
+                            suggested_name=suggestions.get("selected_name") or "",
+                            canonical_name=next(((check["terminology"].get("metadata") or {}).get("display", "")
+                                for check in measurement.get("code_checks", [])
+                                if check.get("system") == "http://loinc.org" and check["terminology"]["state"] == "valid"), ""),
+                            suggestion_state=suggestions.get("state", "disabled"),
+                            laboratory_suggestions_json=encoded(suggestions),
+                            reference_candidates_json=encoded([candidate for candidate in measurement.get("study_candidates", [])
+                                if candidate["evidence_type"] in {"reference_interval", "analytical_interval", "documented_extreme"}]),
+                            study_evidence_json=encoded(measurement.get("study_candidates", [])),
+                            reported_measurements_json=encoded([candidate for candidate in measurement.get("study_candidates", [])
+                                if candidate["evidence_type"] == "reported_measurement"]),
                             fhir_mapping_proposal_json=encoded(mapping_proposal(row, detail, proposals)),
                         )
+                        approval = registry.proposal(payload, row["source_namespace"], selected_profile, checker) if registry else {"state": "not_configured", "review_required": True}
+                        ready_mapping = (approval["state"] == "reused_clinician_approval" and not approval["review_required"]
+                            and not stats.get("invalid") and (stats.get("minimum") is not None or stats.get("maximum") is not None)
+                            and not payload.get("modifier_extensions") and not payload["quantity"].get("comparator"))
+                        row.update(mapping_review_state=approval["state"], approved_mapping_ready=ready_mapping,
+                                   clinician_mapping_json=encoded(approval))
+                        approved_count += ready_mapping
+                        detail["clinician_mapping"] = approval
+                        if approval["state"] == "reused_clinician_approval":
+                            approved = approval["target"]
+                            row.update(suggested_code=approved["code"], suggested_code_system=approved["code_system"],
+                                       suggested_unit=approved["unit"], suggested_factor=approved["factor"], suggested_name=approved["name"])
+                            plan = mapping_proposal(row, detail, proposals)
+                            plan.update(clinician_approved_target=approved, quantity_transformation=approval["verification"],
+                                        review_required=approval["review_required"], approval_id=approval["decision_id"])
+                            row["fhir_mapping_proposal_json"] = encoded(plan)
                         selected = {
                             field: _csv_text(str(row[field]))
                             if isinstance(row.get(field), str)
@@ -824,8 +911,10 @@ def _review_export(config):
                 if not total:
                     raise ValueError("Input contains no selected laboratory measurements")
                 phase = "report"
+                from .review_feedback import profile_fingerprint
                 summary = {
                     "format_version": 1,
+                    "operation": config.operation,
                     "run_id": run_id,
                     "mode": mode,
                     "software": versions(),
@@ -833,6 +922,7 @@ def _review_export(config):
                     "input_sha256": input_hash,
                     "reference_pack_sha256": _input_hash(snapshot) if snapshot else None,
                     "reference_artifacts": artifacts,
+                    "profile_rules_sha256": profile_fingerprint(selected_profile),
                     "evidence_kind": kind,
                     "network_mode": config.network_mode,
                     "input_records": accounting["individual_records"] + accounting["distinct_records"],
@@ -843,6 +933,7 @@ def _review_export(config):
                     "statuses": statuses,
                     "metrics": {
                         "mii_numeric_set_ready": ratio(ready, total),
+                        "approved_mapping_ready": ratio(approved_count, total),
                         **{key: ratio(value, total) for key, value in counters.items()},
                     },
                     "weighted_readiness": None
@@ -855,11 +946,19 @@ def _review_export(config):
                     "export_manifest": manifest,
                     "specification": config.data.get("specification", {}),
                     "lookup_sources": {"ucum": checker.ucum.source, "loinc": checker.loinc.source},
+                    "terminology_plan": routes,
                     "loinc_editions": sorted({
                         term.version for (operation, _), term in checker.loinc.cache.items()
                         if operation == "lookup" and isinstance(term, LoincTerm) and term.version
                     }),
                     "lookup_errors": checker.ucum.errors + checker.loinc.errors,
+                    "research": {
+                        "enabled": enabled, "scope": prepared.scope,
+                        "sources": list(getattr(checker.evidence, "source_records", {}).values()),
+                        "accepted_model_calls": getattr(getattr(checker.evidence, "llm", None), "audit_records", []),
+                        "measured_values_sent_to_models": False,
+                        "identifiers_sent_to_models": False,
+                    },
                     "imported_profile": imported_policy,
                     "elapsed_seconds": round(time.monotonic() - started, 4),
                 }

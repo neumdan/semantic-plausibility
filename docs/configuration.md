@@ -1,66 +1,130 @@
 # Configure a laboratory review
 
-Copy `pipeline.example.toml` to `pipeline.toml`. Paths are relative to that file. Configure only the source and features you use; omitted lookup/model features stay off.
+Start by copying `pipeline.example.toml` to **`pipeline.toml`**. For the first check, leave the example unchanged. For your data, edit its existing `[input]`, `[input.columns]` and `[output]` tables. Enable other features only when you need them. [First setup and run commands](shipped-stack.md#first-setup).
 
-| Section | Defines |
-| --- | --- |
-| `input` | CSV, FHIR file, PostgreSQL or SQLite; location and input granularity |
-| `input.columns` | Semantic role → actual CSV header / database column |
-| `input.snapshot` | Optional lookup pack captured from real services |
-| `specification` | FHIR R4 and the selected deployed profile/policy |
-| `aggregation` | Optional exact-value grouping; other semantic qualifiers are always guarded |
-| `network` / `lookups` | Offline mode or explicit terminology APIs/lists |
-| `packages` | Optional pinned BfArM package setup; downloaded only by `package-init` |
-| `quality` | Optional reviewed ConceptMap; mappings remain proposals |
-| `study` | Matched cohort/period declarations for source comparisons |
-| `output` | Report filename and `distinct`/`items` mode |
+TOML carries the pipeline settings. `.env` or secret files carry credentials; no shell exports are required. The runner supports laboratory **Observation in FHIR R4 (4.0.1)**. Medication, Condition and Procedure remain later adapters.
 
-Keep declared systems, versions, units and every reference interval. Defaults may express documented source facts; they must not invent LOINC or UCUM declarations. See the [field contract](data-contract.md) for available roles.
+## Select the configuration
 
-## Select terminology evidence
+| Runtime | Select the TOML | Default |
+| --- | --- | --- |
+| Python / uv | `run-plausibility-check --config pipeline.toml`; uv loads credentials with `--env-file .env` | `pipeline.toml` in the current directory |
+| Docker Compose | `.env` contains `SQC_CONFIG_FILE=pipeline.toml`; run `docker compose run --rm --build run-plausibility-check` | Host `pipeline.toml`, mounted at `/app/pipeline.toml` |
+| Podman Compose | Same `.env`; run `podman-compose run --rm --build run-plausibility-check` | Same host/container paths |
 
-- **Local data:** download/install the real terminology first, then set the lookup's `type`, `path`, `systems` and `enabled=true`. `package-init` performs explicit package setup; a batch reads installed files.
-- **API:** set its `type`, `endpoint` and `enabled=true`; specify systems for generic adapters and reference credentials when required. Actual secrets belong in `.env` or `local/secrets/`.
-- **Combined:** local German labels plus NLM/LOINC API checks are selectable in the same run. For fully offline UCUM/LOINC checks also reference a captured pack in `input.snapshot` and select `network.mode="offline"`.
+For another container TOML, change the selector in `.env` or use `--env-file local/research.env` with a selector file. [Exact examples](shipped-stack.md#select-another-toml). This Compose parameter chooses a host mount; it is different from the runner's `--config` parameter. The services continue to load project `.env` credentials.
 
-See [the two routes with exact TOML examples](lookups.md#choose-local-files-or-an-api). The default `pipeline.example.toml` selects public APIs. `terminology.example.toml` adds optional package/API tables; extra sources remain disabled until selected. Input data, terminology evidence and report output have separate paths.
+An old shell assignment can override the file selector. Remove it once with `unset SQC_CONFIG_FILE`; `.env.example` and the Compose fallback now select `pipeline.toml`. Existing `.env`/TOML files are never replaced by the setup copy commands.
+
+## Configuration sections
+
+These sections cover the supported workflow. Unknown settings are rejected. Use actual source facts; a configuration must not invent LOINC/UCUM declarations to make a check pass.
+
+| Section | Main settings | Purpose |
+| --- | --- | --- |
+| Root | `config_version=3` | Current configuration schema, separate from the software version |
+| `general` | `PROJECT_NAME`, `RESOURCE_TYPE="Observation"`, `MODEL_ALIAS` | Run label, supported resource type, selected named model (default alias `local`) |
+| `input` | `type`, `origin`, `source_namespace`, `path`, `granularity`, `delimiter` | Location, source/site identity and input representation |
+| `input.columns` / `input.defaults` | Semantic role → column / known constant | CSV/database field mapping; defaults only for documented source facts |
+| `input.elements` | Semantic role → `Observation.*` path | Optional scalar FHIR selection; the native adapter normally needs no mapping |
+| `input.context` / `context_file` / `manifest` | Context and export-selection artifacts | Known axes/qualifiers and source-selection accounting |
+| `input.snapshot` | Captured real lookup-pack path | UCUM/LOINC evidence for offline checks |
+| `database` | `DB_TABLE`, optional `DB_SCHEMA`, connection references | Read-only PostgreSQL or SQLite selection |
+| `specification` | `FHIR_VERSION`, `PROFILE`, `STRUCTURE_DEFINITION` or `PROFILE_FILE`, `VALUE_SETS`, `IG_*` | Selected target rules and pinned artifacts |
+| `aggregation` | `engine="duckdb"`, `group_by` | Grouped sets; optional exact point-value grouping |
+| `output` | `path`, `mode`, `overwrite`, `include_distribution`, `lookup_pack` | CSV report prefix, item/group mode and optional captured evidence |
+| `network` | `mode`, `allowed_http_hosts` | Offline/connected lookups and explicit local plain-HTTP hosts |
+| `lookups.NAME` | `enabled`, `role`, `type`, `endpoint` or `path`, `systems` | Real primary/source/optional terminology services |
+| `packages.NAME` | Registry, name, exact version, path, acceptance | Optional explicit BfArM package installation |
+| `models.NAME` | Runtime, URL reference, model ID, budgets | Optional local inference endpoint |
+| `research` | Scope, providers, per-LOINC budget, catalogue | Separate page/study evidence retrieval |
+| `quality` | `review_registry`, optional `concept_map` | Reviewed local mappings; clinician registry is the feedback route |
+| `study` | `cohort`, `period_start`, `period_end`, `source_label` | Operator declarations for matched LIS/FHIR/CDS Hub comparisons |
+
+## Paths and container mounts
+
+For Python, relative input, output, artifact and secret-file paths resolve against the selected TOML's directory. `--config` itself resolves from your current directory. Keep a configuration beside the paths it describes, or use appropriate absolute paths.
+
+For the supplied Compose stack, keep TOMLs in the repository root. `SQC_CONFIG_FILE` is a repository-relative host filename; the file always appears at `/app/pipeline.toml`. Its relative paths therefore resolve under `/app`.
+
+| TOML path | Host location | Container location / access |
+| --- | --- | --- |
+| `examples/laboratory.csv` | Repository example | `/app/examples/laboratory.csv`, read-only |
+| `local/laboratory.csv` | Your input export | `/app/local/laboratory.csv`, read-only for checking |
+| `local/terminologies/…` | Installed real terminology | `/app/local/terminologies/…`, read-only for checking |
+| `local/secrets/…` | Secret files | `/app/local/secrets/…`, read-only for checking |
+| `output/laboratory-review.csv` | Reports | `/app/output/laboratory-review.csv`, writable |
+
+A host path such as `/Users/…/lab.csv` is not automatically available in a container. Place files under `local/` or explicitly add a read-only bind mount. Package/catalogue/review-import services have writable `local/` mounts for their setup actions.
 
 ## CSV and aggregation
 
-Set `type="csv"`, map your headers, and choose:
+Replace the corresponding tables in `pipeline.toml`; do not append a second table with the same name. This example assumes the headers shown in the mapping:
 
-- `granularity="individual"`: one measurement per row; no aggregate count/bounds.
-- `granularity="distinct"`: already grouped input; use real `count`, or omit it when unknown.
-- `output.mode="distinct"`: summarize values per guarded code–unit–reference set.
-- `output.mode="items"`: retain source IDs/locators; requires individual input.
+```toml
+[input]
+type = "csv"
+origin = "lis"
+source_namespace = "site-lis-a"
+path = "local/laboratory.csv"
+granularity = "individual"
+delimiter = ","
 
-To keep exact point values as separate tuples, add:
+[input.columns]
+code = "test_code"
+code_system = "test_system"
+analyte_name = "test_name"
+value = "result"
+unit = "unit_text"
+unit_code = "unit_code"
+unit_system = "unit_system"
+reference_ranges_json = "reference_ranges_json"
+# source_id = "observation_id"     # Optional; needed for an explicit source ID in items mode.
+```
+
+Use `granularity="individual"` for one measurement per row. For an already distinct export, set `granularity="distinct"` and map `count="count"` only when real source frequencies are supplied. Omit count when unknown; do not manufacture a frequency of one. For aggregate extrema, map `value_min/value_max` instead of `value`.
+
+Full `reference_ranges_json` preserves all intervals and qualifiers. For one unqualified interval only, map `reference_low`, `reference_high`, `reference_unit`, `reference_unit_system` instead. Preserve code versions, comparators, status and available method/specimen context. The optional `specimen` role expects a resolved LOINC system-axis token, not a raw SNOMED code. [All field roles and examples](data-contract.md#minimum-export).
+
+`output.mode="distinct"` combines eligible values per complete guarded set. Names, codings/editions, units, all reference qualifiers, comparators, status and context remain part of the guards. To retain exact point values as separate sets:
 
 ```toml
 [aggregation]
+engine = "duckdb"
 group_by = ["code", "code_system", "unit", "unit_system", "reference_range", "value"]
 ```
 
-Min/max-only inputs cannot use exact-value grouping or supply mean/SE/median/IQR.
+The five non-value fields above are mandatory grouping keys. Min/max-only inputs cannot use exact-value grouping or reconstruct mean/SE/median/IQR. `output.mode="items"` preserves IDs/locators and requires individual input; distinct input cannot restore them.
 
-## FHIR Bundle / NDJSON
+## FHIR Bundle and NDJSON
 
-Use [examples/lab/fhir.toml](../examples/lab/fhir.toml), with `input.type="fhir_file"` and `granularity="individual"`. Set `input.path` to an R4 Bundle, NDJSON file or NDJSON directory. Native reading preserves alternative codings, components and all reference ranges; remove CSV column/default tables. Export one current version per Observation ID.
+Replace `[input]` with:
 
-Use TORCH/CRTDL or the server's supported CQL upstream. [LaboratorySelection.cql](../examples/studies/LaboratorySelection.cql) illustrates selection; it is not a universal export command. A count-only MeasureReport is insufficient. LIS APIs similarly produce a supported export. [MII/FDPG placement](mii-quality.md).
+```toml
+[input]
+type = "fhir_file"
+origin = "fhir"
+source_namespace = "site-fhir-a"
+path = "local/laboratory.bundle.json"
+granularity = "individual"
+```
 
-## PostgreSQL or SQLite
+Remove `[input.columns]` and `[input.defaults]`. The native adapter reads R4 Observation fields, alternative codings, components and all reference ranges. It supports Bundle/JSON, NDJSON files and NDJSON directories; export one current version per Observation ID. Optional `input.elements` is limited to selected scalar `Observation.*` paths; components use the native reader. [Runnable source example](../examples/lab/fhir.toml).
 
-Prefer a hospital CSV export when the database is disconnected. [distinct-export.postgres.sql](../examples/studies/distinct-export.postgres.sql) illustrates grouping against a **site-defined** view; no CDS Hub schema is assumed.
+Extract resources upstream using TORCH/CRTDL or the server's supported CQL. A count-only MeasureReport cannot supply measurements, distributions or intervals. LIS vendor APIs likewise need to produce a supported file or mapped view. [MII/FDPG placement](mii-quality.md) · [CQL selection example](../examples/studies/LaboratorySelection.cql).
 
-For a direct PostgreSQL read, install `uv sync --locked --no-editable --extra postgres`. Keep `input.columns`, replace the input type, and add:
+## PostgreSQL and SQLite
+
+Prefer a CSV export for disconnected hospital databases. Direct reads use your site's selected table/view and the same `input.columns` contract; the runner assumes no universal CDS Hub schema.
+
+For PostgreSQL, install `uv sync --locked --no-editable --extra postgres` (the Compose image includes the adapter), remove `input.path`, retain your column mapping, and configure:
 
 ```toml
 [input]
 type = "postgres"
-origin = "cds_hub"                 # or lis
-snapshot = "local/reference-pack.json"
-granularity = "distinct"
+origin = "cds_hub"                  # Or lis.
+source_namespace = "site-cds-hub-a"
+granularity = "distinct"           # Use individual for a view containing single measurements.
 
 [database]
 DB_SCHEMA = "semantic_review"
@@ -68,23 +132,127 @@ DB_TABLE = "lab"
 DB_DSN_ENV = "LAB_DB_DSN"
 ```
 
-Put the connection string in ignored `.env`: `LAB_DB_DSN=postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=verify-full`. Configure a trusted CA and a SELECT-only account. The adapter validates identifiers and reads in a read-only transaction. Do not paste real credentials into documentation/reports.
+Put the real DSN in ignored `.env`; load it with uv's `--env-file .env` or Compose. A template is `LAB_DB_DSN=postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=verify-full`. Configure a trusted CA and SELECT-only account. `DB_DSN_FILE="local/secrets/lab-dsn"` is the secret-file alternative. Identifiers are validated and PostgreSQL scanning uses a read-only transaction.
 
-Alternatively supply `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER_ENV`, `DB_PASSWORD_ENV` or `DB_PASSWORD_FILE`, and `DB_SSLMODE`. An explicit `PATH_TO_DB_CONFIG_TOML` reuses flat CDS Toolchain `DB_*` fields; `DB_USER_KEY`/`DB_PASSWORD_KEY` select its credential keys. Choose one connection method.
+Other supported connection fields are `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER_ENV`, `DB_PASSWORD_ENV` or `DB_PASSWORD_FILE`, and `DB_SSLMODE`. Choose a DSN or these separate fields. `PATH_TO_DB_CONFIG_TOML` alternatively reuses flat CDS Toolchain `DB_*` settings; `DB_USER_KEY`/`DB_PASSWORD_KEY` select its credential keys. Keep that existing credential-bearing file under ignored `local/`. [Source grouping SQL](../examples/studies/distinct-export.postgres.sql).
 
-SQLite uses `type="sqlite"`, `input.path="local/lab.sqlite"`, and `database.DB_TABLE="lab"`; it opens read-only. DuckDB remains the grouping engine. Supply a site-defined table/view with the same selected fields; no CDS Hub schema is assumed.
+For SQLite, use `input.type="sqlite"`, `input.path="local/lab.sqlite"`, the column mapping and `database.DB_TABLE="lab"`; omit PostgreSQL connection fields. It opens read-only. DuckDB is the aggregation engine for every input type, not an additional database server.
 
-## Profile and evidence
+## Profiles and terminology roles
 
-International fallback is FHIR R4. For installed MII/NUM profiles, set `specification.STRUCTURE_DEFINITION` to a resolved R4 Observation snapshot and record `IG_PACKAGE`, `IG_VERSION`, `IG_CANONICAL`. Alternatively use `PROFILE_FILE` for a reviewed selected-element policy; choose one. [examples/lab/mii-lis.toml](../examples/lab/mii-lis.toml) demonstrates the pinned MII snapshot. This imports selected semantic rules, not full IG validation.
+The starter explicitly pins FHIR R4 and MII Laboratory 2026.0.3. `STRUCTURE_DEFINITION` must be an installed resolved R4 Observation snapshot; `IG_PACKAGE`, `IG_VERSION` and `IG_CANONICAL` record its identity. Alternatively use `PROFILE_FILE` for a reviewed selected-element policy; never configure both. `VALUE_SETS` lists real versioned ValueSet JSON used to derive bound systems. [Pinned profile example](../examples/lab/mii-lis.toml).
 
-`network.mode="lookups"` contacts the explicitly enabled real sources. `network.mode="offline"` uses installed real artifacts or a captured lookup pack only; missing evidence remains unverified. For remote lookups set `"lookups"` and explicitly enable each configured source. [Terminology configuration](lookups.md) · [Optional local research](research.md).
+Profiles define constraints/bindings, not API endpoint URLs or credentials. The MII snapshot fixes the quantitative unit system to UCUM and gives laboratory codes a **preferred** LOINC binding. ValueSet routing does not expand filters or prove membership. Unspecified selected rules fall back to international R4; explicit prohibitions remain effective. Full resource/IG validation belongs to the institution's FHIR validator.
 
-```sh
-uv run --no-sync plausibility config-check --config pipeline.toml
-uv run --no-sync --env-file .env plausibility batch --config pipeline.toml
+| Lookup role | Use | Example |
+| --- | --- | --- |
+| `primary` | Verify target terminology identity/unit grammar | Dedicated NLM UCUM and LOINC FHIR services |
+| `source` | Check what the LIS's original local codes/units mean | Real site CSV, SQLite, FHIR artifacts or API |
+| `optional` | Additional labels, aliases and candidates | BfArM supplements, SemLookP / OLS or a configured website |
+
+An optional result cannot reverse a confirmed primary rejection. A valid local code/unit is separate from target compatibility. Without a real source catalogue, membership stays unknown.
+
+```toml
+[lookups.lis_catalogue]
+enabled = true
+role = "source"
+type = "csv"
+path = "local/terminologies/lis-catalogue.csv"
+systems = ["https://your-site.example/lis/tests", "https://your-site.example/lis/units"]
+complete = false
 ```
 
-`config-check` checks setup; `--connections` additionally requests connection probes. The batch checks the actual input contract. Existing outputs require a new filename or explicit `output.overwrite=true`.
+This references your actual file; the project does not generate local terminology. CSV catalogues require `system,code`, optionally `version,display,definition,expected_unit_code,expected_unit_system,specimen,method`. Set `complete=true` only for a complete edition.
 
-Optional German labels, SemLookP name candidates and WHO ICD-11 lookup have one [configuration example](../terminology.example.toml) and [setup guide](lookups.md#german-packages-and-labels). Package installation is separate from a batch; model startup remains separate as well.
+Supported types: `ucum`, `loinc`, generic `fhir`, `csv`, `sqlite`, `fhir_artifacts`, `website`, `ols`, `who_icd`. Set `enabled=true` deliberately, one dedicated UCUM and LOINC service each. API adapters use `endpoint`; dedicated UCUM/LOINC also accept `endpoint_env`. Local adapters use `path` and declared `systems`. WHO ICD-11 is a standalone lookup, not a Condition batch check. [Adapter-specific fields, access and setup](lookups.md#choose-local-files-or-an-api) · [Optional terminology TOML](../terminology.example.toml).
+
+## Network and credentials
+
+The starter uses `network.mode="lookups"` for enabled real sources. For `"offline"`, install real local artifacts and reference actual captured UCUM/LOINC evidence in `input.snapshot`; absent evidence stays unverified. Capture a connected run with `output.lookup_pack="output/reference-pack.json"`. Research cannot retrieve remote evidence in offline mode.
+
+`allowed_http_hosts` permits explicitly named local/plain-HTTP endpoints, including Compose `ollama`, Docker Desktop `host.docker.internal` and Podman `host.containers.internal`. It is not an outbound firewall. Public API URLs in the examples use HTTPS.
+
+| Service | TOML references for credentials |
+| --- | --- |
+| Official LOINC Basic Auth | `username_env` / `username_file`, `password_env` / `password_file` |
+| Generic FHIR / website bearer token | `token_env` / `token_file` |
+| WHO ICD OAuth | `client_id_env` / `client_id_file`, `client_secret_env` / `client_secret_file` |
+| PostgreSQL | `DB_DSN_ENV` / `DB_DSN_FILE`, or user/password references above |
+| Local model requiring a key | `api_key_env` / `api_key_file` |
+| PubMed optional key | `research.pubmed.API_KEY_ENV` / `API_KEY_FILE` |
+| Protected package setup | `packages.NAME.token_env` / `token_file`, with explicit conditions acceptance |
+
+Environment references name a variable whose value lives in `.env` or the runtime. File references point to a secret file containing only the value; mount it under `local/secrets/` for Compose. Plain Python can use file references without loading `.env`. The default user TOMLs and files under `local/`/`output/` are excluded from Git, as are `.env` credentials. Keep other site configurations under ignored `local/` or add them to your ignore rules.
+
+## Local models and research
+
+A deterministic `run-plausibility-check` does not use a model, even if the TOML enables research. Use the separate `research-evidence` command on the completed audited report. The legacy `plausibility batch` command still honours `research.enabled`.
+
+```toml
+[models.local]
+runtime = "ollama"                 # external for LM Studio / another local compatible server.
+base_url_env = "LOCAL_MODEL_BASE_URL"
+model = "ministral-3:3b"
+temperature = 0
+max_tokens = 2048
+timeout_seconds = 180
+response_mode = "json_schema"
+```
+
+Set exactly one of `base_url` or `base_url_env`. For direct Python without environment loading, use `base_url="http://127.0.0.1:11434/v1"` instead. The endpoint must remain local. Choose the actual served model ID; configuring it does not start or download the model. `general.MODEL_ALIAS` selects a named table.
+
+`response_mode` supports `json_schema` or `json_object` with the same application guards. Optional controls include `reasoning_effort`, `enable_thinking`, `expected_digest` and `pull_timeout_seconds`; use only controls supported by the selected server/model. [Provisioning and native URLs](shipped-stack.md#ollama).
+
+```toml
+[research]
+enabled = true
+scope = "studies"                 # lookup uses pages/catalogues without study databases.
+sources = ["pubmed", "europe_pmc"]
+max_articles_per_loinc = 3         # 1–12 total unique articles per exact code/edition.
+unit_catalog = "local/unit-catalog.json"
+loinc_website_base_url = "https://loinc.org"
+
+[research.pubmed]
+BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+MAX_RESULTS = 1
+# EMAIL = "study-contact@example.org"
+# API_KEY_ENV = "PUBMED_API_KEY"
+
+[research.europe_pmc]
+BASE_URL = "https://www.ebi.ac.uk/europepmc/webservices/rest"
+MAX_RESULTS = 1
+```
+
+Prepare the real catalogue with `catalog-init` and the model with `model-init` or native setup. Provider limits bound query results; the unique-article cap is separate and retrieval is cached per code/edition. `--plan` exposes tasks/schemas/searches; executed `.trace.jsonl` records actual prompts, queries and guarded responses. Public evidence supports clinician adjudication, not an automatic semantic-correctness judgment. [Research and feedback](research.md).
+
+## Output and clinician feedback
+
+Edit the existing output table:
+
+```toml
+[output]
+mode = "distinct"                 # items requires individual input.
+path = "output/laboratory-review.csv"
+overwrite = false
+include_distribution = true
+# lookup_pack = "output/reference-pack.json"
+```
+
+Only CSV is the batch data output format; HTML, summary, evidence and audit sidecars are always produced. Pick a fresh path to preserve prior reports; research needs a fresh output prefix too. [Artifact contents](data-contract.md#output-artifacts).
+
+For reviewed mappings, set a stable `input.source_namespace` before collecting feedback. After `review-import` creates the local registry, enable:
+
+```toml
+[quality]
+review_registry = "local/clinician-mappings.json"
+```
+
+Reuse requires matching source/profile/context and revalidated targets/factors; history and revocations remain visible. Study selection metadata records cohort/period declarations, not proof that exports are comparable. [Clinician workflow](research.md#clinician-feedback) · [Source comparison studies](studies.md).
+
+## Validate settings
+
+```sh
+uv run --no-sync --env-file .env run-plausibility-check config-check --config pipeline.toml
+```
+
+Add `--connections` for explicit probes. Without it, the report checks setup and local files/columns; neither mode is a clinical audit. Unknown keys, mismatched source fields and unsupported resource/FHIR versions fail explicitly. A missing/unavailable terminology response remains unverified during a check.

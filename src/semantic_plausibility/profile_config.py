@@ -38,6 +38,7 @@ class InputProfile:
     canonical: str = ""
     guide_version: str = ""
     element_rules: dict[str, ElementRule] = field(default_factory=dict)
+    source_sha256: str = ""
 
 
 FHIR_R4_RULES = {
@@ -225,13 +226,15 @@ def assess_quantity(profile: InputProfile, path: str, quantity: dict[str, Any]) 
     }
 
 
-def load_profile(name: str, config: Path | None = None) -> InputProfile:
+def load_profile(name: str, config: Path | None = None, *, data: dict | None = None) -> InputProfile:
     """Load explicit per-element IG constraints; omitted elements inherit FHIR R4."""
-    if config is None:
+    if config is None and data is None:
         if name not in PROFILES:
             raise ValueError(f"Unknown input profile: {name}")
         return PROFILES[name]
-    data = json.loads(config.read_text(encoding="utf-8"))
+    if config is not None and data is not None:
+        raise ValueError("Choose a profile file or imported profile data")
+    data = data if data is not None else json.loads(config.read_text(encoding="utf-8"))
     if not isinstance(data, dict) or data.get("name") != name:
         raise ValueError("Profile config must be an object with the selected name")
     if data.get("fhir_version", "4.0.1") != "4.0.1":
@@ -279,7 +282,8 @@ def load_profile(name: str, config: Path | None = None) -> InputProfile:
                 for system, value in (raw.get("system_bindings") or {}).items()
             },
         )
-    return InputProfile(name, str(data.get("canonical") or ""), str(data.get("guide_version") or ""), rules)
+    return InputProfile(name, str(data.get("canonical") or ""), str(data.get("guide_version") or ""), rules,
+                        data.get("import_provenance", {}).get("source_sha256", ""))
 
 
 def profile_assessment(resource: dict[str, Any], profile: InputProfile) -> dict[str, Any]:

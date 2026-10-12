@@ -209,6 +209,31 @@ def value_checks(item: dict, ranges: list, stats: dict, quantity: dict, pipeline
     }
 
 
+def source_reference_checks(payload, stats, unit_check):
+    """Compare numbers in an exact verified source unit, independent of target IG rules."""
+    q = payload["quantity"]
+    code, system = q.get("code"), q.get("system")
+    results = []
+    for index, interval in enumerate(payload.get("reference_ranges", [])):
+        comparable = bool(code and system and unit_check.get("state") == "valid"
+                          and not q.get("comparator") and not stats.get("invalid"))
+        bounds = {}
+        for side in ("low", "high"):
+            bound = interval.get(side)
+            bounds[side] = number(bound.get("value")) if isinstance(bound, dict) else None
+            if isinstance(bound, dict):
+                # Omitted bound unit inherits only the declared measurement unit.
+                declared = bound.get("code") or bound.get("unit")
+                comparable &= not bound.get("comparator") and (not declared or declared == code) and bound.get("system", system) == system
+                comparable &= bounds[side] is not None
+        low, high = bounds["low"], bounds["high"]
+        ordered = (low is not None or high is not None) and not (low is not None and high is not None and low > high)
+        results.append({"index": index, "state": "numeric_bounds_valid_in_source_units" if comparable and ordered else "unresolved",
+            "unit_code": code, "unit_system": system, "context_qualified": bool(interval.get("age") or interval.get("appliesTo")),
+            **(_extrema(stats, low, high) if comparable and ordered else {}), "semantic_correctness": "not_inferred"})
+    return results
+
+
 def display_checks(checks: dict) -> dict[str, str]:
     states = {c["state"] for c in checks["local_reference"]}
     qualified = len(checks["local_reference"]) > 1 or any(

@@ -93,6 +93,11 @@ def observation_from_row(
         "loinc_system": mapping.value(row, "loinc_system"),
         "method": mapping.value(row, "method"),
     }
+    axes = {name: mapping.value(row, role) for name, role in (
+        ("component", "loinc_component"), ("property", "loinc_property"),
+        ("time", "loinc_time_aspect"), ("scale", "loinc_scale")) if mapping.value(row, role)}
+    if axes:
+        context["source_axes"] = axes
     return obs, context
 
 

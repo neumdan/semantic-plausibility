@@ -52,6 +52,8 @@ def check_configuration(path, *, source_alias=None, connections=False, research=
         row.get("type") for row in raw_config.get("lookups", {}).values() if row.get("enabled", False)
     }
     deployment = load_deployment(path)
+    from .batch import BatchConfiguration
+    from .profile_lookups import terminology_plan
     report = {
         "configuration_sha256": deployment.sha256,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -59,6 +61,14 @@ def check_configuration(path, *, source_alias=None, connections=False, research=
         "model_aliases": list(deployment.data.get("models", {})),
         "checks": [],
         "scope": "Configuration and connection readiness, not a clinical audit",
+        "connections_probed": connections,
+        "selected_input": {"type": raw_config.get("input", {}).get("type"),
+                           "path": raw_config.get("input", {}).get("path")},
+        "selected_lookups": [{"alias": alias, "type": row.get("type"),
+                              "location": row.get("path") or row.get("endpoint") or "configured endpoint reference"}
+                             for alias, row in raw_config.get("lookups", {}).items() if row.get("enabled")],
+        "research_enabled": raw_config.get("research", {}).get("enabled", False),
+        "terminology_plan": terminology_plan(BatchConfiguration(path)),
     }
     with deployment.prepare(
         source_alias=source_alias,

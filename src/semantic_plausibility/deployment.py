@@ -116,7 +116,7 @@ class Deployment:
         table(
             self.data.get("research", {}),
             "research",
-            {"scope", "unit_catalog", "observation_definitions", "pubmed", "loinc_website_base_url"},
+            {"scope", "unit_catalog", "observation_definitions", "pubmed", "loinc_website_base_url", "sources", "europe_pmc", "max_articles_per_loinc"},
         )
         table(self.data.get("network", {}), "network", {"allowed_http_hosts"})
         units = table(
@@ -316,7 +316,7 @@ class Deployment:
         return f"postgresql://{quote(user, safe='')}:{quote(password, safe='')}@{authority}:{port}/{quote(database, safe='')}?{query}"
 
     @contextmanager
-    def prepare(self, *, source_alias=None, research=None, model_alias=None, action="execute"):
+    def prepare(self, *, source_alias=None, research=None, model_alias=None, action="execute", source_access=True):
         run = self.data.get("run", {})
         alias = source_alias or run.get("source") or next(iter(self.data["sources"]))
         if alias not in self.data["sources"]:
@@ -394,7 +394,7 @@ class Deployment:
                     updates["LOINC_FHIR_PASSWORD"] = self.secret(section, "password")
                 elif live and credentials_needed and section_name == "fhir":
                     updates["TX_FHIR_BEARER_TOKEN"] = self.secret(section, "token")
-            if source["kind"] == "postgres" and action in {"execute", "connections"}:
+            if source_access and source["kind"] == "postgres" and action in {"execute", "connections"}:
                 updates["SQC_CFG_DB_DSN"] = self.database_dsn()
             models_file = None
             if enabled or action == "model-init":
@@ -440,6 +440,10 @@ class Deployment:
                         "PUBMED_EUTILS_BASE_URL": pubmed.get(
                             "base_url", "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
                         ),
+                        "SQC_RESEARCH_SOURCES": ",".join(settings.get("sources", ["pubmed"])),
+                        "EUROPE_PMC_BASE_URL": settings.get("europe_pmc", {}).get("base_url", "https://www.ebi.ac.uk/europepmc/webservices/rest"),
+                        "SQC_EUROPE_PMC_RETMAX": settings.get("europe_pmc", {}).get("max_results", 3),
+                        "SQC_MAX_ARTICLES_PER_LOINC": settings.get("max_articles_per_loinc", 3),
                     }
                 )
             entries = (
@@ -455,6 +459,7 @@ class Deployment:
                         "terminology source",
                         {
                             "kind",
+                            "role",
                             "systems",
                             "path",
                             "complete",

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "semantic-plausibility"
-version = "0.9.3"
+version = "0.10.0"
 description = "Local, auditable semantic reviews of distinct laboratory exports"
 readme = "README.md"
 requires-python = ">=3.14,<3.15"
@@ -16,6 +16,8 @@ postgres = ["psycopg[binary]==3.3.6"]
 
 [project.scripts]
 plausibility = "semantic_plausibility.cli:main"
+run-plausibility-check = "semantic_plausibility.cli:run_main"
+research-evidence = "semantic_plausibility.cli:research_main"
 
 [dependency-groups]
 dev = ["ruff>=0.12,<1"]

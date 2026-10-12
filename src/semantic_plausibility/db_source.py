@@ -130,6 +130,11 @@ def resource_from_row(row: dict[str, Any], mapping: dict[str, Any]) -> tuple[dic
             key: str(row.get(key) or defaults.get(key) or "")
             for key in ("source_test", "loinc_system", "method")
         }
+        axes = {name: str(row.get(role) or defaults.get(role) or "") for name, role in (
+            ("component", "loinc_component"), ("property", "loinc_property"),
+            ("time", "loinc_time_aspect"), ("scale", "loinc_scale")) if row.get(role) or defaults.get(role)}
+        if axes:
+            context["source_axes"] = axes
         return resource, context
     if kind == "Observation":
         csv_mapping = CsvMapping(

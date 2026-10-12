@@ -3,7 +3,7 @@ name: semantic-plausibility-stack
 # Runtime configuration: pipeline.toml. Credentials: .env or local/ secret files.
 # Portable CPU setup; optional Linux GPU overlay: compose.gpu.yaml.
 x-runner: &runner
-  image: semantic-plausibility-stack:0.9.3
+  image: semantic-plausibility-stack:0.10.0
   build:
     context: .
     dockerfile: deploy/Dockerfile
@@ -14,16 +14,29 @@ x-runner: &runner
   security_opt: [no-new-privileges:true]
   tmpfs: [/tmp]
   volumes:
-    - ./${SQC_CONFIG_FILE:-pipeline.example.toml}:/app/pipeline.toml:ro
+    - ./${SQC_CONFIG_FILE:-pipeline.toml}:/app/pipeline.toml:ro
     - ./examples:/app/examples:ro
     - ./local:/app/local:ro
     - ./output:/app/output
   restart: "no"
 
 services:
-  runner:
+  run-plausibility-check:
     <<: *runner
-    command: ["batch", "--config", "/app/pipeline.toml"]
+    command: ["check", "--config", "/app/pipeline.toml"]
+  research-evidence:
+    <<: *runner
+    profiles: [research]
+    command: ["research-evidence", "--config", "/app/pipeline.toml"]
+  review-import:
+    <<: *runner
+    profiles: [review]
+    command: ["review-import", "--help"]
+    volumes:
+      - ./${SQC_CONFIG_FILE:-pipeline.toml}:/app/pipeline.toml:ro
+      - ./examples:/app/examples:ro
+      - ./local:/app/local
+      - ./output:/app/output
   model-init:
     <<: *runner
     command: ["model-init", "--config", "/app/pipeline.toml"]
@@ -35,7 +48,7 @@ services:
     command: ["catalog-init", "--config", "/app/pipeline.toml"]
     profiles: [research]
     volumes:
-      - ./${SQC_CONFIG_FILE:-pipeline.example.toml}:/app/pipeline.toml:ro
+      - ./${SQC_CONFIG_FILE:-pipeline.toml}:/app/pipeline.toml:ro
       - ./examples:/app/examples:ro
       - ./local:/app/local
       - ./output:/app/output
@@ -44,7 +57,7 @@ services:
     command: ["package-init", "--config", "/app/pipeline.toml"]
     profiles: [terminology]
     volumes:
-      - ./${SQC_CONFIG_FILE:-pipeline.example.toml}:/app/pipeline.toml:ro
+      - ./${SQC_CONFIG_FILE:-pipeline.toml}:/app/pipeline.toml:ro
       - ./examples:/app/examples:ro
       - ./local:/app/local
       - ./output:/app/output

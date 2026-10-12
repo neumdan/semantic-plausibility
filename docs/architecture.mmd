@@ -6,12 +6,13 @@ flowchart TD
     GROUP["Embedded DuckDB grouping<br/>Distinct: complete guarded sets<br/>Known counts → mean/SE, median/IQR<br/>Items: retain ID / component path"]
     LOCAL["A · Local terminology<br/>Download once with package-init<br/>or install real JSON/CSV/SQLite<br/>Set lookup.path + systems<br/>Offline: add UCUM/LOINC pack<br/>Keep editions and file hashes"]
     API["B · API configuration<br/>Set type, endpoint + systems<br/>Credentials: .env / secret files<br/>NLM / LOINC / own FHIR<br/>network.mode = lookups<br/>Enabled APIs called at runtime"]
-    CHECK["Same laboratory check kernel<br/>Exact code/system + alias checks<br/>UCUM syntax / LOINC unit examples<br/>Transformations: verified factors only<br/>Values / references / context<br/>Missing evidence → unverified"]
-    RESEARCH["Optional candidate evidence<br/>Local model for extraction<br/>SemLookP name candidates<br/>Quoted terminology pages<br/>Bounded PubMed abstracts<br/>Expert applicability required"]
+    CHECK["Same laboratory check kernel<br/>Source code / unit / reference checks<br/>Target profile systems and bindings<br/>LOINC axes / verified UCUM factors<br/>Preserve whole-set context<br/>Missing evidence → unverified"]
+    RESEARCH["Separate evidence research<br/>Name search → exact candidates<br/>Cached per LOINC / edition<br/>PubMed + Europe PMC + pages<br/>Quoted values / units / ranges<br/>Exact prompts / query trace"]
     QC["Other MII quality checks<br/>FHIR Validator: conformance<br/>FDE: availability/completeness<br/>Separate scopes and outputs"]
-    OUTPUT["Local review artifacts<br/>CSV + HTML + summary + evidence<br/>Terminology credibility / readiness<br/>Suggested mapping / transformation<br/>Chained log + hashes + editions"]
+    OUTPUT["Checked export and proposals<br/>CSV + HTML + summary + evidence<br/>Source and target checks separate<br/>Mapping + reference transformations<br/>Chained log + hashes + editions"]
     STUDY["Matched export studies<br/>LIS ↔ FHIR ↔ CDS Hub<br/>Groups + known frequencies<br/>Context changes / loss candidates"]
-    EXPERT["Laboratory physician review<br/>Approve proposals in a separate copy<br/>Apply/revalidate in the site ETL"]
+    REGISTRY["Scoped mapping registry<br/>Source + profile + set scope<br/>Recheck targets in later runs<br/>Retain history and revocation"]
+    EXPERT["Laboratory physician review<br/>Decision + reviewer + time + evidence<br/>Apply/revalidate approved site plans"]
     INPUT --> NORMAL
     CONFIG --> NORMAL
     NORMAL --> GROUP
@@ -20,14 +21,16 @@ flowchart TD
     GROUP --> CHECK
     LOCAL --> |"local reads"| CHECK
     API --> |"selected API calls"| CHECK
-    CHECK -.-> |"optional"| RESEARCH
+    OUTPUT -.-> |"separate pass"| RESEARCH
     CHECK --> OUTPUT
-    RESEARCH -.-> |"candidate evidence"| OUTPUT
+    RESEARCH -.-> |"dossier"| EXPERT
+    EXPERT --> |"decision"| REGISTRY
+    REGISTRY -.-> |"scoped reuse"| CHECK
     OUTPUT --> STUDY
     OUTPUT --> EXPERT
     QC -.-> |"complementary"| EXPERT
     classDef normal fill:#f3f7fa,stroke:#c4d5df,color:#142d42
     class INPUT,CONFIG,NORMAL,GROUP,LOCAL,API,CHECK,QC,STUDY normal
     classDef teal fill:#eef7f4,stroke:#a8cfc6,color:#142d42
-    class RESEARCH,OUTPUT,EXPERT teal
+    class RESEARCH,OUTPUT,REGISTRY,EXPERT teal
     classDef error fill:#fcf1f3,stroke:#ecc7cf,color:#142d42

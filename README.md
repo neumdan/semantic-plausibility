@@ -1,80 +1,95 @@
-# Laboratory Semantic Review
+# Laboratory semantic plausibility
 
-A local Python library for **laboratory export → grouped sets → real terminology checks → review proposals**. It checks code/system, unit/system, code–unit fit, numbers and supplied reference ranges. Source data stays unchanged.
+Help clinicians and IT teams populate the selected **MII KDS laboratory FHIR Observation** with a defensible code, name, numeric value, unit and complete reference context. The pipeline checks the source set, proposes target coding and transformations, gathers evidence of reported practice and reuses clinician-approved mappings in later runs.
 
-## Where everything is
+**Check → research evidence → clinician review → scoped mapping reuse.** Source records remain unchanged. Formal FHIR conformance is checked with the institution's validator after applying approved mappings.
 
-| What | Where |
-| --- | --- |
-| Example input | `examples/laboratory.csv` — 8 illustrative measurement rows, no clinical reference recommendations |
-| Your input | Put your export under ignored `local/`; select it in `[input]` |
-| Configuration | Copy `pipeline.example.toml` to ignored `pipeline.toml` |
-| Credentials / model URL | Ignored `.env`; template `.env.example` |
-| Checks | `src/semantic_plausibility/`; [process and module map](docs/implementation.md) |
-| Output | `output/laboratory-review.csv`, HTML, evidence, summary and audit log |
+## Run a check
 
-**Every default lookup contacts a real service:** NLM UCUM and the public FHIR terminology test server at `https://tx.fhir.org/r4`. Actual source URLs and returned LOINC versions are recorded. For routine studies configure your own service or the authenticated [official LOINC API](https://loinc.org/kb/api/auth). An outage or missing evidence stays unverified. No fabricated lookup data is supplied.
+Input: CSV, FHIR R4 Bundle/NDJSON, read-only PostgreSQL view or SQLite extract. Distinct exports are the main use case; individual input can retain resource IDs. Run these commands from the repository directory.
 
-## Run with Podman
-
-Install Podman and `podman-compose`; start the Podman machine on macOS/Windows. From this folder:
+### Prepare once
 
 ```sh
 cp -n pipeline.example.toml pipeline.toml
 cp -n .env.example .env
 mkdir -p local output
-export PODMAN_COMPOSE_PROVIDER=podman-compose
-SQC_CONFIG_FILE=pipeline.toml podman compose run --rm --build runner
 ```
 
-The runner writes reports and exits. No model is used until enabled. Set a new `output.path` for another run; explicit `overwrite=true` replaces that report set.
+**`pipeline.toml` is the default configuration.** It defines input/columns, profiles, lookups, model and output; `.env` contains credentials and optional container settings. No shell exports are needed. For the first run, keep the supplied example input. For your own data, edit `[input]` and `[input.columns]` in the TOML.
 
-With Python 3.14 and [uv](https://docs.astral.sh/uv/):
+### Choose one way to run
+
+**Python and uv** — uv provides Python 3.14 and the locked dependencies:
 
 ```sh
 uv sync --locked --no-editable
-uv run --no-sync --env-file .env plausibility batch --config pipeline.toml
+uv run --no-sync --env-file .env run-plausibility-check --config pipeline.toml
 ```
 
-## What happens
+The direct script uses the same configuration: `uv run --no-sync --env-file .env python run-plausibility-check.py --config pipeline.toml`.
 
-1. Read the selected CSV, FHIR R4 Bundle/NDJSON, SQLite table or read-only PostgreSQL view.
-2. Preserve codes, units, values/bounds, complete reference sets and context. Group in embedded DuckDB; retain real frequencies or individual IDs as configured.
-3. Check declared systems/codes, UCUM syntax, LOINC example units, verified conversion factors and numeric/reference consistency.
-4. Optionally use a local model to extract quoted unit/range candidates from real catalogues, terminology pages and PubMed abstracts.
-5. Write separate findings and proposed transformations for physician review. An out-of-reference value is descriptive, not a patient diagnosis.
+**Docker** — Docker with Compose:
 
-`passed`, `suggestion`, `unclear`, `error` describe assessed findings. `mii_numeric_set_ready` is a numeric completeness/terminology proxy, not MII certification or clinical approval.
+```sh
+docker compose run --rm --build run-plausibility-check
+```
 
-## Add Ollama
+**Podman** — Podman with `podman-compose`; start its machine first on macOS/Windows:
 
-The TOML already defines `ministral-3:3b`; `.env` supplies its local URL. [Start the optional model, download the real UCUM catalogue and enable research](docs/shipped-stack.md#ollama). Model output never establishes code validity or a conversion factor by itself.
+```sh
+podman-compose run --rm --build run-plausibility-check
+```
 
-## German labels and other APIs
+The runner checks once and exits. Its default is a deterministic check, even when research is enabled in the TOML. The examples use the actual MII Laboratory 2026.0.3 snapshot, a real referenced HL7 ValueSet, NLM UCUM and a public LOINC FHIR test service. Measurements are illustrative; lookup responses are real.
 
-Choose per lookup: **A — install/download real terminology, then reference its local `path`; B — configure an API `endpoint` and any credential references.** Both routes can be combined. The default laboratory configuration uses public APIs. [Route selection and TOML examples](docs/lookups.md#choose-local-files-or-an-api) · [Test again without overwriting earlier reports](docs/shipped-stack.md#test-again).
+Open `output/laboratory-review.html` and its CSV. The example produces **8 input rows → 7 review groups / 84 source occurrences**. Set a fresh `output.path` for another run.
 
-[BfArM packages and name/API configuration](docs/lookups.md#german-packages-and-labels) add versioned German LOINC/UCUM labels locally. `package-init` installs explicitly selected editions after you accept their download conditions; ordinary batches never download packages automatically. APIs remain available alongside local artifacts.
+Existing installation: in `.env`, change an old `SQC_CONFIG_FILE=pipeline.example.toml` to `SQC_CONFIG_FILE=pipeline.toml`. Remove any old shell assignment with `unset SQC_CONFIG_FILE`; the copy commands preserve existing files. [Setup and repeat runs](docs/shipped-stack.md) · [Configuration reference and source recipes](docs/configuration.md).
 
-Optional SemLookP/OLS searches return name candidates for review. A separate WHO ICD-11 MMS lookup uses your OAuth credentials and a pinned release/language. The laboratory batch still assesses Observation; Condition/medication assessment is later work. [Optional configuration](terminology.example.toml).
+## Add evidence research
+
+Copy `pipeline.research.example.toml` to `pipeline.research.toml`, choose a local model and start/provision it using [the setup guide](docs/shipped-stack.md#ollama). Then inspect the prompts and run a separate pass on the completed check:
+
+```sh
+uv run --no-sync research-evidence --config pipeline.research.toml --report output/laboratory-review.csv --plan
+uv run --no-sync --env-file .env research-evidence --config pipeline.research.toml --report output/laboratory-review.csv
+```
+
+Actual LOINC pages, PubMed and Europe PMC provide quoted units, reported values and interval candidates. Queries exclude local measured values/reference bounds and patient IDs. Research reuses the audited export and does not query the hospital database again. The trace records the actual searches, prompts and guarded responses. Evidence supports clinician adjudication; it does not establish semantic correctness.
+
+## Feed clinician reviews back
+
+Return review columns with the original `tuple_id`, reviewer, timestamp, evidence and approved target/factor. Import them into an ignored local registry, then reference `quality.review_registry` in TOML. Future checks reuse approvals only for the same source/site, full semantic context, catalogue fingerprint and profile edition; target codes/units/factors are rechecked. Rejected/deferred/revoked decisions remain non-executable.
+
+[Review import and concrete example](docs/research.md#clinician-feedback) · [Goal and requirements](docs/requirements.md).
+
+## Configure terminology
+
+The profile defines system/binding requirements; it does not provide endpoint URLs. Select `role="primary"` for target verification, `"source"` for your real LIS catalogue and `"optional"` for additional labels/search evidence. Local codes and units are checked independently of target-profile compatibility. Unconfigured source terminology stays unverified; no site catalogue is invented.
+
+```sh
+uv run --no-sync --env-file .env run-plausibility-check lookup --config pipeline.toml --lookup loinc --code 718-7
+```
+
+[Input, profiles, paths and service roles](docs/configuration.md) · [Local downloads, APIs and credentials](docs/lookups.md) · [Docker, Podman and Python](docs/shipped-stack.md) · [Field contract](docs/data-contract.md).
 
 ## Architecture
 
-![Local export review architecture](docs/architecture.svg)
+![Laboratory check, evidence research and clinician feedback](docs/architecture.svg)
 
 ## Decision flow
 
-![Terminology, label, unit-fit and evidence decisions](docs/decision-flow.svg)
-
-[Input/profile configuration](docs/configuration.md) · [Field/output contract](docs/data-contract.md) · [Architecture and decision diagrams](docs/index.html) · [MII quality checks](docs/mii-quality.md) · [Study protocol](docs/studies.md)
+![Source verification, target mapping, research and scoped review reuse](docs/decision-flow.svg)
 
 ```python
-from semantic_plausibility import run_batch, verify_audit
-result = run_batch("pipeline.toml")
-print(result.csv, result.statuses)
-print(verify_audit(result.log))
+from semantic_plausibility import run_plausibility_check, research_evidence, import_reviews
+result = run_plausibility_check("pipeline.toml")
+# Optional, after preparing the local model:
+# dossier = research_evidence("pipeline.research.toml", report=result.csv)
+# import_reviews(result.csv, "local/clinician-review.csv", "local/mappings.json", "pipeline.toml")
 ```
 
-Python 3.14; DuckDB 1.5.6; optional psycopg 3.3.6. Dependencies are locked in `uv.lock`. [Implementation and real-service tests](docs/implementation.md).
+Python 3.14; DuckDB 1.5.6; optional psycopg 3.3.6; exact dependencies in `uv.lock`. [Implementation/tests](docs/implementation.md) · [MII quality environment](docs/mii-quality.md).
 
-Apache-2.0; terminology/model licences remain separate. Laboratory Observation only; medication/diagnosis are later work.
+Laboratory Observation is implemented. Medication (ingredient, strength, dose/unit, route, timing), Condition and Procedure are later domain adapters. FDPG evidence access is later work requiring an appropriate authorised interface/export. Apache-2.0; terminology/model licences remain separate.

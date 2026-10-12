@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def configuration(folder, *, connected=False, name="review.csv"):
     text = (ROOT / "pipeline.example.toml").read_text()
+    text = text.replace('"examples/', '"' + str(ROOT / "examples") + '/')
     text = text.replace('path = "examples/laboratory.csv"', 'path = ' + json.dumps(str(ROOT / "examples/laboratory.csv")))
     text = text.replace('path = "output/laboratory-review.csv"', 'path = ' + json.dumps(str(folder / name)))
     if not connected:

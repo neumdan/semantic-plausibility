@@ -12,5 +12,5 @@ RUN if [ "$INSTALL_POSTGRES" = "1" ]; then \
     fi
 COPY examples ./examples
 ENV PATH="/app/.venv/bin:$PATH"
-ENTRYPOINT ["plausibility"]
+ENTRYPOINT ["run-plausibility-check"]
 CMD ["--help"]

@@ -258,6 +258,7 @@ def write_html(path, rows, summary, csv_name, log_name):
     columns = [
         "code",
         "analyte_name",
+        "canonical_name",
         "name_check",
         "code_system",
         "unit_code",
@@ -271,6 +272,9 @@ def write_html(path, rows, summary, csv_name, log_name):
         "lookup_credibility",
         "mii_numeric_set_ready",
         "suggested_unit",
+        "suggested_code",
+        "suggested_name",
+        "suggestion_state",
     ]
     head = "".join(f"<th>{escape(column.replace('_', ' '))}</th>" for column in columns)
     body = "".join(

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -14,6 +15,18 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     batch = sub.add_parser("batch", help="Review an export and write CSV, HTML, evidence and an audit log")
     batch.add_argument("--config", type=Path, default=Path("pipeline.toml"))
+    check = sub.add_parser("check", help="Check source sets and target profile; reuse approved mappings, no model research")
+    check.add_argument("--config", type=Path, default=Path("pipeline.toml"))
+    research = sub.add_parser("research-evidence", help="Research real evidence from a completed check report")
+    research.add_argument("--config", type=Path, default=Path("pipeline.toml"))
+    research.add_argument("--report", type=Path)
+    research.add_argument("--out", type=Path)
+    research.add_argument("--plan", action="store_true", help="Print exact prompts/planned searches without network/model calls")
+    feedback = sub.add_parser("review-import", help="Import clinician decisions into a scoped, versioned mapping registry")
+    feedback.add_argument("--config", type=Path, default=Path("pipeline.toml"))
+    feedback.add_argument("--report", type=Path, required=True)
+    feedback.add_argument("--review", type=Path, required=True)
+    feedback.add_argument("--registry", type=Path, required=True)
     compare = sub.add_parser("compare", help="Compare matched LIS/FHIR/CDS Hub distinct reports")
     compare.add_argument("--baseline", type=Path, required=True)
     compare.add_argument("--target", type=Path, action="append", required=True)
@@ -49,10 +62,10 @@ def main(argv: list[str] | None = None) -> int:
             command.add_argument("--model-alias", default=None)
     args = parser.parse_args(argv)
     try:
-        if args.command == "batch":
-            from .batch import BatchConfiguration, run_batch
+        if args.command in {"batch", "check"}:
+            from .batch import BatchConfiguration, run_batch, run_plausibility_check
 
-            configuration = BatchConfiguration(args.config)
+            configuration = BatchConfiguration(args.config, research=False if args.command == "check" else None)
             print(f"Input: {configuration.input_type}; {configuration.input.get('path', 'configured database view')}", flush=True)
             print(f"Grouping: {configuration.output.get('mode', 'distinct')}; network: {configuration.network_mode}", flush=True)
             for name, lookup in configuration.data.get("lookups", {}).items():
@@ -60,7 +73,7 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"Lookup {name}: {lookup.get('endpoint', lookup.get('path', 'configured source'))}", flush=True)
             print("Local-model research: " + ("enabled" if configuration.data.get("research", {}).get("enabled", False) else "disabled"), flush=True)
             print("Processing: read -> group -> terminology/fit -> numeric/reference checks -> report", flush=True)
-            result = run_batch(args.config)
+            result = run_plausibility_check(args.config) if args.command == "check" else run_batch(args.config)
             print(f"{result.input_records} input rows -> {result.distinct_tuples} laboratory review rows.")
             print("Status counts: " + json.dumps(result.statuses, sort_keys=True))
             print(f"Review CSV: {result.csv}")
@@ -71,6 +84,13 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"Numeric semantic readiness: {metric['numerator']}/{metric['denominator']} (not full FHIR validation)."
             )
+        elif args.command == "research-evidence":
+            from .evidence_research import research_evidence, research_plan
+            result = research_plan(args.config, args.report) if args.plan else research_evidence(args.config, args.report, args.out)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        elif args.command == "review-import":
+            from .review_feedback import import_reviews
+            print(json.dumps(import_reviews(args.report, args.review, args.registry, args.config), indent=2))
         elif args.command == "compare":
             from .study_compare import compare_reports
 
@@ -126,6 +146,20 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, OSError, RuntimeError, json.JSONDecodeError) as exc:
         parser.error(str(exc))
     return 2
+
+
+def run_main(argv=None):
+    """The named runner defaults to the deterministic check; legacy CLI stays available."""
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    commands = {"batch", "check", "research-evidence", "review-import", "compare", "verify", "lookup",
+                "profile-import", "config-check", "model-init", "catalog-init", "package-init"}
+    if not arguments or arguments[0] not in commands and arguments[0] not in {"-h", "--help"}:
+        arguments.insert(0, "check")
+    return main(arguments)
+
+
+def research_main():
+    return main(["research-evidence", *sys.argv[1:]])
 
 
 if __name__ == "__main__":

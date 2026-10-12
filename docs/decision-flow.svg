@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1850" viewBox="0 0 1100 1850" role="img" aria-labelledby="title desc">
-<title id="title">Configured local or API evidence → laboratory decisions</title><desc id="desc">Input contract + selected profile; Select configured evidence per lookup: A, B or both; A · Ready local terminology files; B · Configured API and credentials; Validate declared code/system and unit/system; Confirmed invalid; Verified code / unit; Not verified; Check supplied aliases, LOINC axes / example units and context; Documented unchanged fit; Verified linear conversion; Ambiguous / mismatch; Explicit candidate sources and optional local research; Values and reference metadata; Write separate checks, credibility and explicit readiness denominators; Expert adjudication → approved site mapping → formal FHIR validation</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="2050" viewBox="0 0 1100 2050" role="img" aria-labelledby="title desc">
+<title id="title">Source checks, target proposals, evidence and reviewed reuse</title><desc id="desc">Input contract + selected profile; Select configured evidence per lookup: A, B or both; A · Ready local terminology files; B · Configured API and credentials; Validate declared code/system and unit/system; Confirmed invalid; Verified code / unit; Not verified; Check supplied aliases, LOINC axes / example units and context; Documented unchanged fit; Verified linear conversion; Ambiguous / mismatch; Explicit candidate sources and optional local research; Values and reference metadata; Write separate checks, credibility and explicit readiness denominators; Clinician adjudication of the entire set; Versioned source and profile scope for future mappings</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#537487"/></marker></defs>
 <style>text{font-family:Arial,sans-serif;fill:#142d42}.heading{font-size:19px;font-weight:700}.body{font-size:17px}.label{font-size:14px;fill:#526978}</style><rect width="1100" height="100%" fill="white"/>
 <g data-node="INPUT"><rect x="130" y="20" width="840" height="106" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
@@ -67,25 +67,31 @@
 <text x="766" y="1082" class="body">First example is a candidate</text>
 <text x="766" y="1107" class="body">No guessed transformation</text>
 </g>
-<g data-node="RESEARCH"><rect x="130" y="1195" width="840" height="106" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="146" y="1224" class="heading">Explicit candidate sources and optional local research</text>
-<text x="146" y="1252" class="body">SemLookP names; catalogue → local model → quoted lookup pages → PubMed candidates</text>
-<text x="146" y="1277" class="body">Candidate searches are opt-in; offline mode has no remote research</text>
+<g data-node="RESEARCH"><rect x="130" y="1550" width="840" height="106" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="146" y="1579" class="heading">Explicit candidate sources and optional local research</text>
+<text x="146" y="1607" class="body">Names → real search → exact candidate + unit/axes → model choice or abstention</text>
+<text x="146" y="1632" class="body">Catalogue spellings; quoted page/study intervals; offline has no remote research</text>
 </g>
-<g data-node="NUMERIC"><rect x="130" y="1360" width="840" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="146" y="1389" class="heading">Values and reference metadata</text>
-<text x="146" y="1417" class="body">Finite numbers, ordered bounds, supplied units and interval context</text>
-<text x="146" y="1442" class="body">Out-of-reference is descriptive; it is not automatically a data error</text>
-<text x="146" y="1467" class="body">Evidence of clinical plausibility requires method/population review</text>
+<g data-node="NUMERIC"><rect x="130" y="1195" width="840" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="146" y="1224" class="heading">Values and reference metadata</text>
+<text x="146" y="1252" class="body">Finite numbers, ordered bounds, supplied units and interval context</text>
+<text x="146" y="1277" class="body">Out-of-reference is descriptive; it is not automatically a data error</text>
+<text x="146" y="1302" class="body">Evidence of clinical plausibility requires method/population review</text>
 </g>
-<g data-node="OUTPUT"><rect x="130" y="1555" width="840" height="106" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="146" y="1584" class="heading">Write separate checks, credibility and explicit readiness denominators</text>
-<text x="146" y="1612" class="body">Priority: error → unclear → suggestion → passed</text>
-<text x="146" y="1637" class="body">Readiness is a numeric semantic proxy, not MII certification or clinical approval</text>
+<g data-node="OUTPUT"><rect x="130" y="1385" width="840" height="106" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="146" y="1414" class="heading">Write separate checks, credibility and explicit readiness denominators</text>
+<text x="146" y="1442" class="body">Priority: error → unclear → suggestion → passed</text>
+<text x="146" y="1467" class="body">Readiness is a numeric semantic proxy, not MII certification or clinical approval</text>
 </g>
-<g data-node="REVIEW"><rect x="130" y="1720" width="840" height="82" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="146" y="1749" class="heading">Expert adjudication → approved site mapping → formal FHIR validation</text>
-<text x="146" y="1777" class="body">Patient Observations are never generated from aggregate means</text>
+<g data-node="REVIEW"><rect x="130" y="1720" width="840" height="106" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="146" y="1749" class="heading">Clinician adjudication of the entire set</text>
+<text x="146" y="1777" class="body">Record approval / rejection / defer / revoke with reviewer, evidence and time</text>
+<text x="146" y="1802" class="body">Apply approved site transformations in ETL; validate actual FHIR resources</text>
+</g>
+<g data-node="REGISTRY"><rect x="130" y="1890" width="840" height="106" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="146" y="1919" class="heading">Versioned source and profile scope for future mappings</text>
+<text x="146" y="1947" class="body">Recheck target code / unit / factor and each reference bound on reuse</text>
+<text x="146" y="1972" class="body">Changed context / catalogue / profile or revocation prevents automatic reuse</text>
 </g>
 <path data-edge="INPUT-SOURCE" d="M550 126 V182" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
 <path data-edge="SOURCE-LOCAL" d="M550 291 V315 H270 V342" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
@@ -101,10 +107,13 @@
 <path data-edge="FIT-MATCH" d="M550 947 V975 H185 V997" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
 <path data-edge="FIT-CONVERT" d="M550 947 V997" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
 <path data-edge="FIT-AMBIG" d="M550 947 V975 H915 V997" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="MATCH-RESEARCH" d="M185 1132 V1165 H550 V1192" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="CONVERT-RESEARCH" d="M550 1132 V1192" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="AMBIG-RESEARCH" d="M915 1132 V1165 H550 V1192" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="RESEARCH-NUMERIC" d="M550 1301 V1357" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="NUMERIC-OUTPUT" d="M550 1492 V1552" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="OUTPUT-REVIEW" d="M550 1661 V1717" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="MATCH-NUMERIC" d="M185 1132 V1165 H550 V1192" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="CONVERT-NUMERIC" d="M550 1132 V1192" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="AMBIG-NUMERIC" d="M915 1132 V1165 H550 V1192" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="NUMERIC-OUTPUT" d="M550 1327 V1382" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="OUTPUT-RESEARCH" d="M550 1491 V1547" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="OUTPUT-REVIEW" d="M130 1440 H70 V1775 H127" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="RESEARCH-REVIEW" d="M550 1656 V1717" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="REVIEW-REGISTRY" d="M550 1826 V1887" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="REGISTRY-LOOKUP" d="M130 1940 H5 V610 H127" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
 </svg>

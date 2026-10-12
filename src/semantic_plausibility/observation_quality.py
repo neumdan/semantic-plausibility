@@ -36,6 +36,7 @@ class LoincTerm:
     part_codes: dict[str, str] = field(default_factory=dict)
     designations: tuple[dict[str, str], ...] = ()
     synonyms: tuple[str, ...] = ()
+    status: str = ""
 
 
 @dataclass(frozen=True)
@@ -58,6 +59,8 @@ class ResearchCandidate:
     method: str = ""
     excerpt: str = ""
     status: str = "candidate"
+    reported_value: str | None = None
+    value_kind: str = ""
 
 
 class UnitAuthority(Protocol):

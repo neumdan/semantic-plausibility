@@ -1,4 +1,4 @@
-# Laboratory input and output contract (0.9.3)
+# Laboratory input and output contract (0.10.0)
 
 ## Minimum export
 
@@ -64,6 +64,16 @@ The main statuses are `passed`, `suggestion`, `unclear`, `error`; `not_applicabl
 
 `status`, `reason`, `code_check`, `unit_check`, `code_unit_fit`, `reference_check`, `value_reference_check`, `lookup_credibility`, `mii_numeric_set_ready`, `occurrence_count`, `value_min/max`, `value_mean/se`, `value_median/q1/q3/iqr`, `suggested_unit`, `transformation_json`, `coding_proposal_json`, `fhir_mapping_proposal_json`.
 
+Names/research: `analyte_name` is supplied; `canonical_name` is the exact lookup display. `suggested_code`/`suggested_name` record a model-selected, independently verified candidate or remain empty on abstention. `suggestion_state`, `laboratory_suggestions_json` retain the shortlist, conflicts, unresolved axes and provenance; `reference_candidates_json` contains quoted candidate intervals with context. Retrieved candidates are never asserted equivalent to the source test.
+
 Credibility is an evidence category, **not a calibrated probability**: `supported_by_configured_sources`, `partial`, `unverified`, `rejected`. Numerical readiness is defined in the report independently of credibility. `clinical_value_evidence` and `clinical_reference_evidence` remain `not_established` by the numeric core. Grounded research candidates do not change that into clinical approval.
 
 CSV strings are escaped against spreadsheet formulas. Full evidence may contain measured values and semantic metadata; the audit log avoids raw source IDs/values/secrets. Removing IDs is not anonymisation. Nothing is sent back automatically: transfer the reviewed reports only through your institution's approved process.
+
+## Source checks and clinician reuse
+
+`source_namespace` is retained in distinct reports as a stable source/site label, not a patient ID. `source_code_check`, `source_unit_check`, `source_code_unit_fit` and `source_reference_check_json` describe source evidence separately from target-profile checks. `mapping_review_state`, `approved_mapping_ready` and `clinician_mapping_json` describe scoped feedback; original numeric readiness remains unchanged by an un-applied mapping plan.
+
+Review columns and the separate evidence dossier/trace are described in [research and feedback](research.md). The registry is local and versioned; accepted targets/factors are rechecked on reuse. `approved_mapping_ready` counts currently supported approved plans, not full patient-resource validation.
+
+Optional mapped roles `component`, `property`, `time_aspect` and `scale` preserve known source axis descriptors alongside specimen/method. Use resolved descriptors, not inferred aliases. For native FHIR, a context file can supply `source_axes={component,property,time,scale}`; time here is the observation definition (such as Pt or a collection duration), not a patient timestamp. Conflicts with resolved LOINC axes stay under review.

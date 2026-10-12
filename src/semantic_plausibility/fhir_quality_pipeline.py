@@ -13,7 +13,7 @@ from pathlib import Path
 import re
 from typing import Any
 
-from .observation_quality import ApprovedMapping, LoincTerm
+from .observation_quality import ApprovedMapping, LoincTerm, UnitEvidence
 from .name_checks import measurement_names
 from .profile_config import (
     InputProfile,
@@ -72,12 +72,14 @@ class FhirQualityPipeline:
         profile: InputProfile | None = None,
         terminology: Any = None,
         spelling: Any = None,
+        suggestions: Any = None,
     ):
         self.ucum, self.loinc, self.research = ucum, loinc, research
         self.approvals = approvals or []
         self.profile = profile or load_profile("fhir-r4-lab")
         self.terminology = terminology
         self.spelling = spelling
+        self.suggestions = suggestions
 
     def check(
         self,
@@ -88,11 +90,16 @@ class FhirQualityPipeline:
         loinc_system: str = "",
         method: str = "",
         research: bool = False,
+        source_axes: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         if phase not in {"pre_fhir", "at_fhir", "post_fhir"}:
             raise ValueError("phase must be pre_fhir, at_fhir or post_fhir")
         if observation.get("resourceType") != "Observation":
             raise ValueError("Expected a FHIR Observation")
+        if source_axes is not None and (not isinstance(source_axes, dict) or any(
+            name not in {"component", "property", "time", "scale"} or not isinstance(value, str)
+            for name, value in source_axes.items())):
+            raise ValueError("source_axes must contain string component/property/time/scale descriptors")
         profile_result = profile_assessment(observation, self.profile)
         items = [("Observation", observation)]
         items += [
@@ -100,7 +107,7 @@ class FhirQualityPipeline:
             for i, component in enumerate(observation.get("component") or [])
         ]
         checks = [
-            self._check_item(item, path, source_test, loinc_system, method, research)
+            self._check_item(item, path, source_test, loinc_system, method, research, source_axes or {})
             for path, item in items
             if "valueQuantity" in item or item.get("referenceRange")
         ]
@@ -133,6 +140,7 @@ class FhirQualityPipeline:
         loinc_system: str,
         method: str,
         do_research: bool,
+        source_axes: dict[str, str],
     ) -> dict[str, Any]:
         quantity = item.get("valueQuantity") or {}
         if not isinstance(quantity, dict):
@@ -190,6 +198,24 @@ class FhirQualityPipeline:
             errors.append(f"LOINC unavailable: {exc}")
 
         name_checks, unit_label_check = measurement_names(item.get("code") or {}, quantity, term=term, router=self.terminology)
+        source_code_checks = []
+        for coding in codings:
+            system, code, version = str(coding.get("system") or ""), str(coding.get("code") or ""), str(coding.get("version") or "")
+            if system == LOINC and term and term.code == code:
+                validation = {"state": "valid", "source": term.source, "version": term.version}
+            elif self.terminology:
+                validation = self.terminology.check(system, code, version, research=False)
+            else:
+                validation = {"state": "unknown", "source": None}
+            source_code_checks.append({"system": system, "code": code, "version": version, **validation})
+        source_unit_fits = []
+        for check in source_code_checks:
+            definition = check.get("metadata") or {}
+            expected_unit = definition.get("expected_unit_code")
+            expected_system = definition.get("expected_unit_system")
+            if expected_unit and expected_system:
+                source_unit_fits.append("documented_match" if expected_unit == quantity.get("code")
+                    and expected_system == quantity.get("system") else "catalogue_representation_differs_review")
         code_checks = []
         for coding in codings:
             if not isinstance(coding, dict):
@@ -367,9 +393,10 @@ class FhirQualityPipeline:
                         except Exception as exc:
                             errors.append(f"Code website lookup unavailable: {type(exc).__name__}")
             if mapping["class"] in {"needs_refinement", "unresolved"}:
-                found = []
+                found = [UnitEvidence(candidate, "loinc_ucum_example", term.source)
+                         for candidate in examples(term)] if term else []
                 try:
-                    found = self.research.website_units(loinc_code, research_term)
+                    found += self.research.website_units(loinc_code, research_term)
                 except Exception as exc:
                     errors.append(f"LOINC website unavailable: {exc}")
                 try:
@@ -407,6 +434,19 @@ class FhirQualityPipeline:
             except Exception as exc:
                 errors.append(f"PubMed unavailable: {exc}")
         comparisons = self._study_comparisons(studies, unit, value, interval) if ucum_valid else []
+
+        proposals = None
+        if do_research and self.suggestions:
+            proposals = self.suggestions.assess(item.get("code") or {}, quantity, term, self,
+                specimen=loinc_system, method=method, name_checks=name_checks,
+                source_axes=source_axes,
+                context_conflict=(mapping["class"] in {"needs_refinement", "unresolved"}
+                    or system_fit == "mismatch" or method_fit == "mismatch"
+                    or bool(term and any(value and {"component": term.component, "property": term.property,
+                        "time": term.time_aspect, "scale": term.scale}.get(name) and value.casefold() !=
+                        {"component": term.component, "property": term.property, "time": term.time_aspect,
+                         "scale": term.scale}[name].casefold() for name, value in source_axes.items()))))
+            errors += proposals["errors"]
 
         has_context = (
             system_fit == "match" and method_fit in {"match", "not_applicable"} and scale_fit == "match"
@@ -448,8 +488,13 @@ class FhirQualityPipeline:
             "path": path,
             "name_checks": name_checks,
             "unit_label_check": unit_label_check,
+            "laboratory_suggestions": proposals,
             "loinc_code": loinc_code,
             "loinc_axes": axes,
+            "additional_axis_fits": {name: "not_provided" if not source_axes.get(name)
+                else "unresolved_target_axis" if not axes or not axes.get(name)
+                else "match" if source_axes[name].casefold() == axes[name].casefold() else "mismatch"
+                for name in ("component", "property", "time", "scale")},
             "loinc_source": term.source if term else None,
             "loinc_version": term.version if term else None,
             "source_codings": [
@@ -462,6 +507,8 @@ class FhirQualityPipeline:
             "quantity_policy": quantity_policy,
             "reference_range_policies": range_policies,
             "unit_check": unit_check,
+            "source_code_checks": source_code_checks,
+            "source_code_unit_fit": source_unit_fits or ["not_documented_in_source_catalogue"],
             "multiple_loinc_codes": len(loinc_codes) > 1,
             "multiple_loinc_versions": len(loinc_versions) > 1,
             "source_value": serial(value),
@@ -495,7 +542,7 @@ class FhirQualityPipeline:
             "unit_spelling": spelling,
             "reference_unit_spelling": reference_spelling,
             "reference_checks": reference_checks,
-            "execution_order": ["exact_lookup", "name_aliases_and_candidates", "catalogue_spelling", "website_lookup", "study_search"],
+            "execution_order": ["exact_lookup", "name_aliases_and_candidates", "catalogue_spelling", "website_lookup", "study_search", "verified_code_name_proposals"],
             "study_candidates": studies,
             "study_comparisons": comparisons,
             "errors": errors,
