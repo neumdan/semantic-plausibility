@@ -19,6 +19,7 @@ from .review_feedback import ReviewRegistry, report_details, verify_report_profi
 from . import research_prompts as prompts
 from .model_schemas import response_schema
 from .observation_services import PublicEvidenceClient
+from .report_sources import review_set_fields
 
 
 def research_plan(config_path, report=None):
@@ -52,13 +53,15 @@ def research_plan(config_path, report=None):
         "execution": "plan_only_no_network_or_model_call"}
 
 
-def research_evidence(config_path, report=None, output=None):
+def research_evidence(config_path, report=None, output=None, *, progress=None):
     config = BatchConfiguration(config_path, research=True)
     if config.network_mode != "lookups":
         raise ValueError("Evidence retrieval needs explicitly enabled connected lookups")
     local_model_only(config)
     source = config.path_value(report or config.output.get("path", "output/laboratory-review.csv"))
     original, details = report_details(source)
+    if progress:
+        progress(f"Researching {len(original)} checked groups; source values stay local.")
     target = config.path_value(output) if output else source.with_name(source.stem + ".research.csv")
     paths = {name: target.with_suffix(suffix) for name, suffix in {
         "csv": ".csv", "summary": ".summary.json", "evidence": ".evidence.jsonl",
@@ -100,8 +103,10 @@ def research_evidence(config_path, report=None, output=None):
                             for original_row in original:
                                 detail = details[original_row["tuple_id"]]
                                 payload = detail["metadata"]
-                                _, assessment = checker.assess(payload, detail["observed_values"])
+                                raw, assessment = checker.assess(payload, detail["observed_values"])
                                 item = assessment["report"]["measurements"][0]
+                                for candidate in item.get("study_candidates", []):
+                                    candidate.update(candidate_loinc=item.get("loinc_code"), candidate_version=item.get("loinc_version"))
                                 row = dict(original_row)
                                 proposals = item.get("laboratory_suggestions") or {}
                                 approval = registry.proposal(payload, row.get("source_namespace", ""), profile, checker) if registry else {"state": "not_configured"}
@@ -109,7 +114,8 @@ def research_evidence(config_path, report=None, output=None):
                                 if approval["state"] == "reused_clinician_approval":
                                     target_code = approval["target"]
                                     term = checker.loinc.lookup(target_code["code"], target_code["code_version"])
-                                    item["study_candidates"] += [vars(candidate) for candidate in checker.evidence.search_studies(term)]
+                                    item["study_candidates"] += [vars(candidate) | {"candidate_loinc": term.code, "candidate_version": term.version}
+                                                                for candidate in checker.evidence.search_studies(term)]
                                 # Also research exactly verified alternative codes for unmapped LIS sets.
                                 for candidate in proposals.get("coding_candidates", []):
                                     if candidate["code"] != item.get("loinc_code") and candidate["selectable"]:
@@ -117,7 +123,7 @@ def research_evidence(config_path, report=None, output=None):
                                         found = [vars(c) | {"candidate_loinc": term.code, "candidate_version": term.version}
                                                  for c in checker.evidence.search_studies(term)]
                                         item["study_candidates"] += found
-                                row.update(suggested_code=proposals.get("selected_code") or "",
+                                row.update(suggested_code=proposals.get("selected_code") or row.get("suggested_code", ""),
                                     suggested_name=proposals.get("selected_name") or "", suggestion_state=proposals.get("state", "unresolved"),
                                     laboratory_suggestions_json=encoded(proposals),
                                     reference_candidates_json=encoded([candidate for candidate in item["study_candidates"]
@@ -125,8 +131,44 @@ def research_evidence(config_path, report=None, output=None):
                                     study_evidence_json=encoded(item["study_candidates"]),
                                     reported_measurements_json=encoded([candidate for candidate in item["study_candidates"]
                                         if candidate["evidence_type"] == "reported_measurement"]),
-                                    clinician_mapping_json=encoded(approval), evidence_json=encoded(assessment))
+                                    clinician_mapping_json=encoded(approval),
+                                    suggested_unit=raw.get("vorschlag_einheit", ""),
+                                    suggested_factor=raw.get("vorschlag_faktor", ""),
+                                    suggestion_basis=raw.get("vorschlag_grundlage", ""),
+                                    transformation_json=encoded(assessment["recommendation"]["transformation"]))
+                                selected = next((candidate for candidate in proposals.get("coding_candidates", [])
+                                    if candidate["code"] == proposals.get("selected_code") and candidate["selectable"]), None)
+                                if selected:
+                                    row.update(suggested_code_system=selected["system"], suggested_code_version=selected["version"])
+                                    fit = selected["unit_fit"]
+                                    if selected["code"] != item.get("loinc_code"):
+                                        from .recommendations import transformation
+                                        from .fhir_quality_pipeline import FhirQualityPipeline
+                                        mapping = {**fit, "class": fit["class"] if fit.get("source_unit_mapping_verified") else "unresolved",
+                                            "factor": fit.get("factor_from_original")}
+                                        pipeline = FhirQualityPipeline(checker.ucum, checker.loinc)
+                                        plan = transformation(mapping, payload["quantity"], payload["reference_ranges"], fit.get("target"), pipeline)
+                                        row.update(suggested_unit=fit.get("target") or "", suggested_factor=plan.get("factor") or "",
+                                            suggestion_basis="verified_target_code_unit_candidate", transformation_json=encoded(plan))
+                                if approval["state"] == "reused_clinician_approval":
+                                    target_code = approval["target"]
+                                    row.update(suggested_code=target_code["code"], suggested_code_system=target_code["code_system"],
+                                        suggested_code_version=target_code["code_version"], suggested_name=target_code["name"],
+                                        suggested_unit=target_code["unit"], suggested_factor=target_code["factor"],
+                                        transformation_json=encoded(approval["verification"]))
+                                from .export_review import mapping_proposal
+                                coding = [{"target_code": candidate["code"], "target_system": candidate["system"],
+                                    "target_version": candidate["version"], "target_verified": True, "source": candidate["source"],
+                                    "unit_fit": candidate["unit_fit"], "review_required": True} for candidate in proposals.get("coding_candidates", [])]
+                                row["coding_proposal_json"] = encoded(coding or json.loads(original_row.get("coding_proposal_json") or "[]"))
+                                row["fhir_mapping_proposal_json"] = encoded(mapping_proposal(row,
+                                    {"recommendation": {"transformation": json.loads(row["transformation_json"])}}, json.loads(row["coding_proposal_json"])))
+                                assessment.update(metadata=payload, observed_values=detail["observed_values"])
+                                row["evidence_json"] = encoded(assessment)
+                                row.update(review_set_fields(row, assessment))
                                 reviewed.append(row)
+                                if progress:
+                                    progress(f"Completed {len(reviewed)}/{len(original)} groups; {len(item['study_candidates'])} study evidence records for this set.")
                                 evidence_file.write(encoded({"tuple_id": row["tuple_id"], "metadata": payload,
                                     "observed_values": detail["observed_values"], **assessment}) + "\n")
                         evidence = checker.evidence
@@ -142,6 +184,10 @@ def research_evidence(config_path, report=None, output=None):
                             research={"sources": list(getattr(evidence, "source_records", {}).values()),
                                 "queries": len(getattr(evidence, "query_log", [])), "accepted_model_calls": getattr(llm, "audit_records", []),
                                 "max_articles_per_loinc": evidence.max_articles_per_loinc,
+                                "model_state": "responses_accepted" if getattr(llm, "audit_records", []) else "no_accepted_response",
+                                "groups_with_code_proposals": sum(bool(row.get("suggested_code")) for row in reviewed),
+                                "groups_with_name_proposals": sum(bool(row.get("suggested_name")) for row in reviewed),
+                                "groups_with_study_evidence": sum(bool(json.loads(row["study_evidence_json"])) for row in reviewed),
                                 "semantic_correctness": "clinician_adjudication_required", "hospital_database_requeried": False})
                     finally:
                         if checker.terminology:
@@ -174,7 +220,9 @@ def research_evidence(config_path, report=None, output=None):
                     os.replace(folder / paths["audit"].name, failed)
                 raise ValueError("Evidence research failed (" + type(exc).__name__ + "); incomplete artifacts were not published") from None
         return {"csv": str(paths["csv"]), "html": str(paths["html"]), "trace": str(paths["trace"]),
-                "audit": str(paths["audit"]), "groups": len(original), "source_changed": False}
+                "audit": str(paths["audit"]), "groups": len(original), "source_changed": False,
+                "model_state": summary["research"]["model_state"],
+                "groups_with_study_evidence": summary["research"]["groups_with_study_evidence"]}
     finally:
         if log:
             log.close()

@@ -480,6 +480,7 @@ class FhirQualityPipeline:
                 "scale": term.scale,
                 "method": term.method,
                 "unresolved_part_codes": term.part_codes,
+                "axis_sources": term.axis_sources,
             }
             if term
             else None

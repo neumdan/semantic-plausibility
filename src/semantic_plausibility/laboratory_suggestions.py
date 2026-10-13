@@ -21,17 +21,18 @@ class LaboratorySuggestions:
         names = list(dict.fromkeys(str(name).strip() for name in
             [concept.get("text"), *(c.get("display") for c in concept.get("coding", []))]
             if name and len(str(name)) <= 300))[:3]
+        source_name_present = bool(names)
         if not names and term and term.display:
             names = [term.display]
         unit = str(quantity.get("code") or quantity.get("unit") or "")
         key = (tuple(names), unit, quantity.get("unit"), quantity.get("system"), term.code if term else "",
-               term.version if term else "", specimen, method, context_conflict, tuple(sorted(source_axes.items())))
+               term.version if term else "", specimen, method, context_conflict, tuple(sorted(source_axes.items())), source_name_present)
         if key not in self.cache:
             self.cache[key] = self._assess(names, unit, quantity, term, pipeline,
-                specimen, method, name_checks, context_conflict, source_axes)
+                specimen, method, name_checks, context_conflict, source_axes, source_name_present)
         return self.cache[key]
 
-    def _assess(self, names, unit, quantity, term, pipeline, specimen, method, name_checks, context_conflict, source_axes):
+    def _assess(self, names, unit, quantity, term, pipeline, specimen, method, name_checks, context_conflict, source_axes, source_name_present):
         unit_system = quantity.get("system")
         result = {"state": "no_name", "queries": [], "coding_candidates": [], "name_candidates": [],
                   "selected_code": None, "selected_name": None, "model_used": False, "errors": [],
@@ -41,8 +42,8 @@ class LaboratorySuggestions:
         candidates = []
         if term:
             result["name_candidates"] = self._names(term, pipeline.terminology)
-        needs_search = bool(names) and (unit_system != UCUM_URI or context_conflict or not term or not name_checks or
-            any(check["state"] not in {"exact_alias", "not_provided"} for check in name_checks))
+        needs_search = bool(names) and (unit_system != UCUM_URI or context_conflict or not term or (source_name_present and not name_checks) or
+            any(check["state"] not in {"exact_alias", "component_label", "not_provided"} for check in name_checks))
         if not needs_search:
             result["state"] = "sourced_name_available" if term else "no_name"
             return result
@@ -61,23 +62,31 @@ class LaboratorySuggestions:
         if term:
             candidates.append((term, {"source": term.source, "method": "existing_exact_code"}))
         found = [candidate for check in name_checks for candidate in check.get("candidates", [])]
+        if hasattr(pipeline.loinc, "search_names"):
+            for query in result["queries"][:3]:
+                try:
+                    found = pipeline.loinc.search_names(query["query"]) + found
+                except (OSError, ValueError, RuntimeError) as exc:
+                    result["errors"].append("Primary name search unavailable: " + type(exc).__name__)
         if pipeline.terminology:
             for query in result["queries"][:5]:
                 rows, errors = pipeline.terminology.search_names(LOINC_URI, query["query"])
                 found += rows
                 result["errors"] += errors
         seen = {(term.code, term.version)} if term else set()
-        for row in found:
+        verified_seen = set(seen)
+        for row in found[:40]:
             code, version = row.get("code"), row.get("version", "")
             if row.get("system") != LOINC_URI or not code or (code, version) in seen:
                 continue
             seen.add((code, version))
-            if len(candidates) >= 5:
+            if len(candidates) >= 12:
                 break
             try:
                 verified = pipeline.loinc.lookup(code, version=version) if version else pipeline.loinc.lookup(code)
-                if verified:
+                if verified and (verified.code, verified.version) not in verified_seen:
                     candidates.append((verified, row))
+                    verified_seen.add((verified.code, verified.version))
             except Exception as exc:
                 result["errors"].append("Candidate exact lookup unavailable: " + type(exc).__name__)
         interpretations = []
@@ -104,7 +113,14 @@ class LaboratorySuggestions:
                 except Exception:
                     pass
         result["unit_interpretations"] = interpretations
-        for candidate, retrieval in candidates:
+        def priority(pair):
+            candidate = pair[0]
+            mismatch = bool(specimen and candidate.system and specimen.casefold() != candidate.system.casefold())
+            component_match = normalized_name(candidate.component) in {normalized_name(row["query"]) for row in result["queries"]}
+            return (candidate.code != (term.code if term else ""), mismatch, not component_match,
+                    bool(candidate.method and not method), candidate.status != "ACTIVE")
+        candidates.sort(key=priority)
+        for candidate, retrieval in candidates[:5]:
             try:
                 options = [(interpretation, pipeline._mapping(interpretation["unit"], True, candidate, "", specimen, method))
                            for interpretation in interpretations]
@@ -121,6 +137,7 @@ class LaboratorySuggestions:
             axes = {"component": candidate.component, "property": candidate.property,
                     "time": candidate.time_aspect, "system": candidate.system, "scale": candidate.scale,
                     "method": candidate.method, "unresolved_part_codes": candidate.part_codes}
+            axes["axis_sources"] = candidate.axis_sources
             conflicts = []
             conflicts += [name for name, value in source_axes.items() if value and axes.get(name)
                           and value.casefold() != axes[name].casefold()]
@@ -131,7 +148,8 @@ class LaboratorySuggestions:
                 conflicts.append("scale")
             if candidate.status and candidate.status.upper() != "ACTIVE":
                 conflicts.append("code_status_requires_review")
-            allowed = mapping["class"] in {"correct", "normalization_verified", "conversion_verified"} and not conflicts
+            missing_axes = [name for name in ("component", "property", "system", "scale") if not axes[name]]
+            allowed = mapping["class"] in {"correct", "normalization_verified", "conversion_verified"} and not conflicts and not missing_axes
             labels = self._names(candidate, pipeline.terminology)
             result["coding_candidates"].append({
                 "code": candidate.code, "system": LOINC_URI, "version": candidate.version,
@@ -140,6 +158,7 @@ class LaboratorySuggestions:
                 "name_evidence": labels, "axes": axes, "unit_fit": mapping,
                 "context_conflicts": conflicts, "missing_context": [key for key, value in
                     (("specimen", specimen), ("method", method), ("time", "")) if not value],
+                "unresolved_axes": missing_axes,
                 "selectable": allowed, "target_verified": True, "source": candidate.source,
                 "retrieval": retrieval, "review_required": True,
             })
@@ -173,7 +192,8 @@ class LaboratorySuggestions:
             rows, _ = router.labels(LOINC_URI, term.code, term.version)
             labels += [{"name": row["value"], "language": row.get("language", ""),
                         "source": row.get("source"), "version": row.get("version"),
-                        "supplement": row.get("supplement")} for row in rows
+                        "supplement": row.get("supplement"),
+                        **{key: row.get(key) for key in ("source_url", "source_title", "source_sha256", "artifact_version", "supplement_version") if row.get(key)}} for row in rows
                        if not row.get("supplement") or row.get("base_version_declared")]
         seen, result = set(), []
         for label in labels:

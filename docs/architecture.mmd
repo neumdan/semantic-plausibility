@@ -1,36 +1,26 @@
 %% Same node/edge contract as architecture.svg.
 flowchart TD
-    INPUT["Hospital export boundary<br/>LIS / FHIR / CDS Hub → files/view<br/>TORCH/CQL or SQL selection upstream<br/>Explicit input + output selection"]
-    CONFIG["TOML + secret references<br/>Map input / selected profile rules<br/>Choose local, API or both<br/>Enable sources; select editions<br/>Offline mode disables API calls"]
-    NORMAL["Validate and standardise<br/>Codes + units + values + references<br/>Preserve versions/context; no rewrite"]
-    GROUP["Embedded DuckDB grouping<br/>Distinct: complete guarded sets<br/>Known counts → mean/SE, median/IQR<br/>Items: retain ID / component path"]
-    LOCAL["A · Local terminology<br/>Download once with package-init<br/>or install real JSON/CSV/SQLite<br/>Set lookup.path + systems<br/>Offline: add UCUM/LOINC pack<br/>Keep editions and file hashes"]
-    API["B · API configuration<br/>Set type, endpoint + systems<br/>Credentials: .env / secret files<br/>NLM / LOINC / own FHIR<br/>network.mode = lookups<br/>Enabled APIs called at runtime"]
-    CHECK["Same laboratory check kernel<br/>Source code / unit / reference checks<br/>Target profile systems and bindings<br/>LOINC axes / verified UCUM factors<br/>Preserve whole-set context<br/>Missing evidence → unverified"]
-    RESEARCH["Separate evidence research<br/>Name search → exact candidates<br/>Cached per LOINC / edition<br/>PubMed + Europe PMC + pages<br/>Quoted values / units / ranges<br/>Exact prompts / query trace"]
-    QC["Other MII quality checks<br/>FHIR Validator: conformance<br/>FDE: availability/completeness<br/>Separate scopes and outputs"]
-    OUTPUT["Checked export and proposals<br/>CSV + HTML + summary + evidence<br/>Source and target checks separate<br/>Mapping + reference transformations<br/>Chained log + hashes + editions"]
-    STUDY["Matched export studies<br/>LIS ↔ FHIR ↔ CDS Hub<br/>Groups + known frequencies<br/>Context changes / loss candidates"]
-    REGISTRY["Scoped mapping registry<br/>Source + profile + set scope<br/>Recheck targets in later runs<br/>Retain history and revocation"]
-    EXPERT["Laboratory physician review<br/>Decision + reviewer + time + evidence<br/>Apply/revalidate approved site plans"]
-    INPUT --> NORMAL
-    CONFIG --> NORMAL
-    NORMAL --> GROUP
-    CONFIG -.-> |"setup / path"| LOCAL
-    CONFIG -.-> |"explicit selection"| API
-    GROUP --> CHECK
-    LOCAL --> |"local reads"| CHECK
-    API --> |"selected API calls"| CHECK
-    OUTPUT -.-> |"separate pass"| RESEARCH
-    CHECK --> OUTPUT
-    RESEARCH -.-> |"dossier"| EXPERT
-    EXPERT --> |"decision"| REGISTRY
-    REGISTRY -.-> |"scoped reuse"| CHECK
-    OUTPUT --> STUDY
-    OUTPUT --> EXPERT
-    QC -.-> |"complementary"| EXPERT
-    classDef normal fill:#f3f7fa,stroke:#c4d5df,color:#142d42
-    class INPUT,CONFIG,NORMAL,GROUP,LOCAL,API,CHECK,QC,STUDY normal
-    classDef teal fill:#eef7f4,stroke:#a8cfc6,color:#142d42
-    class RESEARCH,OUTPUT,REGISTRY,EXPERT teal
-    classDef error fill:#fcf1f3,stroke:#ecc7cf,color:#142d42
+    INPUT["Input and source contract<br/>LIS / CSV / DB exports or actual FHIR Bundle / NDJSON<br/>Names, code/system/version, value, unit/system<br/>All reference intervals, specimen, method and known counts"]
+    CONFIG["One TOML configuration<br/>Input/output and columns; pinned MII guide/profile<br/>Primary / source / optional terminology services<br/>Local model and credentials by environment/file reference"]
+    VALIDATE["Full FHIR validation when the input is FHIR<br/>Local Matchbox + official HL7 validator, or MII validator<br/>Pinned guide and dependencies; local Blaze terminology<br/>Retain OperationOutcome; unavailable stays unverified"]
+    GROUP["Standardise and aggregate locally<br/>Preserve the complete semantic set and context<br/>DuckDB: distinct sets or items with source IDs<br/>Known frequencies: mean/SE and median/IQR"]
+    LOCAL["Downloaded terminology<br/>Real BfArM JSON / source catalogue<br/>Versioned labels and exact membership<br/>Supplements do not prove conversions"]
+    CHECK["Laboratory semantic checks<br/>Source validity and target profile fit<br/>LOINC axes / UCUM grammar and factors<br/>Numeric values and full reference context<br/>Explicit transformation proposals"]
+    API["Configured terminology APIs<br/>NLM UCUM / LOINC / selected services<br/>Exact lookups; known versions and coverage<br/>Only enabled services are contacted"]
+    REPORT["Audited check report<br/>CSV / HTML, summary, evidence and hash-chained log<br/>Formal FHIR outcomes and semantic findings stay separate<br/>Source set → linked terminology → complete proposal"]
+    RESEARCH["Separate evidence research with local Ollama<br/>LOINC pages + Europe PMC / PubMed abstracts<br/>Sourced alternatives, quoted values, units and intervals<br/>Article title / URL / DOI, response hash and retrieval time<br/>Prompts and guarded replies in the research trace"]
+    REVIEW["Clinician review and future mapping reuse<br/>Review semantic correctness and evidence applicability<br/>Approve/reject/defer/revoke code, name, unit and factor<br/>Scoped registry rechecks target and transformation<br/>Apply in ETL, then validate the resulting FHIR resources"]
+    INPUT --> |"FHIR"| VALIDATE
+    CONFIG --> |"guide"| VALIDATE
+    VALIDATE --> |"attach outcomes"| GROUP
+    INPUT --> |"CSV / DB"| GROUP
+    GROUP --> |"sets"| CHECK
+    LOCAL --> |"files"| CHECK
+    API --> |"API"| CHECK
+    CHECK --> |"checks + proposals"| REPORT
+    REPORT --> |"optional evidence pass"| RESEARCH
+    REPORT --> |"review"| REVIEW
+    RESEARCH --> |"dossier"| REVIEW
+    classDef normal fill:#ffffff,stroke:#b7cec9,color:#142d42
+    classDef teal fill:#eef7f4,stroke:#b7cec9,color:#142d42
+    class VALIDATE,CHECK,REPORT,RESEARCH,REVIEW teal

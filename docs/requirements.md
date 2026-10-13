@@ -13,6 +13,7 @@ The first deployment uses MII Laboratory **2026.0.3**, a stable published releas
 | Explicit input and configuration | Mapped CSV/SQLite/PostgreSQL or native R4 Bundle/NDJSON; LIS APIs, TORCH/CQL and vendor exports remain upstream. |
 | Whole-set analysis | Preserve alternate codings, versions, names, comparators, specimen/method/status and complete reference qualifiers. DuckDB groups guarded sets and eligible distributions; items mode retains source IDs. |
 | Check source meaning first | Actual source code/unit membership and documented source unit expectations are separate from target-profile compatibility. Numeric references can be compared in an exact verified source unit. Missing source catalogues yield unknown, not invented definitions. |
+| Full resource/guide validation | For actual FHIR inputs, call the selected local Matchbox/HL7 or MII validator before aggregation; retain OperationOutcomes and unresolved coverage. CSV/DB aggregates are not patient resources. |
 | Derive target systems from the profile | Import fixed/pattern systems and bindings; supplied real ValueSets resolve their systems. Unspecified selected elements use R4 fallback; explicit prohibitions remain effective. Endpoint URLs/credentials are deployment configuration. |
 | Explicit terminology roles | Primary services verify targets, source services describe the LIS, optional sources provide extra labels/candidates. An optional positive result cannot reverse a confirmed primary rejection. |
 | Propose interoperable coding | Retrieve candidates from actual names/aliases/catalogues; verify code/edition, units and available axes. Local unit displays may be UCUM candidates, but a display does not establish source-code equivalence or a conversion factor. |
@@ -25,7 +26,7 @@ The first deployment uses MII Laboratory **2026.0.3**, a stable published releas
 
 ## Scope of the decision
 
-The project produces a mapping plan, not a patient Observation from aggregate statistics. Applying that plan requires source resource identity, subject, timing and other mandatory fields in the institution's ETL. The official FHIR/IG validator checks the resulting individual resources. FDE availability/completeness measures remain complementary.
+The project produces a mapping plan, not a patient Observation from aggregate statistics. Applying that plan requires source resource identity, subject, timing and other mandatory fields in the institution's ETL. The configured local FHIR/IG validator checks actual input and resulting individual resources. FDE availability/completeness measures remain complementary.
 
 A reference interval, analytical measurement range and reported extreme are different evidence types. Age/sex, assay/platform, calibration, preanalytical conditions and population can limit applicability. Literature quotations and unit compatibility support plausibility; clinician adjudication establishes semantic correctness in the defined source context.
 
@@ -34,3 +35,17 @@ A reference interval, analytical measurement range and reported extreme are diff
 Medication needs ingredient/product identity, strength numerator/denominator, dose/unit, route, frequency/timing and status; ATC alone does not identify all of these. Condition needs code/edition, verification/clinical status, severity/stage and body site. Procedure needs code/edition, status, timing, site and technique. Timing primitives can use FHIR units-of-time while dose Quantities use an IG-selected unit system; do not assume every unit element is UCUM. Each adapter must load its actual MII profile/bindings and source catalogues before mapping.
 
 FDPG access is not a public literature lookup. A future provider must use an authorised feasibility/research interface or permitted aggregate export, retain selection/cohort provenance and keep observed practice separate from reference-interval validation.
+
+## Medication next
+
+The laboratory semantic runner rejects medication input today. The next adapter should use the published [MII Medication 2026.0.1 guide](https://www.medizininformatik-initiative.de/Kerndatensatz/KDS_Medikation_2026/MIIIGModulMedikation.html) and preserve linked product/ingredient records alongside the prescription or administration.
+
+| Required context | FHIR R4 source / proposed check |
+| --- | --- |
+| Product, formulation, ingredients, concentration and package amount | [Medication](https://hl7.org/fhir/R4/medication.html): `code`, `form`, `ingredient.strength`, `amount`; verify product catalogue definitions/editions |
+| Dose, route, timing, duration and conditional use | [Dosage](https://hl7.org/fhir/R4/dosage.html) in request/statement; retain every dose/rate instruction and Timing qualifier |
+| Actual administration | MedicationAdministration medication reference, effective time/period, dose, rate and route; keep administration distinct from prescription |
+
+**Illustrative shape checks, not prescribing guidance:** `20 mg/mL × 5 mL = 100 mg` requires a verified product concentration. A liquid product paired with `1 tablet` is a formulation/unit mismatch; do not convert it by spelling correction. Without verified strength, volume-to-mass conversion stays unresolved. Separate package amount from per-administration dose and daily total. ATC alone does not identify a formulation/concentration. Count-unit annotations cannot establish pharmaceutical form.
+
+Reuse the same source → terminology/product definitions → full proposal/evidence → clinician review design, with a separate domain adapter and profile-scoped mapping registry. Medication semantic checks and clinical dosage appropriateness are not implemented by this release.

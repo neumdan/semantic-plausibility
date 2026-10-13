@@ -12,6 +12,22 @@ from semantic_plausibility.terminology_packages import install_package, package_
 from semantic_plausibility.terminology_router import FhirArtifactSource, TerminologyRouter
 
 
+@unittest.skipUnless(os.getenv("SQC_TEST_BFARM_DIR"), "Set SQC_TEST_BFARM_DIR to your already-downloaded real BfArM lab JSONs")
+class DownloadedTerminologyTests(unittest.TestCase):
+    def test_downloaded_labels_keep_publisher_hash_and_edition_guard(self):
+        source = FhirArtifactSource(Path(os.environ["SQC_TEST_BFARM_DIR"]))
+        labels = source.labels("http://loinc.org", "718-7", "2.83")
+        self.assertTrue(labels)
+        for label in labels:
+            self.assertTrue(label["source_url"].startswith("https://terminologien.bfarm.de/"))
+            self.assertEqual(len(label["source_sha256"]), 64)
+            self.assertEqual(label["version"], "2.83")
+        self.assertEqual(source.labels("http://loinc.org", "718-7", "2.82"), [])
+        self.assertEqual(source.check("http://loinc.org", "718-7")["state"], "unknown")
+        found = source.search_names(labels[0]["value"])
+        self.assertTrue(any(row["code"] == "718-7" and row["source_sha256"] == labels[0]["source_sha256"] for row in found))
+
+
 @unittest.skipUnless(os.getenv("SQC_LIVE_TESTS") == "1", "Set SQC_LIVE_TESTS=1 for real public services")
 class PublicTerminologyTests(unittest.TestCase):
     def test_bfarm_metadata_and_explicit_download_conditions(self):

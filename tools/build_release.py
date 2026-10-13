@@ -26,8 +26,10 @@ ROOT_FILES = {
     "NOTICE",
     "compose.offline.yaml",
     "compose.gpu.yaml",
+    "compose.mii.yaml",
     "pipeline.example.toml",
     "pipeline.research.example.toml",
+    "pipeline.fhir.example.toml",
     "terminology.example.toml",
 }
 FOLDERS = {"src", "tests", "examples", "docs", "deploy", "tools", ".github"}

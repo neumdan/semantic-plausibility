@@ -67,7 +67,14 @@ UNIT_SPELLING = (
 )
 
 STUDY_BOUNDS = (
-    "Extract bounds only if explicitly stated in the supplied abstract. Return "
+    "Extract bounds for the supplied verified analyte definition only if explicitly stated in the supplied abstract. "
+    "Copy one supplied excerpt_candidates sentence exactly as the excerpt; never combine sentences. "
+    "That same sentence must name the requested analyte and its own interval. An interval for thiamine, "
+    "glycated hemoglobin or another analyte is not a hemoglobin interval. "
+    "Context fields must be empty or copy one complete supplied sentence of at most 512 characters; do not paraphrase. "
+    "Compare component, property, specimen and method; another derivative, cell subtype or different assay is not this analyte. "
+    "A reported individual value or summary is not an interval: leave bounds null and use the measurement task for it. "
+    "Never reconstruct the analyte from model memory of a LOINC code. Return "
     "{evidence_type:null|string,low:null|string,high:null|string,unit:null|string,population:string,specimen:string,"
     "method:string,excerpt:string}. The excerpt must be an exact contiguous span of the "
     "abstract containing every returned bound and unit. Unsupported fields must be empty. "
@@ -80,7 +87,9 @@ STUDY_BOUNDS = (
 
 STUDY_MEASUREMENTS = (
     "Extract at most three explicitly reported measurements or measurement units of the named analyte "
-    "from the supplied study abstract. Return {measurements:[{reported_value:null|string,value_kind:string,"
+    "from the supplied study abstract. Copy one supplied excerpt_candidates sentence exactly for each excerpt; "
+    "never combine sentences or print escaped Unicode sequences as literal text. Context fields must be empty or copy "
+    "one complete supplied sentence of at most 512 characters, never a paraphrase. Return {measurements:[{reported_value:null|string,value_kind:string,"
     "unit:string,population:string,specimen:string,method:string,excerpt:string}]}. value_kind is "
     "individual_value, summary_statistic, unit_only or unspecified; use unspecified when the text is unclear. "
     "Every unit/value must occur as an exact token in one contiguous quotation. Only associate a value "

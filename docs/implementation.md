@@ -8,6 +8,8 @@ The named check reads an export, writes local artifacts and exits. Evidence rese
 | Read CSV/FHIR/SQLite/PostgreSQL | `audit.py`, `batch_quality.py`, `db_source.py`, `export_review.py` |
 | Guarded grouping and weighted statistics | `export_grouping.py` (embedded DuckDB) |
 | Real UCUM syntax/factors and LOINC metadata | `observation_services.py` |
+| Local full FHIR/IG validation | `fhir_validation.py`, pinned Matchbox/HL7 or MII service |
+| Source → linked terminology → complete proposal and citations | `report_sources.py`, provider-origin metadata in `observation_services.py` |
 | Additional configured CodeSystems/ValueSets | `terminology_router.py`, `terminology_validation.py` |
 | Pinned package setup / aliases / optional OLS and WHO APIs | `terminology_packages.py`, `name_checks.py`, `terminology_apis.py`; `lookup` inspects one source |
 | Code–unit fit, references and recommendations | `fhir_quality_pipeline.py`, `recommendations.py` |
@@ -38,4 +40,31 @@ Core tests check grouping, input/output contracts, profile import, audit integri
 
 Protected BfArM translation tests require `SQC_BFARM_ACCEPT_DOWNLOAD_CONDITIONS=1` after accepting the linked terms. WHO tests require `SQC_WHO_LIVE_TESTS=1`, `WHO_ICD_CLIENT_ID` and `WHO_ICD_CLIENT_SECRET`. These are explicit opt-ins; skipped integrations are not counted as verified. No protected package content is committed.
 
-Run from a fresh output folder. PostgreSQL/hospital integration and local-model clinical accuracy need site-specific studies. The application complements MII FHIR conformance/availability checks; it is not a FHIR validator.
+Run from a fresh output folder. PostgreSQL/hospital integration and local-model clinical accuracy need site-specific studies. The application complements MII FHIR conformance/availability checks; it delegates full resource/guide validation to the local Matchbox/HL7 or MII service. [Setup and scopes](validation.md).
+
+## Validation container compatibility
+
+Matchbox 4.1.21 and MII validator 0.0.1-alpha.8 are pinned; the latter uses the optional `compose.mii.yaml` overlay. Matchbox runs on an internal network with its configured local Blaze service. Its image build installs the real guide/dependencies. The generated ephemeral H2 inventory widens Matchbox 4.1.21's `TYPE` column to accommodate MII datatype canonical identifiers; no published guide resource is edited. Server AI error analysis/statistics storage are disabled.
+
+Live FHIR tests require a running local Matchbox with the real MII guide: `SQC_LIVE_FHIR_VALIDATION_TESTS=1 uv run --no-sync python -m unittest discover -s tests -p test_fhir_validation.py -v`. The valid/invalid source inputs are illustrative; every validation response comes from the actual service.
+
+## Current verification
+
+Verified on 13 October 2026 for 0.11.2: **49 tests; 46 passed, 3 explicit skips**. Actual LOINC/NLM, Europe PMC/PubMed, existing BfArM files and native Ollama requests passed. The skipped integrations were a running Matchbox instance, a new protected BfArM download and credentialed WHO access. The prior live Matchbox/MII-guide test returned 0 errors for the complete example Bundle and 2 for its missing-identifier variant; it was not restarted for this CSV run.
+
+Native model: Ollama 0.40.2, `ministral-3:3b`, Q4_K_M; observed model SHA-256 `316262d960e27504463e6270bd8c1e8665c957ef2cff620ba333af9e1480df63`. The tag's served metadata reports 3.8B parameters. This run used Python 3.14.8 and DuckDB 1.5.6. The wheel, public manual site and runner archive built successfully; private configuration, inputs and reports were excluded.
+
+The live research test retrieves the actual caregiver/thiamine article (PMID 42473864). Its reported hemoglobin measurement can be extracted, while the thiamine interval cannot become a hemoglobin reference recommendation. Quotes are chosen from normalised source sentences; rejected content does not disable later model tasks. These source/schema guards constrain extraction, while clinicians still assess applicability and semantic correctness.
+
+The starter's eight rows group into seven sets representing 84 occurrences. Six sets have verified LOINC codes; all seven unit expressions pass NLM UCUM syntax, including `10*6`, whose compatibility with a cell concentration is unresolved. Three sets meet the documented numeric readiness conditions (75/84 weighted occurrences). A value outside an exported range is flagged without classifying the result as semantically wrong. CSV aggregates receive no full-resource FHIR validation.
+
+The complete Europe PMC run retrieved 11 distinct articles, accepted 16 model responses through the source guards and rejected 13. The actual proposals were:
+
+| Source set | Result and source |
+| --- | --- |
+| `LIS-HB`, Hemoglobin, blood, `g/dL` | Propose [718-7](https://loinc.org/718-7), component Hemoglobin, canonical name “Hemoglobin [Mass/volume] in Blood”; clinician review remains required. |
+| Hemoglobin `140 g/L`, illustrative bounds `120–160 g/L` | Propose `14 g/dL`, bounds `12–16 g/dL`, using the NLM-verified factor `0.1`. |
+| Leukocytes `6690-2`, `10*6` | [LOINC's example](https://loinc.org/6690-2) supplies `10*3/uL` as a review candidate; no executable conversion factor is supplied. |
+| Study evidence | Extracted a reported hemoglobin value of `5.7 g/dL` from [PMID 42473864](https://europepmc.org/article/MED/42473864). No supported reference interval was extracted in this bounded run. The case value does not define an interval. |
+
+This run selected `sources=["europe_pmc"]`, `MAX_RESULTS=3`, `max_articles_per_loinc=6` and the documented optional human-population query filter. Changing provider results, model weights or budgets may change candidates. The report's trace retains the actual inputs and guarded outputs; the original checked report remained unchanged.

@@ -1,4 +1,4 @@
-# Laboratory input and output contract (0.10.0)
+# Laboratory input and output contract (0.11.1)
 
 ## Minimum export
 
@@ -54,6 +54,7 @@ For `output.path="output/review.csv"`:
 | `review.summary.json` | Counts, explicit numerators/denominators, versions, hashes, profile provenance and scope |
 | `review.evidence.jsonl` | Detailed per-group assessment with original semantic metadata and evidence |
 | `review.audit.jsonl` | UTC phases/progress, software, hashes, counters, redacted errors; hash chain |
+| `review.fhir-validation.jsonl` when enabled for FHIR input | Full local validator OperationOutcomes, requested profile/packages and source/submitted resource hashes |
 | Optional captured pack | Only queried verdicts/terms/verified linear factors for offline reuse; same report directory |
 
 An existing prefix requires `overwrite=true` or a new filename. Concurrent runs with the same output prefix are blocked. Files publish from staged temporary files; the summary is published last as the completion marker. Failed runs retain `.failed.<run-id>.audit.jsonl`, with safe diagnostics and no completed summary. A stale `.run.lock` should be removed only after confirming its owning process is no longer running.
@@ -66,6 +67,8 @@ The main statuses are `passed`, `suggestion`, `unclear`, `error`; `not_applicabl
 
 Names/research: `analyte_name` is supplied; `canonical_name` is the exact lookup display. `suggested_code`/`suggested_name` record a model-selected, independently verified candidate or remain empty on abstention. `suggestion_state`, `laboratory_suggestions_json` retain the shortlist, conflicts, unresolved axes and provenance; `reference_candidates_json` contains quoted candidate intervals with context. Retrieved candidates are never asserted equivalent to the source test.
 
+Formal FHIR: `fhir_validation_state` and `fhir_validation_scope` describe the full input-document check before grouping. States are `passed`, `passed_with_warnings`, `invalid`, `incomplete`, `unavailable`, `disabled` or `not_applicable` for scalar CSV/DB input. Aggregated rows share the input-level result; this is not a per-group conformance certification. The HTML links the full outcomes and places supporting citations beside each proposal. [Validation setup](validation.md).
+
 Credibility is an evidence category, **not a calibrated probability**: `supported_by_configured_sources`, `partial`, `unverified`, `rejected`. Numerical readiness is defined in the report independently of credibility. `clinical_value_evidence` and `clinical_reference_evidence` remain `not_established` by the numeric core. Grounded research candidates do not change that into clinical approval.
 
 CSV strings are escaped against spreadsheet formulas. Full evidence may contain measured values and semantic metadata; the audit log avoids raw source IDs/values/secrets. Removing IDs is not anonymisation. Nothing is sent back automatically: transfer the reviewed reports only through your institution's approved process.
@@ -77,3 +80,17 @@ CSV strings are escaped against spreadsheet formulas. Full evidence may contain 
 Review columns and the separate evidence dossier/trace are described in [research and feedback](research.md). The registry is local and versioned; accepted targets/factors are rechecked on reuse. `approved_mapping_ready` counts currently supported approved plans, not full patient-resource validation.
 
 Optional mapped roles `component`, `property`, `time_aspect` and `scale` preserve known source axis descriptors alongside specimen/method. Use resolved descriptors, not inferred aliases. For native FHIR, a context file can supply `source_axes={component,property,time,scale}`; time here is the observation definition (such as Pt or a collection duration), not a patient timestamp. Conflicts with resolved LOINC axes stay under review.
+
+## Complete review projection
+
+Every checked/researched row now contains:
+
+| Field | Meaning |
+| --- | --- |
+| `source_data_json` | Original codings/name, numeric values/statistics, units, all reference intervals and context; source ID only if retained by item mode |
+| `linked_data_json` | Exact LOINC name/component/axes/edition, unit lookup, sourced labels and verified retrieval candidates |
+| `recommendation_set_json` | Conditional target code/system/edition/name/analyte, proposed unit/transformation, original reference sets and applicable evidence candidates, explanations/sources and review requirement |
+| `matched_analyte`, `suggested_analyte` | Existing exact-code component versus proposed-code component; absent when not resolved |
+| `suggested_code_version` | Edition associated with the proposed target code |
+
+A proposal never rewrites input. Exact membership, definition/name, dimensional fit, numeric completeness and evidence applicability remain separate. The HTML presents these structured fields as source → linked data → proposal, with checks in the final column.

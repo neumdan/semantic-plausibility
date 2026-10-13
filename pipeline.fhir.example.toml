@@ -1,0 +1,94 @@
+# Input: illustrative laboratory measurements, not clinical reference evidence.
+# Lookups: real public services. Paths are relative to this configuration.
+# Copy to pipeline.toml: the default for Python, Docker Compose and podman-compose.
+# Setup: docs/shipped-stack.md. Configuration reference: docs/configuration.md.
+config_version = 3
+
+[general]
+PROJECT_NAME = "laboratory-review"
+RESOURCE_TYPE = "Observation"
+
+[input]
+type = "fhir_file"
+origin = "fhir"
+source_namespace = "synthetic-fhir-laboratory"
+path = "examples/fhir/laboratory-valid.bundle.json"
+granularity = "individual"
+
+[specification]
+FHIR_VERSION = "4.0.1"
+PROFILE = "mii-kds-lab"
+STRUCTURE_DEFINITION = "examples/profiles/ObservationLab-2026.0.3.json"
+VALUE_SETS = ["examples/profiles/results-laboratory-observations-uv-ips.json"]
+IG_PACKAGE = "de.medizininformatikinitiative.kerndatensatz.laborbefund"
+IG_VERSION = "2026.0.3"
+IG_CANONICAL = "https://www.medizininformatik-initiative.de/fhir/core/modul-labor/StructureDefinition/ObservationLab"
+
+[specification.links]
+resource = "https://hl7.org/fhir/R4/observation.html"
+guide = "https://www.medizininformatik-initiative.de/Kerndatensatz/KDS_Laborbefund_2026/MIIIGModulLaborbefund.html"
+source = "https://github.com/medizininformatik-initiative/kerndatensatzmodul-labor"
+
+[network]
+mode = "lookups"
+allowed_http_hosts = ["ollama", "host.containers.internal", "host.docker.internal"]
+
+[lookups.ucum]
+role = "primary"
+enabled = true
+type = "ucum"
+endpoint = "https://ucum.nlm.nih.gov/ucum-service/v1"
+
+[lookups.loinc]
+role = "primary"
+enabled = true
+type = "loinc"
+endpoint = "https://tx.fhir.org/r4"   # Public test service; observed release is recorded.
+# Official alternative: https://fhir.loinc.org requires these credentials.
+# username_env = "LOINC_FHIR_USERNAME"
+# password_env = "LOINC_FHIR_PASSWORD"
+
+[models.local]
+container_base_url = "http://ollama:11434/v1" # Compose Ollama; native inference uses base_url(_env) below.
+runtime = "ollama"
+base_url = "http://127.0.0.1:11434/v1" # Native Ollama; container_base_url is used in Compose.
+model = "ministral-3:3b"
+temperature = 0
+max_tokens = 2048
+timeout_seconds = 180
+response_mode = "json_schema"
+
+[research]
+enabled = false                     # true after starting Ollama and catalog-init
+scope = "lookup"                    # studies also retrieves PubMed abstracts
+unit_catalog = "local/unit-catalog.json"
+loinc_website_base_url = "https://loinc.org"
+
+[output]
+mode = "distinct"
+path = "output/fhir-laboratory-review.csv"
+
+[quality]
+# Create this registry with review-import after checking and clinician review.
+# review_registry = "local/clinician-mappings.json"
+
+[lookups.bfarm_lab]
+# Real BfArM FHIR JSON supplements, installed by the operator.
+enabled = false
+role = "optional"
+type = "fhir_artifacts"
+path = "local/terminologies/bfarm-lab"
+systems = ["http://loinc.org", "http://unitsofmeasure.org"]
+
+[validation]
+# Matchbox uses the official HL7 validator. Applied only to actual FHIR input.
+enabled = true
+backend = "matchbox"
+endpoint = "http://127.0.0.1:8081/matchboxv3/fhir"
+container_endpoint = "http://matchbox:8080/matchboxv3/fhir"
+terminology_server = "http://blaze:8080/fhir"
+terminology_endpoint = "http://127.0.0.1:8082/fhir"
+timeout_seconds = 180
+fail_on_error = true
+# additional_packages = [] # Extra real guides use pinned package#version entries.
+# token_env = "FHIR_VALIDATOR_TOKEN" # Only for a protected local validator.

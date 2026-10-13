@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
+from copy import deepcopy
 import re
 from typing import Any
 
@@ -75,6 +76,21 @@ def response_schema(instruction: str) -> dict[str, Any]:
         return SCHEMAS[instruction]
     except KeyError:
         raise ValueError("Model task has no registered response schema") from None
+
+
+def evidence_schema(instruction: str, evidence: dict[str, Any]) -> dict[str, Any]:
+    """Constrain study quotations to actual source sentences, including abstention."""
+    schema = deepcopy(response_schema(instruction))
+    excerpts = evidence.get("excerpt_candidates")
+    if excerpts and instruction in {prompts.STUDY_BOUNDS, prompts.STUDY_MEASUREMENTS}:
+        target = (schema["properties"]["excerpt"] if instruction == prompts.STUDY_BOUNDS
+                  else schema["properties"]["measurements"]["items"]["properties"]["excerpt"])
+        target["enum"] = ([""] if instruction == prompts.STUDY_BOUNDS else []) + excerpts
+        properties = (schema["properties"] if instruction == prompts.STUDY_BOUNDS
+                      else schema["properties"]["measurements"]["items"]["properties"])
+        for name in _CONTEXT:
+            properties[name]["enum"] = [""] + [part for part in excerpts if len(part) <= 512]
+    return schema
 
 
 def validate_response(value: Any, schema: dict[str, Any], path: str = "response") -> None:
@@ -173,6 +189,9 @@ def validate_grounding(instruction: str, value: dict[str, Any], evidence: dict[s
             _range_guard(row, evidence.get("page_excerpt", ""))
     elif instruction == prompts.STUDY_BOUNDS:
         _range_guard(value, evidence.get("abstract", ""))
+        component = evidence.get("analyte_definition", {}).get("component", "")
+        if (value["low"] is not None or value["high"] is not None) and component and component.casefold() not in value["excerpt"].casefold():
+            raise ValueError("Study bounds quotation does not explicitly name the verified analyte")
         kind = value["evidence_type"]
         if (value["low"] is not None or value["high"] is not None) and kind is None:
             raise ValueError("Study bounds need an explicit evidence type, not a search-query category")
@@ -184,6 +203,9 @@ def validate_grounding(instruction: str, value: dict[str, Any], evidence: dict[s
     elif instruction == prompts.STUDY_MEASUREMENTS:
         for row in value["measurements"]:
             _range_guard({**row, "low": row["reported_value"], "high": None}, evidence.get("abstract", ""))
+            component = evidence.get("analyte_definition", {}).get("component", "")
+            if component and component.casefold() not in row["excerpt"].casefold():
+                raise ValueError("Study evidence quotation does not explicitly name the verified analyte")
             if row["value_kind"] == "unit_only" and row["reported_value"] is not None:
                 raise ValueError("A unit-only excerpt must not supply a measured value")
     elif instruction == prompts.UNIT_CANDIDATES:

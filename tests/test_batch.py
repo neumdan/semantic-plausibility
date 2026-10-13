@@ -1,6 +1,7 @@
 """Export and safety contracts without fabricated terminology evidence."""
 import csv
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -9,6 +10,7 @@ from semantic_plausibility import run_batch, verify_audit
 from semantic_plausibility.batch import BatchConfiguration
 from semantic_plausibility.profile_import import import_structure_definition
 from semantic_plausibility.model_config import allowed_endpoint
+from semantic_plausibility.deployment import environment
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -81,6 +83,25 @@ class BatchTests(unittest.TestCase):
             with self.subTest(new=new):
                 self.config.write_text(original.replace(old, new))
                 with self.assertRaises(ValueError):
+                    BatchConfiguration(self.config)
+
+    def test_one_config_routes_native_and_compose_model_without_exposing_keys(self):
+        config = BatchConfiguration(self.config)
+        original = os.getenv("SQC_IN_CONTAINER")
+        for container, expected in (("0", "http://127.0.0.1:11434/v1"), ("1", "http://ollama:11434/v1")):
+            with self.subTest(container=container), environment({"SQC_IN_CONTAINER": container, "LOCAL_MODEL_BASE_URL": "http://127.0.0.1:11434/v1"}):
+                with config.deployment.prepare(research=True, action="validate", source_access=False) as prepared:
+                    model = json.loads(prepared.models_file.read_text())["models"][0]
+                    self.assertEqual(model["base_url"], expected)
+                    self.assertNotIn("container_base_url", model)
+        self.assertEqual(os.getenv("SQC_IN_CONTAINER"), original)
+
+    def test_profile_links_cannot_carry_embedded_secrets(self):
+        text = self.config.read_text()
+        for url in ("https://user:password@example.org/profile", "https://example.org/profile?token=secret", "javascript:alert(1)"):
+            with self.subTest(url=url):
+                self.config.write_text(text.replace('https://hl7.org/fhir/R4/observation.html', url))
+                with self.assertRaisesRegex(ValueError, "documentation links"):
                     BatchConfiguration(self.config)
 
     def test_optional_package_configuration_is_pinned_and_does_not_activate_sources(self):

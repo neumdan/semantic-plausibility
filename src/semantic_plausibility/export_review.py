@@ -37,8 +37,12 @@ from .support import _csv_text, _input_hash, read_contexts
 from .observation_quality import LoincTerm
 from .terminology_router import TerminologyRouter, artifact_files, load_sources
 from .review_feedback import REVIEW_FIELDS, ReviewRegistry
+from .report_sources import SET_FIELDS, review_set_fields
 
 EXTRA_FIELDS = [
+    *SET_FIELDS,
+    "fhir_validation_state",
+    "fhir_validation_scope",
     "semantic_signature",
     "source_namespace",
     "source_id",
@@ -169,14 +173,14 @@ class ReliableLookup:
         if name not in {"is_valid", "factor", "lookup"}:
             return getattr(self.client, name)
 
-        def call(*args):
-            key = (name, args)
+        def call(*args, **kwargs):
+            key = (name, args, tuple(sorted(kwargs.items())))
             if key in self.cache:
                 return self.cache[key]
             if self.circuit_breaker and self.failures >= 3:
                 return None
             try:
-                result = getattr(self.client, name)(*args)
+                result = getattr(self.client, name)(*args, **kwargs)
                 self.failures = 0
             except Exception as exc:
                 self.failures += 1
@@ -390,7 +394,7 @@ def mapping_proposal(row, evidence, proposals):
         "source_code": {"system": row["code_system"], "code": row["code"], "version": row["code_version"]},
         "coding_candidates": proposals,
         "unit_candidate": row["suggested_unit"] or row["unit_code"],
-        "unit_system": row["unit_system"],
+        "unit_system": "http://unitsofmeasure.org" if row["suggested_unit"] else row["unit_system"],
         "quantity_transformation": evidence.get("recommendation", {}).get("transformation"),
         "review_required": True,
         "missing_patient_resource_fields": ["subject", "effective[x]", "identifier", "status_as_applicable"],
@@ -442,17 +446,17 @@ def reference_pack(checker, original_kind):
     ucum, loinc = checker.ucum, checker.loinc
     verdicts = {
         args[0]: value
-        for (name, args), value in getattr(ucum, "cache", {}).items()
+        for (name, args, _), value in getattr(ucum, "cache", {}).items()
         if name == "is_valid" and type(value) is bool
     }
     terms = {}
-    for (name, args), value in getattr(loinc, "cache", {}).items():
+    for (name, args, _), value in getattr(loinc, "cache", {}).items():
         if name == "lookup" and isinstance(value, LoincTerm):
             data = asdict(value)
             terms[(data["code"], data.get("version", ""))] = data
     conversions = [
         {"source": args[0], "target": args[1], "factor": str(value)}
-        for (name, args), value in getattr(ucum, "cache", {}).items()
+        for (name, args, _), value in getattr(ucum, "cache", {}).items()
         if name == "factor" and value is not None
     ]
     return {
@@ -548,6 +552,8 @@ def _review_export(config):
         "log": target.with_suffix(".audit.jsonl"),
         "evidence": target.with_suffix(".evidence.jsonl"),
     }
+    if config.validation.get("enabled") and config.input_type == "fhir_file":
+        paths["fhir_validation"] = target.with_suffix(".fhir-validation.jsonl")
     if config.output.get("lookup_pack"):
         paths["lookup_pack"] = config.path_value(config.output["lookup_pack"])
         if paths["lookup_pack"].parent != target.parent:
@@ -662,8 +668,16 @@ def _review_export(config):
                     else "configured_lookup_services"
                 )
                 phase = "input_preflight"
+                fhir_validation = {"state": "not_applicable" if config.validation.get("enabled") else "disabled",
+                    "scope": "CSV/database tuples are not full FHIR resources" if config.input_type != "fhir_file" else "Full FHIR validation was not enabled"}
                 if config.input_type == "csv":
                     validate_csv(config, source["path"])
+                if "fhir_validation" in paths:
+                    from .fhir_validation import validate_input
+                    phase = "fhir_resource_validation"
+                    fhir_validation = validate_input(config, source["path"], folder / "fhir-validation.jsonl")
+                    fhir_validation["operation_outcomes"] = paths["fhir_validation"].name
+                    log.event("fhir_resources_validated", **fhir_validation)
                 manifest = (
                     json.loads(config.path_value(config.input["manifest"]).read_text())
                     if config.input.get("manifest")
@@ -774,6 +788,8 @@ def _review_export(config):
                             **detail,
                         }
                         row = review_row(raw_row, detail, config)
+                        row.update(fhir_validation_state=fhir_validation["state"],
+                                   fhir_validation_scope=fhir_validation["scope"])
                         measurement = detail.get("report", {}).get("measurements", [{}])[0]
                         source_checks = measurement.get("source_code_checks", [])
                         names = measurement.get("name_checks", [])
@@ -887,6 +903,7 @@ def _review_export(config):
                             plan.update(clinician_approved_target=approved, quantity_transformation=approval["verification"],
                                         review_required=approval["review_required"], approval_id=approval["decision_id"])
                             row["fhir_mapping_proposal_json"] = encoded(plan)
+                        row.update(review_set_fields(row, detail))
                         selected = {
                             field: _csv_text(str(row[field]))
                             if isinstance(row.get(field), str)
@@ -940,7 +957,8 @@ def _review_export(config):
                     if unknown_frequency
                     else ratio(weighted_ready, weighted_total),
                     "readiness_definition": READINESS_DEFINITION,
-                    "full_fhir_validation": "not_performed",
+                    "full_fhir_validation": fhir_validation["state"],
+                    "fhir_validation": fhir_validation,
                     "clinical_value_and_reference_evidence": "not_established_by_numeric_checks",
                     "study": config.data.get("study", {}),
                     "export_manifest": manifest,
@@ -948,7 +966,7 @@ def _review_export(config):
                     "lookup_sources": {"ucum": checker.ucum.source, "loinc": checker.loinc.source},
                     "terminology_plan": routes,
                     "loinc_editions": sorted({
-                        term.version for (operation, _), term in checker.loinc.cache.items()
+                        term.version for (operation, _, _), term in checker.loinc.cache.items()
                         if operation == "lookup" and isinstance(term, LoincTerm) and term.version
                     }),
                     "lookup_errors": checker.ucum.errors + checker.loinc.errors,
@@ -966,6 +984,8 @@ def _review_export(config):
                     paths[alias].name: _input_hash(path)
                     for alias, path in (("csv", csv_file), ("evidence", evidence_file))
                 }
+                if "fhir_validation" in paths:
+                    summary["output_hashes"][paths["fhir_validation"].name] = _input_hash(folder / "fhir-validation.jsonl")
                 if "lookup_pack" in paths:
                     (folder / "lookup-pack.json").write_text(
                         json.dumps(
@@ -1002,6 +1022,7 @@ def _review_export(config):
                     "log": folder / "audit.jsonl",
                     "evidence": evidence_file,
                     "lookup_pack": folder / "lookup-pack.json",
+                    "fhir_validation": folder / "fhir-validation.jsonl",
                 }
                 # The summary is the last published file and marks a complete run.
                 for alias in [key for key in paths if key != "summary"] + ["summary"]:
@@ -1026,6 +1047,7 @@ def _review_export(config):
                     paths["summary"],
                     paths["report"],
                     paths["log"],
+                    fhir_validation["state"],
                 )
         except Exception as exc:
             log.event(

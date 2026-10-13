@@ -27,6 +27,9 @@ def check_name(name, system, code, version="", *, term=None, router=None, search
             if value
         ]
         aliases += [dict(row, source=term.source, version=term.version) for row in term.designations]
+        if term.component:
+            aliases.append({"value": term.component, "language": "", "use": "component_only",
+                            "source": term.axis_sources.get("COMPONENT", {}).get("source", term.source), "version": term.version})
     if router:
         additional, errors = router.labels(system, code, version)
         aliases += additional
@@ -34,7 +37,8 @@ def check_name(name, system, code, version="", *, term=None, router=None, search
     confirmed = [
         row for row in matches if not row.get("supplement") or row.get("base_version_declared") or not version
     ]
-    state = "exact_alias" if confirmed else "alias_version_unverified" if matches else "unverified"
+    state = ("component_label" if confirmed and all(row.get("use") == "component_only" for row in confirmed)
+             else "exact_alias" if confirmed else "alias_version_unverified" if matches else "unverified")
     candidates = []
     if router and search and not confirmed:
         candidates, failures = router.search_names(system, name)

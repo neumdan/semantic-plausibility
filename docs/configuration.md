@@ -30,13 +30,14 @@ These sections cover the supported workflow. Unknown settings are rejected. Use 
 | `input.context` / `context_file` / `manifest` | Context and export-selection artifacts | Known axes/qualifiers and source-selection accounting |
 | `input.snapshot` | Captured real lookup-pack path | UCUM/LOINC evidence for offline checks |
 | `database` | `DB_TABLE`, optional `DB_SCHEMA`, connection references | Read-only PostgreSQL or SQLite selection |
-| `specification` | `FHIR_VERSION`, `PROFILE`, `STRUCTURE_DEFINITION` or `PROFILE_FILE`, `VALUE_SETS`, `IG_*` | Selected target rules and pinned artifacts |
+| `specification` | `FHIR_VERSION`, `PROFILE`, `PROFILE_VERSION`, `STRUCTURE_DEFINITION` or `PROFILE_FILE`, `VALUE_SETS`, `IG_*`, `links` | Selected target rules and pinned artifacts |
+| `validation` | `enabled`, `backend`, `endpoint`, `container_endpoint`, `terminology_server`, `additional_packages`, `timeout_seconds`, `fail_on_error` | Local full-resource/guide validation before grouping FHIR input |
 | `aggregation` | `engine="duckdb"`, `group_by` | Grouped sets; optional exact point-value grouping |
 | `output` | `path`, `mode`, `overwrite`, `include_distribution`, `lookup_pack` | CSV report prefix, item/group mode and optional captured evidence |
 | `network` | `mode`, `allowed_http_hosts` | Offline/connected lookups and explicit local plain-HTTP hosts |
 | `lookups.NAME` | `enabled`, `role`, `type`, `endpoint` or `path`, `systems` | Real primary/source/optional terminology services |
 | `packages.NAME` | Registry, name, exact version, path, acceptance | Optional explicit BfArM package installation |
-| `models.NAME` | Runtime, URL reference, model ID, budgets | Optional local inference endpoint |
+| `models.NAME` | Runtime, native URL reference, `container_base_url`, model ID, budgets | Optional local inference endpoint |
 | `research` | Scope, providers, per-LOINC budget, catalogue | Separate page/study evidence retrieval |
 | `quality` | `review_registry`, optional `concept_map` | Reviewed local mappings; clinician registry is the feedback route |
 | `study` | `cohort`, `period_start`, `period_end`, `source_label` | Operator declarations for matched LIS/FHIR/CDS Hub comparisons |
@@ -50,12 +51,14 @@ For the supplied Compose stack, keep TOMLs in the repository root. `SQC_CONFIG_F
 | TOML path | Host location | Container location / access |
 | --- | --- | --- |
 | `examples/laboratory.csv` | Repository example | `/app/examples/laboratory.csv`, read-only |
+| `../input/laboratory.csv` | Sibling private input directory | `/input/laboratory.csv`, read-only |
+| `../input/terminologies/…` | Sibling real downloads | `/input/terminologies/…`, read-only |
 | `local/laboratory.csv` | Your input export | `/app/local/laboratory.csv`, read-only for checking |
 | `local/terminologies/…` | Installed real terminology | `/app/local/terminologies/…`, read-only for checking |
 | `local/secrets/…` | Secret files | `/app/local/secrets/…`, read-only for checking |
 | `output/laboratory-review.csv` | Reports | `/app/output/laboratory-review.csv`, writable |
 
-A host path such as `/Users/…/lab.csv` is not automatically available in a container. Place files under `local/` or explicitly add a read-only bind mount. Package/catalogue/review-import services have writable `local/` mounts for their setup actions.
+A host path such as `/Users/…/lab.csv` is not automatically available in a container. Use sibling `../input/` (the default Compose input mount) or ignored `local/`. Set `SQC_INPUT_DIR` in `.env` only to choose a different host input directory; it still appears at `/input` in the container. For Python, adjust the TOML path to the actual host location when using a custom input directory. Package/catalogue/review-import services have writable `local/` mounts for their setup actions.
 
 ## CSV and aggregation
 
@@ -66,7 +69,7 @@ Replace the corresponding tables in `pipeline.toml`; do not append a second tabl
 type = "csv"
 origin = "lis"
 source_namespace = "site-lis-a"
-path = "local/laboratory.csv"
+path = "../input/laboratory.csv"
 granularity = "individual"
 delimiter = ","
 
@@ -142,7 +145,7 @@ For SQLite, use `input.type="sqlite"`, `input.path="local/lab.sqlite"`, the colu
 
 The starter explicitly pins FHIR R4 and MII Laboratory 2026.0.3. `STRUCTURE_DEFINITION` must be an installed resolved R4 Observation snapshot; `IG_PACKAGE`, `IG_VERSION` and `IG_CANONICAL` record its identity. Alternatively use `PROFILE_FILE` for a reviewed selected-element policy; never configure both. `VALUE_SETS` lists real versioned ValueSet JSON used to derive bound systems. [Pinned profile example](../examples/lab/mii-lis.toml).
 
-Profiles define constraints/bindings, not API endpoint URLs or credentials. The MII snapshot fixes the quantitative unit system to UCUM and gives laboratory codes a **preferred** LOINC binding. ValueSet routing does not expand filters or prove membership. Unspecified selected rules fall back to international R4; explicit prohibitions remain effective. Full resource/IG validation belongs to the institution's FHIR validator.
+Profiles define constraints/bindings, not API endpoint URLs or credentials. The MII snapshot fixes the quantitative unit system to UCUM and gives laboratory codes a **preferred** LOINC binding. ValueSet routing does not expand filters or prove membership. Unspecified selected rules fall back to international R4; explicit prohibitions remain effective. Set `validation.enabled=true` to run the selected local Matchbox/HL7 or MII service before grouping actual FHIR input. The complete guide and dependencies are pinned independently of the selected-element importer. [Validation configuration and examples](validation.md).
 
 | Lookup role | Use | Example |
 | --- | --- | --- |
@@ -165,6 +168,10 @@ complete = false
 This references your actual file; the project does not generate local terminology. CSV catalogues require `system,code`, optionally `version,display,definition,expected_unit_code,expected_unit_system,specimen,method`. Set `complete=true` only for a complete edition.
 
 Supported types: `ucum`, `loinc`, generic `fhir`, `csv`, `sqlite`, `fhir_artifacts`, `website`, `ols`, `who_icd`. Set `enabled=true` deliberately, one dedicated UCUM and LOINC service each. API adapters use `endpoint`; dedicated UCUM/LOINC also accept `endpoint_env`. Local adapters use `path` and declared `systems`. WHO ICD-11 is a standalone lookup, not a Condition batch check. [Adapter-specific fields, access and setup](lookups.md#choose-local-files-or-an-api) · [Optional terminology TOML](../terminology.example.toml).
+
+## Full FHIR validation
+
+`validator-init` derives Matchbox/MII server settings from the selected profile/package, then the container build installs the guide dependencies. Native Python uses `validation.endpoint`; the container uses `container_endpoint`. Full resources are only sent to a local/LAN service; redirects and proxy forwarding are disabled. `validation.token_env`/`token_file` are optional references for a protected validator. `additional_packages` accepts pinned `package#version` entries. CSV/scalar database tuples are not full FHIR resources. [Exact setup and OperationOutcome outputs](validation.md).
 
 ## Network and credentials
 
@@ -191,7 +198,8 @@ A deterministic `run-plausibility-check` does not use a model, even if the TOML 
 ```toml
 [models.local]
 runtime = "ollama"                 # external for LM Studio / another local compatible server.
-base_url_env = "LOCAL_MODEL_BASE_URL"
+base_url = "http://127.0.0.1:11434/v1"
+container_base_url = "http://ollama:11434/v1"
 model = "ministral-3:3b"
 temperature = 0
 max_tokens = 2048
@@ -199,13 +207,13 @@ timeout_seconds = 180
 response_mode = "json_schema"
 ```
 
-Set exactly one of `base_url` or `base_url_env`. For direct Python without environment loading, use `base_url="http://127.0.0.1:11434/v1"` instead. The endpoint must remain local. Choose the actual served model ID; configuring it does not start or download the model. `general.MODEL_ALIAS` selects a named table.
+The starter defines the native address directly in TOML. For an environment reference, replace `base_url` with `base_url_env="LOCAL_MODEL_BASE_URL"` and set that variable in `.env`; choose exactly one. Inside Compose, `container_base_url` overrides the native address automatically. The endpoint must remain local. Choose the actual served model ID; configuring it does not start or download the model. `general.MODEL_ALIAS` selects a named table.
 
 `response_mode` supports `json_schema` or `json_object` with the same application guards. Optional controls include `reasoning_effort`, `enable_thinking`, `expected_digest` and `pull_timeout_seconds`; use only controls supported by the selected server/model. [Provisioning and native URLs](shipped-stack.md#ollama).
 
 ```toml
 [research]
-enabled = true
+enabled = false # research-evidence activates research explicitly
 scope = "studies"                 # lookup uses pages/catalogues without study databases.
 sources = ["pubmed", "europe_pmc"]
 max_articles_per_loinc = 3         # 1–12 total unique articles per exact code/edition.
@@ -221,6 +229,7 @@ MAX_RESULTS = 1
 [research.europe_pmc]
 BASE_URL = "https://www.ebi.ac.uk/europepmc/webservices/rest"
 MAX_RESULTS = 1
+# QUERY_FILTER = '(human OR humans OR patients OR volunteers) NOT (feline OR cats OR canine OR dogs OR rats OR mice OR veterinary)'
 ```
 
 Prepare the real catalogue with `catalog-init` and the model with `model-init` or native setup. Provider limits bound query results; the unique-article cap is separate and retrieval is cached per code/edition. `--plan` exposes tasks/schemas/searches; executed `.trace.jsonl` records actual prompts, queries and guarded responses. Public evidence supports clinician adjudication, not an automatic semantic-correctness judgment. [Research and feedback](research.md).
@@ -256,3 +265,18 @@ uv run --no-sync --env-file .env run-plausibility-check config-check --config pi
 ```
 
 Add `--connections` for explicit probes. Without it, the report checks setup and local files/columns; neither mode is a clinical audit. Unknown keys, mismatched source fields and unsupported resource/FHIR versions fail explicitly. A missing/unavailable terminology response remains unverified during a check.
+
+## Profile and resource links
+
+The same TOML pins the validation package and local snapshot. Add publication/GitHub links for the report:
+
+```toml
+[specification.links]
+resource = "https://hl7.org/fhir/R4/observation.html"
+guide = "https://www.medizininformatik-initiative.de/Kerndatensatz/KDS_Laborbefund_2026/MIIIGModulLaborbefund.html"
+source = "https://github.com/medizininformatik-initiative/kerndatensatzmodul-labor"
+```
+
+Links are for readers; they neither download nor substitute validation artifacts. Install a real R4 StructureDefinition **snapshot**, supply `STRUCTURE_DEFINITION`, pin `IG_PACKAGE`/`IG_VERSION` and configure actual `VALUE_SETS`. Matchbox/HL7 (or MII) validates the individual FHIR document against the installed guide before grouping. CSV/DB aggregates receive semantic-set checks and cannot establish full resource conformance. Validate the actual generated FHIR after applying approved mappings. [Validator setup](validation.md).
+
+A GitHub branch can change; the guide edition and source-file hashes establish what was actually checked. Use HTTP(S) documentation URLs without embedded credentials or query strings. Endpoint credentials stay in `.env` or `local/secrets/`, not these links.

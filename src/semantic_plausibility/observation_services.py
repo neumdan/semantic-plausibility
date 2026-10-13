@@ -30,7 +30,7 @@ from .catalog_evidence import ObservationDefinitionCatalog
 from .observation_quality import LoincTerm, ResearchCandidate, UnitEvidence
 from .model_config import ModelEndpoint, allowed_endpoint, select_model
 from .model_schemas import explicit_token as _explicit_token
-from .model_schemas import response_schema, validate_grounding, validate_response
+from .model_schemas import evidence_schema, validate_grounding, validate_response
 from . import research_prompts as prompts
 
 
@@ -195,6 +195,65 @@ class LoincFhirClient:
         self.session = session or _HttpSession()
         self.timeout = timeout
         self._cache: dict[tuple[str, str], LoincTerm | None] = {}
+        self._parts = {}
+        self._names = {}
+
+    def part(self, code, version):
+        key = (code, version)
+        if key not in self._parts:
+            response = self.session.get(self.base_url + "/CodeSystem/$lookup",
+                params={"system": "http://loinc.org", "code": code, "version": version},
+                headers={"Accept": "application/fhir+json"}, auth=self.auth, timeout=self.timeout)
+            response.raise_for_status()
+            data = response.json()
+            if data.get("resourceType") != "Parameters":
+                raise ValueError("LOINC part lookup returned no Parameters")
+            values = {row["name"]: next((value for key, value in row.items() if key.startswith("value")), "")
+                      for row in data.get("parameter", []) if row.get("name") != "property"}
+            if values.get("version") != version or values.get("code", code) != code or values.get("system", "http://loinc.org") != "http://loinc.org":
+                raise ValueError("LOINC part lookup returned another identity/edition")
+            label = values.get("display")
+            if not isinstance(label, str) or not label or label.startswith("LP"):
+                raise ValueError("LOINC part lookup returned no resolved label")
+            self._parts[key] = {"part_code": code, "display": label, "source": response.url, "version": version,
+                                "source_sha256": hashlib.sha256(response.text.encode()).hexdigest()}
+        return self._parts[key]
+
+    def search_names(self, name):
+        """Bounded discovery; returned numeric codes still require exact lookup."""
+        if name in self._names:
+            return self._names[name]
+        query = name + " [" if "[" not in name else name
+        response = self.session.get(self.base_url + "/ValueSet/$expand",
+            params={"url": "http://loinc.org/vs", "filter": query, "count": 200},
+            headers={"Accept": "application/fhir+json"}, auth=self.auth, timeout=self.timeout)
+        response.raise_for_status()
+        data = response.json()
+        if data.get("resourceType") != "ValueSet":
+            raise ValueError("LOINC name search returned no ValueSet")
+        rows = [{"system": row["system"], "code": row["code"], "label": row.get("display", ""),
+                 "version": row.get("version", ""), "source": response.url, "method": "primary_fhir_name_expansion",
+                 "source_sha256": hashlib.sha256(response.text.encode()).hexdigest()}
+                for row in data.get("expansion", {}).get("contains", [])[:200]
+                if row.get("system") == "http://loinc.org" and re.fullmatch(r"\d+-\d", row.get("code", ""))]
+        if not rows and query != name:
+            response = self.session.get(self.base_url + "/ValueSet/$expand",
+                params={"url": "http://loinc.org/vs", "filter": name, "count": 200},
+                headers={"Accept": "application/fhir+json"}, auth=self.auth, timeout=self.timeout)
+            response.raise_for_status()
+            data = response.json()
+            if data.get("resourceType") != "ValueSet":
+                raise ValueError("LOINC name search returned no ValueSet")
+            rows = [{"system": row["system"], "code": row["code"], "label": row.get("display", ""),
+                     "version": row.get("version", ""), "source": response.url, "method": "primary_fhir_name_expansion",
+                     "source_sha256": hashlib.sha256(response.text.encode()).hexdigest()}
+                    for row in data.get("expansion", {}).get("contains", [])[:200]
+                    if row.get("system") == "http://loinc.org" and re.fullmatch(r"\d+-\d", row.get("code", ""))]
+        folded = name.casefold()
+        rows.sort(key=lambda row: (not row["label"].casefold().startswith(folded + " ["),
+                                  not row["label"].casefold().startswith(folded), len(row["label"])))
+        self._names[name] = rows[:20]
+        return self._names[name]
 
     def lookup(self, code: str, version: str = "") -> LoincTerm | None:
         cache_key = (code, version)
@@ -281,6 +340,17 @@ class LoincFhirClient:
 
         if not display and not one("LONG_COMMON_NAME") and not properties:
             raise ValueError("LOINC lookup contains no concept evidence")
+        axis_sources = {}
+        if not code.startswith("LP") and returned_version:
+            for axis in ("COMPONENT", "PROPERTY", "SYSTEM", "SCALE_TYP", "METHOD_TYP", "TIME_ASPCT"):
+                if axis in part_codes and not one(axis):
+                    try:
+                        evidence = self.part(part_codes[axis], returned_version)
+                        properties[axis] = [evidence["display"]]
+                        axis_sources[axis] = evidence
+                        part_codes.pop(axis)
+                    except (OSError, ValueError, RuntimeError):
+                        pass  # Keep the unresolved part code; never guess an axis.
         term = LoincTerm(
             code=code,
             display=display or one("LONG_COMMON_NAME"),
@@ -291,13 +361,14 @@ class LoincFhirClient:
             method=one("METHOD_TYP"),
             example_ucum_units=many("EXAMPLE_UCUM_UNITS"),
             version=returned_version,
-            time_aspect=one("TIME_ASP"),
+            time_aspect=one("TIME_ASPCT") or one("TIME_ASP"),
             example_units=many("EXAMPLE_UNITS"),
             source=response.url,
             part_codes=part_codes,
             designations=tuple(designations),
             synonyms=tuple(dict.fromkeys((*many("RELATEDNAMES2"), *many("SHORTNAME")))),
             status=one("STATUS"),
+            axis_sources=axis_sources,
         )
         self._cache[cache_key] = term
         return term
@@ -367,7 +438,7 @@ class OpenAICompatibleJsonClient:
     def json(self, instruction: str, evidence: dict[str, Any]) -> dict[str, Any]:
         if self._failures >= 3:
             raise RuntimeError("Local model circuit open after three consecutive failures")
-        schema = response_schema(instruction)
+        schema = evidence_schema(instruction, evidence)
         trace = {"model": self.model, "endpoint": self.base_url, "instruction": instruction,
                  "system_prompt": prompts.SYSTEM + " Required JSON schema: " + json.dumps(schema),
                  "user_prompt": json.dumps({"instruction": instruction, "evidence": evidence}, ensure_ascii=False),
@@ -378,15 +449,20 @@ class OpenAICompatibleJsonClient:
         try:
             result = self._json(instruction, evidence)
         except (OSError, ValueError, RuntimeError) as exc:
-            self._failures += 1
+            # A rejected extraction is not a service outage. Other bounded tasks
+            # still run; only consecutive transport/HTTP failures open the circuit.
+            self._failures = 0 if isinstance(exc, ValueError) else self._failures + 1
             trace.update(state="rejected_or_unavailable", error_type=type(exc).__name__)
+            diagnostic = str(exc)
+            if isinstance(exc, ValueError) and diagnostic.startswith(("Model schema mismatch", "Model returned", "Model selected", "Model proposed", "Study bounds", "Study evidence")):
+                trace["guard_diagnostic"] = diagnostic[:600]
             raise
         self._failures = 0
         trace.update(state="accepted_by_source_guards", response=result)
         return result
 
     def _json(self, instruction: str, evidence: dict[str, Any]) -> dict[str, Any]:
-        schema = response_schema(instruction)
+        schema = evidence_schema(instruction, evidence)
         supplied = json.dumps({"instruction": instruction, "evidence": evidence}, ensure_ascii=False)
         if len(supplied) > 16000:
             raise ValueError("Model evidence exceeds the 16000-character input budget; split the source")
@@ -473,6 +549,7 @@ class PublicEvidenceClient:
         europe_pmc_base_url: str = "https://www.ebi.ac.uk/europepmc/webservices/rest",
         europe_pmc_retmax: int = 3,
         max_articles_per_loinc: int = 3,
+        europe_pmc_query_filter: str = "",
     ):
         if scope not in {"lookup", "studies"}:
             raise ValueError("Evidence scope must be lookup or studies")
@@ -487,6 +564,9 @@ class PublicEvidenceClient:
         self.research_sources = research_sources
         self.europe_pmc_base_url = europe_pmc_base_url.rstrip("/")
         self.europe_pmc_retmax = europe_pmc_retmax
+        if not isinstance(europe_pmc_query_filter, str) or len(europe_pmc_query_filter) > 1000:
+            raise ValueError("Europe PMC query filter must be a bounded public search expression")
+        self.europe_pmc_query_filter = europe_pmc_query_filter
         if type(max_articles_per_loinc) is not int or not 1 <= max_articles_per_loinc <= 12:
             raise ValueError("max_articles_per_loinc must be 1..12")
         self.max_articles_per_loinc = max_articles_per_loinc
@@ -722,6 +802,12 @@ class PublicEvidenceClient:
             "reported_measurement": f'({topic}) AND (measurement OR concentration OR units)',
         }
 
+    @staticmethod
+    def _abstract_payload(record):
+        text = record["abstract"][:6000]
+        excerpts = re.split(r"(?<=[.!?])\s+(?=[A-Z])", text)
+        return {"abstract": text, "excerpt_candidates": [part for part in excerpts if part]}
+
     def search_studies(self, term: LoincTerm) -> list[ResearchCandidate]:
         if self.scope == "lookup":
             return []
@@ -743,33 +829,48 @@ class PublicEvidenceClient:
                     self.query_log.append({"source": source, "state": "unavailable", "error_type": type(exc).__name__})
         candidates = []
         for record in records.values():
+            before = len(candidates)
+            extraction_unavailable = False
             try:
                 candidates += self._extract_study_candidates("unclassified_discovery", [record], term)
             except (OSError, ValueError, RuntimeError) as exc:
+                extraction_unavailable = True
                 self.query_log.append({"source": record["url"], "task": "bounds", "state": "unavailable", "error_type": type(exc).__name__})
             if self.llm is not None:
                 try:
                     answer = self.llm.json(prompts.STUDY_MEASUREMENTS, {
                         "loinc_code": term.code, "analyte": term.component or term.display,
-                        "title": record["title"], "abstract": record["abstract"][:6000]})
+                        "analyte_definition": {"component": term.component, "property": term.property,
+                                               "system": term.system, "scale": term.scale, "method": term.method,
+                                               "example_units": list(term.example_ucum_units)},
+                        "title": record["title"], **self._abstract_payload(record)})
                     for row in answer["measurements"]:
                         candidates.append(ResearchCandidate("reported_measurement", record["url"],
                             unit=row["unit"], population=row["population"], specimen=row["specimen"],
                             method=row["method"], excerpt=row["excerpt"], reported_value=row["reported_value"],
-                            value_kind=row["value_kind"]))
+                            value_kind=row["value_kind"], **self._study_provenance(record)))
                 except (OSError, ValueError, RuntimeError) as exc:
+                    extraction_unavailable = True
                     self.query_log.append({"source": record["url"], "task": "measurements", "state": "unavailable", "error_type": type(exc).__name__})
+            if len(candidates) == before:
+                # Retrieval is evidence of a search result, even when extraction fails/abstains.
+                candidates.append(ResearchCandidate("unclassified_discovery", record["url"],
+                    excerpt=record["title"], status="extraction_unavailable" if extraction_unavailable else "no_supported_extraction",
+                    **self._study_provenance(record)))
         self._study_cache[key] = candidates
         return list(candidates)
 
     def _europe_pmc_records(self, query):
+        if self.europe_pmc_query_filter:
+            query = f"({query}) AND ({self.europe_pmc_query_filter})"
         self.query_log.append({"source": "europe_pmc", "query": query, "page_size": self.europe_pmc_retmax})
         response = self.session.get(self.europe_pmc_base_url + "/search", params={
             "query": query, "format": "json", "resultType": "core", "pageSize": self.europe_pmc_retmax})
         response.raise_for_status()
         digest = hashlib.sha256(response.text.encode()).hexdigest()
+        retrieved_at = datetime.now(timezone.utc).isoformat()
         self.source_records[digest] = {"source": self.europe_pmc_base_url + "/search", "sha256": digest,
-                                     "retrieved_at": datetime.now(timezone.utc).isoformat()}
+                                     "retrieved_at": retrieved_at}
         rows = response.json().get("resultList", {}).get("result", [])
         if not isinstance(rows, list):
             raise ValueError("Europe PMC returned no usable article records")
@@ -782,7 +883,8 @@ class PublicEvidenceClient:
             parser.feed(str(row.get("abstractText", "")))
             records.append({"pmid": identifier if source == "MED" else "",
                 "record_key": "pmid:" + identifier if source == "MED" else source + ":" + identifier,
-                "title": str(row.get("title", "")), "abstract": parser.text(),
+                "title": str(row.get("title", "")), "abstract": re.sub(r"\s+", " ", parser.text()).strip(),
+                "source_sha256": digest, "retrieved_at": retrieved_at, "doi": str(row.get("doi", "")),
                 "url": f"https://europepmc.org/article/{source}/{identifier}"})
         return records
 
@@ -797,6 +899,8 @@ class PublicEvidenceClient:
         if not ids:
             return []
         response = self._ncbi_get("efetch.fcgi", {"db": "pubmed", "id": ",".join(ids), "retmode": "xml"})
+        digest = hashlib.sha256(response.text.encode()).hexdigest()
+        retrieved_at = self.source_records[digest]["retrieved_at"]
         root = ET.fromstring(response.text)
         records: list[dict[str, str]] = []
         for article in root.findall(".//PubmedArticle"):
@@ -804,13 +908,15 @@ class PublicEvidenceClient:
             title_node = article.find(".//ArticleTitle")
             abstracts = article.findall(".//Abstract/AbstractText")
             title = "".join(title_node.itertext()) if title_node is not None else ""
-            abstract = " ".join("".join(node.itertext()) for node in abstracts)
+            abstract = re.sub(r"\s+", " ", " ".join("".join(node.itertext()) for node in abstracts)).strip()
             if pmid in ids:
                 records.append(
                     {
                         "pmid": pmid,
                         "title": title,
                         "abstract": abstract,
+                        "source_sha256": digest, "retrieved_at": retrieved_at,
+                        "doi": article.findtext(".//PubmedData/ArticleIdList/ArticleId[@IdType='doi']") or "",
                         "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
                     }
                 )
@@ -821,7 +927,7 @@ class PublicEvidenceClient:
     ) -> list[ResearchCandidate]:
         if self.llm is None:
             return [
-                ResearchCandidate(evidence_type, record["url"], excerpt=record["title"]) for record in records
+                ResearchCandidate(evidence_type, record["url"], excerpt=record["title"], **self._study_provenance(record)) for record in records
             ]
         result: list[ResearchCandidate] = []
         for record in records:
@@ -830,9 +936,12 @@ class PublicEvidenceClient:
                 {
                     "evidence_type": evidence_type,
                     "loinc_code": term.code,
+                    "analyte_definition": {"display": term.display, "component": term.component, "property": term.property,
+                                           "system": term.system, "scale": term.scale, "method": term.method,
+                                           "example_units": list(term.example_ucum_units)},
                     "pmid": record["pmid"],
                     "title": record["title"],
-                    "abstract": record["abstract"][:6000],
+                    **self._abstract_payload(record),
                 },
             )
             excerpt = str(answer.get("excerpt") or "").strip()
@@ -840,6 +949,8 @@ class PublicEvidenceClient:
                 continue
             low = answer.get("low")
             high = answer.get("high")
+            if low is None and high is None:
+                continue
             if low is not None or high is not None:
                 try:
                     low_number = Decimal(str(low)) if low is not None else None
@@ -891,9 +1002,16 @@ class PublicEvidenceClient:
                     method=anchored["method"],
                     excerpt=excerpt or record["title"],
                     status="candidate",
+                    **self._study_provenance(record),
                 )
             )
         return result
+
+    @staticmethod
+    def _study_provenance(record):
+        """Citation metadata comes from the retrieved provider record, never the model."""
+        return {"source_title": record.get("title", ""), "source_sha256": record.get("source_sha256", ""),
+                "retrieved_at": record.get("retrieved_at", ""), "doi": record.get("doi", "")}
 
 
 def services_from_environment(
@@ -931,6 +1049,7 @@ def services_from_environment(
             research_sources=tuple(filter(None, os.getenv("SQC_RESEARCH_SOURCES", "pubmed").split(","))),
             europe_pmc_base_url=os.getenv("EUROPE_PMC_BASE_URL", "https://www.ebi.ac.uk/europepmc/webservices/rest"),
             europe_pmc_retmax=int(os.getenv("SQC_EUROPE_PMC_RETMAX", "3")),
+            europe_pmc_query_filter=os.getenv("SQC_EUROPE_PMC_QUERY_FILTER", ""),
             max_articles_per_loinc=int(os.getenv("SQC_MAX_ARTICLES_PER_LOINC", "3")),
         ) if use_llm else None,
     )

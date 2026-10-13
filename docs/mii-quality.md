@@ -6,11 +6,13 @@ Reviewed against the official projects on **7 October 2026**. This describes com
 
 | Layer | Tool / output | Question answered |
 | --- | --- | --- |
-| Formal FHIR conformance | MII FHIR Validator → OperationOutcome | Is this individual resource conformant to the selected FHIR/IG constraints and terminology bindings? |
+| Formal FHIR conformance | Local Matchbox/HL7 or MII FHIR Validator → OperationOutcome | Does the actual resource/Bundle meet the selected FHIR/IG constraints and available terminology bindings? |
 | Availability and completeness | FHIR Data Evaluator (FDE) → MeasureReport + DocumentReference | Which criteria/elements are present in the node's data? |
 | Laboratory semantic sets | This library → local CSV/HTML/JSON | Is the declared code–unit–value–reference set supported, consistent and reviewable? What transformation/mapping needs approval? |
 
 The [MII FHIR Validator](https://github.com/medizininformatik-initiative/mii-fhir-validator) is locally deployable and returns OperationOutcome from `/validateResource`. Its documented offline deployment uses installed IG packages/dependencies and a local terminology service such as Blaze. Prepare the required terminology content locally. Public/shared terminology servers are not automatically suitable for production ETL; follow their access policy.
+
+This library now calls the selected local validator before grouping actual FHIR input. `validator-init` derives pinned server configuration from the same TOML; the HTML and hashed sidecars retain formal validation outcomes. CSV/scalar database exports remain semantic-set inputs. [Matchbox/HL7 and MII setup](validation.md).
 
 The [FDE documentation](https://medizininformatik-initiative.github.io/dataportal/data-node/fhir-data-evaluator.html) describes `cdsCodingAvailability` and `DseElementAvailability` metadata reports for the FDPG/data node. **Our summary is not an FDE MeasureReport** and is not submitted to its server/DSF. Keep the measures side by side with their own denominators. A high availability ratio does not prove appropriate laboratory units or reference context.
 

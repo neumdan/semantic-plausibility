@@ -52,6 +52,15 @@ def main(argv: list[str] | None = None) -> int:
     lookup.add_argument("--code", default="")
     lookup.add_argument("--version", default="")
     lookup.add_argument("--name", default="")
+    validator = sub.add_parser("validator-init", help="Prepare pinned Matchbox/MII configuration from the selected FHIR guide")
+    validator.add_argument("--config", type=Path, default=Path("pipeline.toml"))
+    validator.add_argument("--overwrite", action="store_true")
+    terms = sub.add_parser("terminology-init", help="Install the explicitly supplied real guide terminology in the local validator TX service")
+    terms.add_argument("--config", type=Path, default=Path("pipeline.toml"))
+    validate = sub.add_parser("validate-fhir", help="Validate actual FHIR resources locally with Matchbox or the MII validator")
+    validate.add_argument("--config", type=Path, default=Path("pipeline.toml"))
+    validate.add_argument("--input", type=Path)
+    validate.add_argument("--out", type=Path)
     for name, help_text in (
         ("model-init", "Provision the configured local Ollama model"),
         ("catalog-init", "Prepare the configured local unit catalogue"),
@@ -80,14 +89,30 @@ def main(argv: list[str] | None = None) -> int:
             print(f"HTML report: {result.report}")
             print(f"Audit log: {result.log}")
             summary = json.loads(result.summary.read_text())
+            validation = summary.get("fhir_validation", {})
+            print(f"FHIR resource validation: {validation.get('state', 'disabled')}")
             metric = summary["metrics"]["mii_numeric_set_ready"]
             print(
                 f"Numeric semantic readiness: {metric['numerator']}/{metric['denominator']} (not full FHIR validation)."
             )
+            if configuration.validation.get("fail_on_error") and validation.get("state") in {"invalid", "incomplete", "unavailable"}:
+                return 1
         elif args.command == "research-evidence":
             from .evidence_research import research_evidence, research_plan
-            result = research_plan(args.config, args.report) if args.plan else research_evidence(args.config, args.report, args.out)
+            result = research_plan(args.config, args.report) if args.plan else research_evidence(args.config, args.report, args.out,
+                progress=lambda message: print(message, flush=True))
             print(json.dumps(result, ensure_ascii=False, indent=2))
+        elif args.command == "validator-init":
+            from .fhir_validation import initialise_validator
+            print(json.dumps(initialise_validator(args.config, overwrite=args.overwrite), indent=2))
+        elif args.command == "validate-fhir":
+            from .fhir_validation import validate_fhir
+            result = validate_fhir(args.config, args.input, args.out)
+            print(json.dumps(result, indent=2))
+            return 1 if result["state"] in {"invalid", "incomplete", "unavailable"} else 0
+        elif args.command == "terminology-init":
+            from .fhir_validation import initialise_terminology
+            print(json.dumps(initialise_terminology(args.config), indent=2))
         elif args.command == "review-import":
             from .review_feedback import import_reviews
             print(json.dumps(import_reviews(args.report, args.review, args.registry, args.config), indent=2))
@@ -152,7 +177,7 @@ def run_main(argv=None):
     """The named runner defaults to the deterministic check; legacy CLI stays available."""
     arguments = list(sys.argv[1:] if argv is None else argv)
     commands = {"batch", "check", "research-evidence", "review-import", "compare", "verify", "lookup",
-                "profile-import", "config-check", "model-init", "catalog-init", "package-init"}
+                "profile-import", "config-check", "model-init", "catalog-init", "package-init", "validator-init", "terminology-init", "validate-fhir"}
     if not arguments or arguments[0] not in commands and arguments[0] not in {"-h", "--help"}:
         arguments.insert(0, "check")
     return main(arguments)

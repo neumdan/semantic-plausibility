@@ -3,7 +3,7 @@ name: semantic-plausibility-stack
 # Runtime configuration: pipeline.toml. Credentials: .env or local/ secret files.
 # Portable CPU setup; optional Linux GPU overlay: compose.gpu.yaml.
 x-runner: &runner
-  image: semantic-plausibility-stack:0.10.0
+  image: semantic-plausibility-stack:0.11.2
   build:
     context: .
     dockerfile: deploy/Dockerfile
@@ -16,9 +16,11 @@ x-runner: &runner
   volumes:
     - ./${SQC_CONFIG_FILE:-pipeline.toml}:/app/pipeline.toml:ro
     - ./examples:/app/examples:ro
+    - ${SQC_INPUT_DIR:-../input}:/input:ro
     - ./local:/app/local:ro
     - ./output:/app/output
   restart: "no"
+  networks: [default, validation]
 
 services:
   run-plausibility-check:
@@ -35,6 +37,7 @@ services:
     volumes:
       - ./${SQC_CONFIG_FILE:-pipeline.toml}:/app/pipeline.toml:ro
       - ./examples:/app/examples:ro
+      - ${SQC_INPUT_DIR:-../input}:/input:ro
       - ./local:/app/local
       - ./output:/app/output
   model-init:
@@ -50,6 +53,7 @@ services:
     volumes:
       - ./${SQC_CONFIG_FILE:-pipeline.toml}:/app/pipeline.toml:ro
       - ./examples:/app/examples:ro
+      - ${SQC_INPUT_DIR:-../input}:/input:ro
       - ./local:/app/local
       - ./output:/app/output
   package-init:
@@ -59,8 +63,77 @@ services:
     volumes:
       - ./${SQC_CONFIG_FILE:-pipeline.toml}:/app/pipeline.toml:ro
       - ./examples:/app/examples:ro
+      - ${SQC_INPUT_DIR:-../input}:/input:ro
       - ./local:/app/local
       - ./output:/app/output
+  validator-init:
+    <<: *runner
+    command: ["validator-init", "--config", "/app/pipeline.toml"]
+    profiles: [validation, mii-validation]
+    volumes:
+      - ./${SQC_CONFIG_FILE:-pipeline.toml}:/app/pipeline.toml:ro
+      - ./examples:/app/examples:ro
+      - ${SQC_INPUT_DIR:-../input}:/input:ro
+      - ./local:/app/local
+      - ./output:/app/output
+  validate-fhir:
+    <<: *runner
+    command: ["validate-fhir", "--config", "/app/pipeline.toml"]
+    profiles: [validation, mii-validation]
+  terminology-init:
+    <<: *runner
+    command: ["terminology-init", "--config", "/app/pipeline.toml"]
+    profiles: [validation, mii-validation]
+    depends_on:
+      blaze: {condition: service_healthy}
+    volumes:
+      - ./${SQC_CONFIG_FILE:-pipeline.toml}:/app/pipeline.toml:ro
+      - ./examples:/app/examples:ro
+      - ${SQC_INPUT_DIR:-../input}:/input:ro
+      - ./local:/app/local
+      - ./output:/app/output
+  matchbox:
+    profiles: [validation]
+    image: semantic-plausibility-matchbox:4.1.21
+    build:
+      context: ./local/validation/matchbox
+      dockerfile: Dockerfile
+    mem_limit: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports: ["127.0.0.1:${SQC_MATCHBOX_PORT:-8081}:8080"]
+    networks: [validation]
+    depends_on:
+      blaze: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/matchboxv3/actuator/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 36
+      start_period: 30s
+    restart: unless-stopped
+  blaze:
+    profiles: [validation, mii-validation]
+    image: docker.io/samply/blaze:1.9.0@sha256:cba859fb460df3938792226f16ba9bde32bf8dd9edeeadffbd818bccdcce56dc
+    environment:
+      JAVA_TOOL_OPTIONS: -Xmx1200m
+      DB_BLOCK_CACHE_SIZE: "128"
+      ENABLE_TERMINOLOGY_SERVICE: "true"
+      ENABLE_TERMINOLOGY_LOINC: "true"
+      ENABLE_TERMINOLOGY_SNOMED_CT: "false"
+    mem_limit: 2g
+    ports: ["127.0.0.1:${SQC_BLAZE_PORT:-8082}:8080"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes: ["validation_blaze:/app/data"]
+    networks: [validation]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
+    restart: unless-stopped
   ollama:
     profiles: [research]
     image: ${OLLAMA_IMAGE:-docker.io/ollama/ollama:0.34.1}
@@ -83,3 +156,9 @@ services:
 
 volumes:
   ollama_models:
+  validation_blaze:
+
+networks:
+  default:
+  validation:
+    internal: true

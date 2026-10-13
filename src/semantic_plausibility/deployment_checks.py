@@ -54,6 +54,7 @@ def check_configuration(path, *, source_alias=None, connections=False, research=
     deployment = load_deployment(path)
     from .batch import BatchConfiguration
     from .profile_lookups import terminology_plan
+    configuration = BatchConfiguration(path)
     report = {
         "configuration_sha256": deployment.sha256,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -68,7 +69,10 @@ def check_configuration(path, *, source_alias=None, connections=False, research=
                               "location": row.get("path") or row.get("endpoint") or "configured endpoint reference"}
                              for alias, row in raw_config.get("lookups", {}).items() if row.get("enabled")],
         "research_enabled": raw_config.get("research", {}).get("enabled", False),
-        "terminology_plan": terminology_plan(BatchConfiguration(path)),
+        "terminology_plan": terminology_plan(configuration),
+        "fhir_validation": {"enabled": configuration.validation.get("enabled", False),
+                            "backend": configuration.validation.get("backend", "matchbox"),
+                            "applies_to": "Actual FHIR input documents, before aggregation"},
     }
     with deployment.prepare(
         source_alias=source_alias,
@@ -106,6 +110,16 @@ def check_configuration(path, *, source_alias=None, connections=False, research=
             )
         if prepared.audit.unit_catalog:
             probe("unit_catalog", lambda: Path(prepared.audit.unit_catalog).is_file())
+        from .terminology_router import FhirArtifactSource
+        for alias, entry in raw_config.get("lookups", {}).items():
+            if entry.get("enabled") and entry.get("type") == "fhir_artifacts":
+                def local_artifacts(entry=entry):
+                    source = FhirArtifactSource(configuration.path_value(entry["path"]))
+                    return bool(source.systems or source.supplements or source.value_sets)
+                probe("local_terminology:" + alias, local_artifacts)
+        if configuration.validation.get("enabled"):
+            from .fhir_validation import target_profile
+            probe("fhir_validation_profile", lambda: bool(target_profile(configuration)))
         if connections:
             if source["kind"] == "postgres":
 

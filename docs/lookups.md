@@ -43,6 +43,26 @@ For B, put actual credential values in ignored `.env` using those names, or use 
 
 ## Laboratory defaults
 
+### Existing BfArM files
+
+Place your actual downloaded FHIR JSON files in ignored `local/terminologies/bfarm-lab/`. For the German laboratory supplements, the supplied configuration expects:
+
+- `CodeSystem-loinc-linguistic-variant-de-de-2-83-0.json` (LOINC base edition 2.83).
+- `CodeSystem-ucum-common-units-translation-de-de-1-5-0.json` (common-unit German labels).
+
+```toml
+[lookups.bfarm_lab]
+enabled = true
+role = "optional"
+type = "fhir_artifacts"
+path = "local/terminologies/bfarm-lab"
+systems = ["http://loinc.org", "http://unitsofmeasure.org"]
+```
+
+Already downloaded files need no download credentials. A raw official `Loinc.csv` has different headers; it is not the generic `system,code,version,display` catalogue format. These JSON supplements enrich labels and reverse name candidates; they do not establish arbitrary UCUM syntax/conversions or clinical ranges. Exact code and edition checks remain necessary. [BfArM UCUM supplement](https://terminologien.bfarm.de/CodeSystem-ucum-common-units-translation-de-de-1-5-0.html).
+
+`TX_FHIR_BEARER_TOKEN` is an optional credential name for a protected FHIR terminology API. It is unnecessary for local files, public Europe PMC/NLM services or ordinary local Ollama. Generic FHIR lookups explicitly select `token_env`/`token_file`; the official LOINC API uses username/password references. Keep credentials in `.env` or secret files, not TOML values or reports.
+
 | Need | Default | Configuration |
 | --- | --- | --- |
 | Unit grammar and documented linear conversion | NLM UCUM | `lookups.ucum.endpoint` |
@@ -170,3 +190,34 @@ A CSV catalogue needs `system,code` and may include `version,display`. SQLite ne
 For services requiring credentials, reference them in TOML and put their values in `.env` or mounted secret files. Complete release imports and licence acquisition are explicit setup steps, not autonomous model tasks.
 
 Catalogue documentation was reviewed on 8 October 2026. Live tests cover NLM, LOINC FHIR, BfArM public package installation and SemLookP. Protected German translation downloads and authenticated WHO lookups additionally require explicit licence acceptance/credentials and their opt-in tests; they are not claimed as tested without those prerequisites.
+
+## Downloads beside the repository
+
+Use the following operator-owned layout; none of these downloads is published with the code:
+
+```text
+dev/
+  semantic-plausibility/
+    pipeline.toml       # source selection, pinned profile, lookup/model settings
+    .env                # credentials only; ignored
+    local/secrets/      # optional secret files; ignored
+    output/             # local reports; ignored
+  input/
+    laboratory.csv
+    terminologies/bfarm-lab/
+      CodeSystem-loinc-linguistic-variant-de-de-2-83-0.json
+      CodeSystem-ucum-common-units-translation-de-de-1-5-0.json
+```
+
+For these actual downloaded FHIR JSONs, edit the existing lookup table:
+
+```toml
+[lookups.bfarm_lab]
+enabled = true
+role = "optional"
+type = "fhir_artifacts"
+path = "../input/terminologies/bfarm-lab"
+systems = ["http://loinc.org", "http://unitsofmeasure.org"]
+```
+
+Python resolves the sibling path against the TOML directory; Compose mounts it read-only at `/input`. Keep primary LOINC/UCUM APIs configured. Translation supplements enrich matching editions only. Local-file SHA-256, supplement/base editions and the publisher's canonical resource URL accompany label evidence. A raw `Loinc.csv` with official LOINC column names is not the generic `system/code/display/version` lookup CSV; it needs an adapter/conversion, and must not be passed as that catalogue unchanged.

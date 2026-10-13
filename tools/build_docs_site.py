@@ -13,6 +13,7 @@ PUBLIC_DOCS = {
     "mii-quality.md",
     "studies.md",
     "implementation.md",
+    "validation.md",
     "research.md",
     "requirements.md",
     "lookups.md",
@@ -39,7 +40,8 @@ def build_site(root, output):
         shutil.copyfile(root / "examples" / name, output / "examples" / name)
     shutil.copytree(root / "examples" / "lab", output / "examples" / "lab")
     shutil.copytree(root / "examples" / "profiles", output / "examples" / "profiles")
-    for name in ("pipeline.example.toml", "pipeline.research.example.toml", "terminology.example.toml", "README.md", "LICENSE"):
+    shutil.copytree(root / "examples" / "fhir", output / "examples" / "fhir")
+    for name in ("pipeline.example.toml", "pipeline.research.example.toml", "pipeline.fhir.example.toml", "terminology.example.toml", "README.md", "LICENSE"):
         shutil.copyfile(root / name, output / name)
     (output / "index.html").write_text(
         '<!doctype html><html lang="en"><meta charset="utf-8">'

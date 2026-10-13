@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import os
 import re
@@ -148,6 +149,7 @@ class FhirArtifactSource:
     def __init__(self, path: Path):
         self.path = path
         self.systems, self.value_sets, self.supplements = {}, {}, []
+        self.artifact_records = {}
         self._name_index = None
         receipt = path / "installation.json" if path.is_dir() else None
         self.provenance = {}
@@ -161,7 +163,8 @@ class FhirArtifactSource:
         for source in files:
             if source.is_symlink():
                 raise ValueError("Terminology artifacts must be regular files")
-            data = json.loads(source.read_text(encoding="utf-8"))
+            raw = source.read_bytes()
+            data = json.loads(raw)
             if not isinstance(data, dict):
                 raise ValueError("Terminology artifact must contain a JSON object")
             kind = data.get("resourceType")
@@ -169,6 +172,9 @@ class FhirArtifactSource:
                 continue
             if not data.get("url"):
                 raise ValueError("Terminology artifacts need their canonical URL")
+            self.artifact_records[str(source)] = {"source_url": data["url"],
+                "source_title": data.get("title") or data.get("name") or source.name,
+                "source_sha256": hashlib.sha256(raw).hexdigest(), "artifact_version": data.get("version", "")}
             key = (data["url"], data.get("version", ""))
             if kind == "CodeSystem":
                 def concepts(items):
@@ -211,7 +217,8 @@ class FhirArtifactSource:
         row = selected[0].get(code) if selected else None
         return {"state": "valid" if row else "invalid" if selected and selected[1] else "unknown",
                 "source": selected[3] if selected else str(self.path),
-                "metadata": {**row, "version": selected[2], "package": self.provenance} if row else None}
+                "metadata": {**row, "version": selected[2], "package": self.provenance,
+                             "artifact": self.artifact_records.get(selected[3], {})} if row else None}
 
     def labels(self, system, code, version=""):
         """Translations enrich a base code; they never independently validate it."""
@@ -225,7 +232,7 @@ class FhirArtifactSource:
             results += [dict(label, supplement=canonical, supplement_version=edition,
                              base_version_declared=bool(base_version))
                         for label in concept_labels(rows[code], source=source, version=base_version)]
-        return [dict(label, package=self.provenance) for label in results]
+        return [dict(label, **self.artifact_records.get(label["source"], {}), package=self.provenance) for label in results]
 
     def search_names(self, name):
         """Reverse exact display/translation search; ambiguous matches remain candidates."""
@@ -245,7 +252,7 @@ class FhirArtifactSource:
                         candidate = {"state": "candidate", "system": system, "code": code, "version": version,
                                      "label": label["value"], "language": label["language"], "source": source,
                                      "method": "artifact_exact_name", "requires_code_and_context_validation": True,
-                                     "package": self.provenance, **qualifier}
+                                     "package": self.provenance, **qualifier, **self.artifact_records.get(source, {})}
                         index.setdefault(normalized_name(label["value"]), []).append(candidate)
             self._name_index = index
         return self._name_index.get(normalized_name(name), [])[:10]

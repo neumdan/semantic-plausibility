@@ -2,7 +2,7 @@
 
 Help clinicians and IT teams populate the selected **MII KDS laboratory FHIR Observation** with a defensible code, name, numeric value, unit and complete reference context. The pipeline checks the source set, proposes target coding and transformations, gathers evidence of reported practice and reuses clinician-approved mappings in later runs.
 
-**Check → research evidence → clinician review → scoped mapping reuse.** Source records remain unchanged. Formal FHIR conformance is checked with the institution's validator after applying approved mappings.
+**Validate FHIR input → check semantic sets → research evidence → clinician review → scoped mapping reuse.** Full FHIR resources can be validated locally with Matchbox/HL7 or the MII validator against the pinned implementation guide. Source records remain unchanged; apply and revalidate approved mappings in institutional ETL.
 
 ## Run a check
 
@@ -13,10 +13,10 @@ Input: CSV, FHIR R4 Bundle/NDJSON, read-only PostgreSQL view or SQLite extract. 
 ```sh
 cp -n pipeline.example.toml pipeline.toml
 cp -n .env.example .env
-mkdir -p local output
+mkdir -p ../input local output
 ```
 
-**`pipeline.toml` is the default configuration.** It defines input/columns, profiles, lookups, model and output; `.env` contains credentials and optional container settings. No shell exports are needed. For the first run, keep the supplied example input. For your own data, edit `[input]` and `[input.columns]` in the TOML.
+**`pipeline.toml` is the default configuration.** It defines input/columns, profiles, lookups, model and output; `.env` contains credentials and optional container settings. No shell exports are needed. For the first run, keep the supplied example input. For your own data, edit `[input]` and `[input.columns]` in the TOML. Put private exports/downloads in sibling `../input/` or ignored `local/`; both are mounted read-only. Credentials stay in `.env`/secret files.
 
 ### Choose one way to run
 
@@ -49,14 +49,40 @@ Existing installation: in `.env`, change an old `SQC_CONFIG_FILE=pipeline.exampl
 
 ## Add evidence research
 
-Copy `pipeline.research.example.toml` to `pipeline.research.toml`, choose a local model and start/provision it using [the setup guide](docs/shipped-stack.md#ollama). Then inspect the prompts and run a separate pass on the completed check:
+Use the **same `pipeline.toml`**. The explicit `research-evidence` command activates research; `run-plausibility-check` stays deterministic. The starter selects Europe PMC + PubMed and a local Ollama model. Prepare once, then research the existing report:
 
 ```sh
-uv run --no-sync research-evidence --config pipeline.research.toml --report output/laboratory-review.csv --plan
-uv run --no-sync --env-file .env research-evidence --config pipeline.research.toml --report output/laboratory-review.csv
+docker compose --profile research up -d ollama
+docker compose --profile research run --rm --build model-init
+docker compose --profile research run --rm catalog-init
+docker compose --profile research run --rm research-evidence
 ```
 
-Actual LOINC pages, PubMed and Europe PMC provide quoted units, reported values and interval candidates. Queries exclude local measured values/reference bounds and patient IDs. Research reuses the audited export and does not query the hospital database again. The trace records the actual searches, prompts and guarded responses. Evidence supports clinician adjudication; it does not establish semantic correctness.
+For Podman replace `docker compose` with `podman-compose`. The TOML's `models.local.container_base_url` selects the Compose model; native Python uses `base_url` or `base_url_env`. No second research TOML or selector file is needed.
+
+For native Ollama and Python, after starting/provisioning the model and catalogue:
+
+```sh
+uv run --no-sync research-evidence --config pipeline.toml --plan
+uv run --no-sync --env-file .env research-evidence --config pipeline.toml
+```
+
+Open **`output/laboratory-review.research.html`**. Each row shows **source set → linked terminology → complete proposal**: LOINC/system/edition, analyte/component, canonical name, unit, transformation of values and each reference bound, and sourced study evidence. API/file editions, article URLs/quotes and available hashes sit beside the proposal. Unresolved identity or conversion remains explicit; clinicians adjudicate the whole set.
+
+The research command reads `output.path` from TOML by default. `--report` selects another checked CSV **with its evidence/summary/audit sidecars**; a raw CSV needs the check first. `--out output/lab.research-2.csv` selects a fresh research prefix. Queries exclude hospital values/reference bounds and patient IDs. Executed searches/prompts/replies are in `.research.trace.jsonl`.
+
+[Exact Python/Docker/Podman commands and model setup](docs/shipped-stack.md#ollama) · [Evidence and provenance](docs/research.md).
+
+## Add FHIR and guide validation
+
+```sh
+podman-compose --profile validation run --rm --build validator-init
+podman-compose --profile validation up -d blaze
+podman-compose --profile validation run --rm terminology-init
+podman-compose --profile validation up -d --build matchbox
+```
+
+For Docker use `docker compose`. Set `validation.enabled=true` for automatic validation of `fhir_file` input before aggregation. The same command can validate a FHIR file explicitly: `run-plausibility-check validate-fhir --config pipeline.toml --input examples/fhir/laboratory-valid.bundle.json --out output/fhir-valid.jsonl`. Matchbox uses the official HL7 validator; its pinned MII guide/dependencies are installed during the image build. [Complete setup, examples and MII alternative](docs/validation.md).
 
 ## Feed clinician reviews back
 
@@ -86,10 +112,10 @@ uv run --no-sync --env-file .env run-plausibility-check lookup --config pipeline
 from semantic_plausibility import run_plausibility_check, research_evidence, import_reviews
 result = run_plausibility_check("pipeline.toml")
 # Optional, after preparing the local model:
-# dossier = research_evidence("pipeline.research.toml", report=result.csv)
+# dossier = research_evidence("pipeline.toml", report=result.csv)
 # import_reviews(result.csv, "local/clinician-review.csv", "local/mappings.json", "pipeline.toml")
 ```
 
 Python 3.14; DuckDB 1.5.6; optional psycopg 3.3.6; exact dependencies in `uv.lock`. [Implementation/tests](docs/implementation.md) · [MII quality environment](docs/mii-quality.md).
 
-Laboratory Observation is implemented. Medication (ingredient, strength, dose/unit, route, timing), Condition and Procedure are later domain adapters. FDPG evidence access is later work requiring an appropriate authorised interface/export. Apache-2.0; terminology/model licences remain separate.
+Laboratory Observation is implemented. [Medication is the next domain](docs/requirements.md#medication-next): product/form, ingredient, concentration, dose/unit, route, timing and package amount must be assessed together. Condition and Procedure are later adapters. FDPG evidence access is later work requiring an appropriate authorised interface/export. Apache-2.0; terminology/model licences remain separate.

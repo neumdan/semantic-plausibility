@@ -1,119 +1,62 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="2050" viewBox="0 0 1100 2050" role="img" aria-labelledby="title desc">
-<title id="title">Source checks, target proposals, evidence and reviewed reuse</title><desc id="desc">Input contract + selected profile; Select configured evidence per lookup: A, B or both; A · Ready local terminology files; B · Configured API and credentials; Validate declared code/system and unit/system; Confirmed invalid; Verified code / unit; Not verified; Check supplied aliases, LOINC axes / example units and context; Documented unchanged fit; Verified linear conversion; Ambiguous / mismatch; Explicit candidate sources and optional local research; Values and reference metadata; Write separate checks, credibility and explicit readiness denominators; Clinician adjudication of the entire set; Versioned source and profile scope for future mappings</desc>
-<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#537487"/></marker></defs>
-<style>text{font-family:Arial,sans-serif;fill:#142d42}.heading{font-size:19px;font-weight:700}.body{font-size:17px}.label{font-size:14px;fill:#526978}</style><rect width="1100" height="100%" fill="white"/>
-<g data-node="INPUT"><rect x="130" y="20" width="840" height="106" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="146" y="49" class="heading">Input contract + selected profile</text>
-<text x="146" y="77" class="body">Valid headers/types, frequency contract, versions, full reference/context guards</text>
-<text x="146" y="102" class="body">Unsupported/malformed contracts fail with a redacted audit; valid rows continue</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1320" role="img" aria-labelledby="title desc"><title id="title">Decision flow: validate, verify, research and review</title><desc id="desc">Local full FHIR validation, real terminology evidence and auditable clinician proposals.</desc><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10" fill="#537487"/></marker></defs><rect width="1200" height="100%" fill="#f4f7f9"/>
+<path data-edge="INPUT-FHIR" d="M600.0 160 V180.0 H600.0 V200" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
+<path data-edge="FHIR-LOOKUP" d="M600.0 315 V335.0 H600.0 V355" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
+<path data-edge="LOOKUP-FIT" d="M600.0 475 V495.0 H600.0 V515" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
+<path data-edge="FIT-CONVERT" d="M600.0 640 V660.0 H215.0 V680" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
+<path data-edge="FIT-UNKNOWN" d="M600.0 640 V660.0 H600.0 V680" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
+<path data-edge="FIT-UNCHANGED" d="M600.0 640 V660.0 H985.0 V680" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
+<path data-edge="CONVERT-NUMERIC" d="M215.0 795 V817.5 H600.0 V840" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
+<path data-edge="UNKNOWN-NUMERIC" d="M600.0 795 V817.5 H600.0 V840" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
+<path data-edge="UNCHANGED-NUMERIC" d="M985.0 795 V817.5 H600.0 V840" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
+<path data-edge="NUMERIC-REPORT" d="M600.0 960 V980.0 H600.0 V1000" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
+<path data-edge="REPORT-REVIEW" d="M600.0 1120 V1140.0 H600.0 V1160" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
+<g data-node="INPUT"><rect x="340" y="50" width="520" height="110" rx="8" fill="#ffffff" stroke="#b7cec9"/><text x="356" y="79" fill="#142d42" font-family="system-ui,sans-serif" font-size="17" font-weight="600">Input contract and selected guide</text>
+<text x="356" y="103" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Verify source shape, versions, units, references and frequency</text>
+<text x="356" y="124" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Preserve original source records and meaningful context</text>
 </g>
-<g data-node="SOURCE"><rect x="130" y="185" width="840" height="106" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="146" y="214" class="heading">Select configured evidence per lookup: A, B or both</text>
-<text x="146" y="242" class="body">A: previously installed files / captured pack · B: enabled API and credentials</text>
-<text x="146" y="267" class="body">Offline mode disables remote adapters; no fallback to an unconfigured API</text>
+<g data-node="FHIR"><rect x="340" y="200" width="520" height="115" rx="8" fill="#ffffff" stroke="#b7cec9"/><text x="356" y="229" fill="#142d42" font-family="system-ui,sans-serif" font-size="17" font-weight="600">Actual FHIR resources supplied?</text>
+<text x="356" y="253" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Yes: local Matchbox/HL7 or MII full guide validation</text>
+<text x="356" y="274" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">No: CSV/DB set checks; no synthetic patient resources</text>
+<text x="356" y="295" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Retain formal issues separately; missing coverage is incomplete</text>
 </g>
-<g data-node="LOCAL"><rect x="20" y="345" width="500" height="157" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="36" y="374" class="heading">A · Ready local terminology files</text>
-<text x="36" y="402" class="body">package-init is a separate setup command</text>
-<text x="36" y="427" class="body">Accept conditions and pin editions before download</text>
-<text x="36" y="452" class="body">Reference lookup.path / systems; input.snapshot for pack</text>
-<text x="36" y="477" class="body">Supplements provide labels; coverage stays explicit</text>
+<g data-node="LOOKUP"><rect x="340" y="355" width="520" height="120" rx="8" fill="#ffffff" stroke="#b7cec9"/><text x="356" y="384" fill="#142d42" font-family="system-ui,sans-serif" font-size="17" font-weight="600">Look up declared code and unit systems</text>
+<text x="356" y="408" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Configured primary APIs, actual local catalogues and labels</text>
+<text x="356" y="429" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Retain editions and sources; supplements enrich names</text>
+<text x="356" y="450" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Verified / invalid / unknown are distinct outcomes</text>
 </g>
-<g data-node="API"><rect x="580" y="345" width="500" height="157" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="596" y="374" class="heading">B · Configured API and credentials</text>
-<text x="596" y="402" class="body">Set type, endpoint and systems where required</text>
-<text x="596" y="427" class="body">Use .env / secret-file references; select release/language</text>
-<text x="596" y="452" class="body">Require network.mode=lookups and lookup.enabled=true</text>
-<text x="596" y="477" class="body">Public services may need no credentials</text>
+<g data-node="FIT"><rect x="340" y="515" width="520" height="125" rx="8" fill="#ffffff" stroke="#b7cec9"/><text x="356" y="544" fill="#142d42" font-family="system-ui,sans-serif" font-size="17" font-weight="600">Assess the whole semantic set</text>
+<text x="356" y="568" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Name, LOINC axes, unit dimension and specimen/method fit</text>
+<text x="356" y="589" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">UCUM validity alone does not prove analyte compatibility</text>
+<text x="356" y="610" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Known example units support proposals, not universal limits</text>
 </g>
-<g data-node="LOOKUP"><rect x="130" y="565" width="840" height="82" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="146" y="594" class="heading">Validate declared code/system and unit/system</text>
-<text x="146" y="622" class="body">Read local evidence and/or query selected services; retain source and edition</text>
+<g data-node="CONVERT"><rect x="40" y="680" width="350" height="115" rx="8" fill="#ffffff" stroke="#b7cec9"/><text x="56" y="709" fill="#142d42" font-family="system-ui,sans-serif" font-size="17" font-weight="600">Supported transformation</text>
+<text x="56" y="733" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Verified target unit and linear factor</text>
+<text x="56" y="754" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Transform value and each bound independently</text>
+<text x="56" y="775" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">A sourced spelling is still a review proposal</text>
 </g>
-<g data-node="INVALID"><rect x="20" y="700" width="330" height="106" rx="9" fill="#fcf1f3" stroke="#ecc7cf"/>
-<text x="36" y="729" class="heading">Confirmed invalid</text>
-<text x="36" y="757" class="body">Keep deterministic error</text>
-<text x="36" y="782" class="body">Assess remaining fields</text>
+<g data-node="UNKNOWN"><rect x="450" y="680" width="300" height="115" rx="8" fill="#ffffff" stroke="#b7cec9"/><text x="466" y="709" fill="#142d42" font-family="system-ui,sans-serif" font-size="17" font-weight="600">Ambiguous or unsupported</text>
+<text x="466" y="733" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Missing denominator or evidence</text>
+<text x="466" y="754" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Retain error / unresolved finding</text>
+<text x="466" y="775" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">No guessed correction or factor</text>
 </g>
-<g data-node="KNOWN"><rect x="385" y="700" width="330" height="106" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="401" y="729" class="heading">Verified code / unit</text>
-<text x="401" y="757" class="body">Identity or syntax supported</text>
-<text x="401" y="782" class="body">Still check semantic fit</text>
+<g data-node="UNCHANGED"><rect x="810" y="680" width="350" height="115" rx="8" fill="#ffffff" stroke="#b7cec9"/><text x="826" y="709" fill="#142d42" font-family="system-ui,sans-serif" font-size="17" font-weight="600">Documented unchanged fit</text>
+<text x="826" y="733" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Keep supplied code/unit/value</text>
+<text x="826" y="754" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Clinical applicability remains a review task</text>
+<text x="826" y="775" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Continue numeric/reference checks</text>
 </g>
-<g data-node="UNKNOWN"><rect x="750" y="700" width="330" height="106" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="766" y="729" class="heading">Not verified</text>
-<text x="766" y="757" class="body">Absent / partial / unavailable</text>
-<text x="766" y="782" class="body">Unavailable is not invalid</text>
+<g data-node="NUMERIC"><rect x="340" y="840" width="520" height="120" rx="8" fill="#ffffff" stroke="#b7cec9"/><text x="356" y="869" fill="#142d42" font-family="system-ui,sans-serif" font-size="17" font-weight="600">Check values and full reference sets</text>
+<text x="356" y="893" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Finite numbers, ordered bounds and independently valid units</text>
+<text x="356" y="914" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Out-of-reference is descriptive; preserve qualifiers</text>
+<text x="356" y="935" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Evidence of reported practice requires contextual review</text>
 </g>
-<g data-node="FIT"><rect x="130" y="865" width="840" height="82" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="146" y="894" class="heading">Check supplied aliases, LOINC axes / example units and context</text>
-<text x="146" y="922" class="body">Names and unit syntax alone cannot prove fit; examples are not a universal whitelist</text>
+<g data-node="REPORT"><rect x="340" y="1000" width="520" height="120" rx="8" fill="#eef7f4" stroke="#b7cec9"/><text x="356" y="1029" fill="#142d42" font-family="system-ui,sans-serif" font-size="17" font-weight="600">Write checks, recommendations and sources</text>
+<text x="356" y="1053" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Optional Ollama research: real search, then bounded extraction</text>
+<text x="356" y="1074" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Codes, names, units, intervals and their sources</text>
+<text x="356" y="1095" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Formal FHIR state, credibility and readiness remain separate</text>
 </g>
-<g data-node="MATCH"><rect x="20" y="1000" width="330" height="132" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="36" y="1029" class="heading">Documented unchanged fit</text>
-<text x="36" y="1057" class="body">Continue to values/references</text>
-<text x="36" y="1082" class="body">Clinical applicability remains</text>
-<text x="36" y="1107" class="body">a separate review question</text>
+<g data-node="REVIEW"><rect x="340" y="1160" width="520" height="120" rx="8" fill="#eef7f4" stroke="#b7cec9"/><text x="356" y="1189" fill="#142d42" font-family="system-ui,sans-serif" font-size="17" font-weight="600">Clinician adjudication and scoped reuse</text>
+<text x="356" y="1213" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Record reviewer, time, evidence and explicit mapping decision</text>
+<text x="356" y="1234" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Recheck approved targets/factors and every bound on reuse</text>
+<text x="356" y="1255" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Apply approved mappings in ETL and validate actual FHIR</text>
 </g>
-<g data-node="CONVERT"><rect x="385" y="1000" width="330" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="401" y="1029" class="heading">Verified linear conversion</text>
-<text x="401" y="1057" class="body">Propose target + numeric factor</text>
-<text x="401" y="1082" class="body">Check each reference bound too</text>
-<text x="401" y="1107" class="body">Never rewrite source values</text>
-</g>
-<g data-node="AMBIG"><rect x="750" y="1000" width="330" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="766" y="1029" class="heading">Ambiguous / mismatch</text>
-<text x="766" y="1057" class="body">10*6 without a denominator</text>
-<text x="766" y="1082" class="body">First example is a candidate</text>
-<text x="766" y="1107" class="body">No guessed transformation</text>
-</g>
-<g data-node="RESEARCH"><rect x="130" y="1550" width="840" height="106" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="146" y="1579" class="heading">Explicit candidate sources and optional local research</text>
-<text x="146" y="1607" class="body">Names → real search → exact candidate + unit/axes → model choice or abstention</text>
-<text x="146" y="1632" class="body">Catalogue spellings; quoted page/study intervals; offline has no remote research</text>
-</g>
-<g data-node="NUMERIC"><rect x="130" y="1195" width="840" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="146" y="1224" class="heading">Values and reference metadata</text>
-<text x="146" y="1252" class="body">Finite numbers, ordered bounds, supplied units and interval context</text>
-<text x="146" y="1277" class="body">Out-of-reference is descriptive; it is not automatically a data error</text>
-<text x="146" y="1302" class="body">Evidence of clinical plausibility requires method/population review</text>
-</g>
-<g data-node="OUTPUT"><rect x="130" y="1385" width="840" height="106" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="146" y="1414" class="heading">Write separate checks, credibility and explicit readiness denominators</text>
-<text x="146" y="1442" class="body">Priority: error → unclear → suggestion → passed</text>
-<text x="146" y="1467" class="body">Readiness is a numeric semantic proxy, not MII certification or clinical approval</text>
-</g>
-<g data-node="REVIEW"><rect x="130" y="1720" width="840" height="106" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="146" y="1749" class="heading">Clinician adjudication of the entire set</text>
-<text x="146" y="1777" class="body">Record approval / rejection / defer / revoke with reviewer, evidence and time</text>
-<text x="146" y="1802" class="body">Apply approved site transformations in ETL; validate actual FHIR resources</text>
-</g>
-<g data-node="REGISTRY"><rect x="130" y="1890" width="840" height="106" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="146" y="1919" class="heading">Versioned source and profile scope for future mappings</text>
-<text x="146" y="1947" class="body">Recheck target code / unit / factor and each reference bound on reuse</text>
-<text x="146" y="1972" class="body">Changed context / catalogue / profile or revocation prevents automatic reuse</text>
-</g>
-<path data-edge="INPUT-SOURCE" d="M550 126 V182" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="SOURCE-LOCAL" d="M550 291 V315 H270 V342" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="SOURCE-API" d="M550 291 V315 H830 V342" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="LOCAL-LOOKUP" d="M270 502 V535 H400 V562" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="API-LOOKUP" d="M830 502 V535 H700 V562" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="LOOKUP-INVALID" d="M550 647 V675 H185 V697" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="LOOKUP-KNOWN" d="M550 647 V697" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="LOOKUP-UNKNOWN" d="M550 647 V675 H915 V697" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="INVALID-FIT" d="M185 806 V835 H550 V862" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="KNOWN-FIT" d="M550 806 V862" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="UNKNOWN-FIT" d="M915 806 V835 H550 V862" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="FIT-MATCH" d="M550 947 V975 H185 V997" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="FIT-CONVERT" d="M550 947 V997" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="FIT-AMBIG" d="M550 947 V975 H915 V997" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="MATCH-NUMERIC" d="M185 1132 V1165 H550 V1192" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="CONVERT-NUMERIC" d="M550 1132 V1192" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="AMBIG-NUMERIC" d="M915 1132 V1165 H550 V1192" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="NUMERIC-OUTPUT" d="M550 1327 V1382" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="OUTPUT-RESEARCH" d="M550 1491 V1547" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
-<path data-edge="OUTPUT-REVIEW" d="M130 1440 H70 V1775 H127" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
-<path data-edge="RESEARCH-REVIEW" d="M550 1656 V1717" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="REVIEW-REGISTRY" d="M550 1826 V1887" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="REGISTRY-LOOKUP" d="M130 1940 H5 V610 H127" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
 </svg>

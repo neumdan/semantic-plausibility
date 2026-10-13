@@ -3,6 +3,7 @@ from ._version import __version__
 from .batch import BatchResult, run_batch, run_plausibility_check
 from .study_compare import compare_reports, verify_audit
 from .terminology_lookup import lookup_terminology
+from .fhir_validation import validate_fhir
 
 
 def research_evidence(config_path, report=None, output=None):
@@ -20,4 +21,4 @@ def import_reviews(report, reviewed, registry, config_path):
     return run(report, reviewed, registry, config_path)
 
 __all__ = ["BatchResult", "run_batch", "run_plausibility_check", "research_evidence", "research_plan",
-           "import_reviews", "compare_reports", "verify_audit", "lookup_terminology", "__version__"]
+           "import_reviews", "compare_reports", "verify_audit", "lookup_terminology", "validate_fhir", "__version__"]

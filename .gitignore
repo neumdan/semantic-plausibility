@@ -7,6 +7,7 @@ __pycache__/
 .env
 pipeline.toml
 pipeline.research.toml
+pipeline.fhir.toml
 terminology.toml
 .env.*
 !.env.example

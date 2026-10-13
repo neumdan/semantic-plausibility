@@ -16,6 +16,7 @@ path = "examples/laboratory.csv"      # Your export: local/laboratory.csv
 granularity = "distinct"             # count contains the source frequency
 
 [input.columns]
+analyte_name = "source_test"          # In this example source_test contains the analyte name.
 code = "code"
 code_system = "code_system"
 value = "value"
@@ -37,6 +38,11 @@ IG_PACKAGE = "de.medizininformatikinitiative.kerndatensatz.laborbefund"
 IG_VERSION = "2026.0.3"
 IG_CANONICAL = "https://www.medizininformatik-initiative.de/fhir/core/modul-labor/StructureDefinition/ObservationLab"
 
+[specification.links]
+resource = "https://hl7.org/fhir/R4/observation.html"
+guide = "https://www.medizininformatik-initiative.de/Kerndatensatz/KDS_Laborbefund_2026/MIIIGModulLaborbefund.html"
+source = "https://github.com/medizininformatik-initiative/kerndatensatzmodul-labor"
+
 [network]
 mode = "lookups"
 allowed_http_hosts = ["ollama", "host.containers.internal", "host.docker.internal"]
@@ -57,8 +63,9 @@ endpoint = "https://tx.fhir.org/r4"   # Public test service; observed release is
 # password_env = "LOINC_FHIR_PASSWORD"
 
 [models.local]
+container_base_url = "http://ollama:11434/v1" # Compose Ollama; native inference uses base_url(_env) below.
 runtime = "ollama"
-base_url_env = "LOCAL_MODEL_BASE_URL" # Compose: http://ollama:11434/v1
+base_url = "http://127.0.0.1:11434/v1" # Native Ollama; container_base_url is used in Compose.
 model = "ministral-3:3b"
 temperature = 0
 max_tokens = 2048
@@ -66,8 +73,10 @@ timeout_seconds = 180
 response_mode = "json_schema"
 
 [research]
-enabled = false                     # true after starting Ollama and catalog-init
-scope = "lookup"                    # studies also retrieves PubMed abstracts
+enabled = false                     # check stays deterministic; research-evidence explicitly enables research
+scope = "studies"                   # lookup restricts research to terminology pages
+sources = ["europe_pmc", "pubmed"]
+max_articles_per_loinc = 3
 unit_catalog = "local/unit-catalog.json"
 loinc_website_base_url = "https://loinc.org"
 
@@ -90,3 +99,45 @@ path = "output/laboratory-review.csv"
 [quality]
 # Create this registry with review-import after checking and clinician review.
 # review_registry = "local/clinician-mappings.json"
+
+[lookups.bfarm_lab]
+# Real BfArM FHIR JSON supplements, installed by the operator.
+enabled = false
+role = "optional"
+type = "fhir_artifacts"
+path = "local/terminologies/bfarm-lab"
+systems = ["http://loinc.org", "http://unitsofmeasure.org"]
+
+[validation]
+# Matchbox uses the official HL7 validator. Applied only to actual FHIR input.
+enabled = false
+backend = "matchbox"
+endpoint = "http://127.0.0.1:8081/matchboxv3/fhir"
+container_endpoint = "http://matchbox:8080/matchboxv3/fhir"
+terminology_server = "http://blaze:8080/fhir"
+terminology_endpoint = "http://127.0.0.1:8082/fhir"
+timeout_seconds = 180
+fail_on_error = true
+# additional_packages = [] # Extra real guides use pinned package#version entries.
+# token_env = "FHIR_VALIDATOR_TOKEN" # Only for a protected local validator.
+
+
+[research.europe_pmc]
+BASE_URL = "https://www.ebi.ac.uk/europepmc/webservices/rest"
+MAX_RESULTS = 1
+# Optional public population restriction, recorded in the trace (not an applicability verdict):
+# QUERY_FILTER = '(human OR humans OR patients OR volunteers) NOT (feline OR cats OR canine OR dogs OR rats OR mice OR veterinary)'
+
+[research.pubmed]
+BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+MAX_RESULTS = 1
+# API_KEY_ENV = "PUBMED_API_KEY"      # Optional credential reference, never a literal secret.
+
+[lookups.semlook]
+role = "optional"
+enabled = true
+type = "ols"
+systems = ["http://loinc.org"]
+endpoint = "https://semanticlookup.zbmed.de/ols/api"
+ontology = "loinc"
+limit = 5

@@ -1,48 +1,26 @@
 %% Same node/edge contract as decision-flow.svg.
 flowchart TD
-    INPUT["Input contract + selected profile<br/>Valid headers/types, frequency contract, versions, full reference/context guards<br/>Unsupported/malformed contracts fail with a redacted audit; valid rows continue"]
-    SOURCE["Select configured evidence per lookup: A, B or both<br/>A: previously installed files / captured pack · B: enabled API and credentials<br/>Offline mode disables remote adapters; no fallback to an unconfigured API"]
-    LOCAL["A · Ready local terminology files<br/>package-init is a separate setup command<br/>Accept conditions and pin editions before download<br/>Reference lookup.path / systems; input.snapshot for pack<br/>Supplements provide labels; coverage stays explicit"]
-    API["B · Configured API and credentials<br/>Set type, endpoint and systems where required<br/>Use .env / secret-file references; select release/language<br/>Require network.mode=lookups and lookup.enabled=true<br/>Public services may need no credentials"]
-    LOOKUP["Validate declared code/system and unit/system<br/>Read local evidence and/or query selected services; retain source and edition"]
-    INVALID["Confirmed invalid<br/>Keep deterministic error<br/>Assess remaining fields"]
-    KNOWN["Verified code / unit<br/>Identity or syntax supported<br/>Still check semantic fit"]
-    UNKNOWN["Not verified<br/>Absent / partial / unavailable<br/>Unavailable is not invalid"]
-    FIT["Check supplied aliases, LOINC axes / example units and context<br/>Names and unit syntax alone cannot prove fit; examples are not a universal whitelist"]
-    MATCH["Documented unchanged fit<br/>Continue to values/references<br/>Clinical applicability remains<br/>a separate review question"]
-    CONVERT["Verified linear conversion<br/>Propose target + numeric factor<br/>Check each reference bound too<br/>Never rewrite source values"]
-    AMBIG["Ambiguous / mismatch<br/>10*6 without a denominator<br/>First example is a candidate<br/>No guessed transformation"]
-    RESEARCH["Explicit candidate sources and optional local research<br/>Names → real search → exact candidate + unit/axes → model choice or abstention<br/>Catalogue spellings; quoted page/study intervals; offline has no remote research"]
-    NUMERIC["Values and reference metadata<br/>Finite numbers, ordered bounds, supplied units and interval context<br/>Out-of-reference is descriptive; it is not automatically a data error<br/>Evidence of clinical plausibility requires method/population review"]
-    OUTPUT["Write separate checks, credibility and explicit readiness denominators<br/>Priority: error → unclear → suggestion → passed<br/>Readiness is a numeric semantic proxy, not MII certification or clinical approval"]
-    REVIEW["Clinician adjudication of the entire set<br/>Record approval / rejection / defer / revoke with reviewer, evidence and time<br/>Apply approved site transformations in ETL; validate actual FHIR resources"]
-    REGISTRY["Versioned source and profile scope for future mappings<br/>Recheck target code / unit / factor and each reference bound on reuse<br/>Changed context / catalogue / profile or revocation prevents automatic reuse"]
-    INPUT --> SOURCE
-    SOURCE --> |"A"| LOCAL
-    SOURCE --> |"B"| API
-    LOCAL --> LOOKUP
-    API --> LOOKUP
-    LOOKUP --> INVALID
-    LOOKUP --> KNOWN
-    LOOKUP --> UNKNOWN
-    INVALID --> FIT
-    KNOWN --> FIT
-    UNKNOWN --> FIT
-    FIT --> MATCH
+    INPUT["Input contract and selected guide<br/>Verify source shape, versions, units, references and frequency<br/>Preserve original source records and meaningful context"]
+    FHIR["Actual FHIR resources supplied?<br/>Yes: local Matchbox/HL7 or MII full guide validation<br/>No: CSV/DB set checks; no synthetic patient resources<br/>Retain formal issues separately; missing coverage is incomplete"]
+    LOOKUP["Look up declared code and unit systems<br/>Configured primary APIs, actual local catalogues and labels<br/>Retain editions and sources; supplements enrich names<br/>Verified / invalid / unknown are distinct outcomes"]
+    FIT["Assess the whole semantic set<br/>Name, LOINC axes, unit dimension and specimen/method fit<br/>UCUM validity alone does not prove analyte compatibility<br/>Known example units support proposals, not universal limits"]
+    CONVERT["Supported transformation<br/>Verified target unit and linear factor<br/>Transform value and each bound independently<br/>A sourced spelling is still a review proposal"]
+    UNKNOWN["Ambiguous or unsupported<br/>Missing denominator or evidence<br/>Retain error / unresolved finding<br/>No guessed correction or factor"]
+    UNCHANGED["Documented unchanged fit<br/>Keep supplied code/unit/value<br/>Clinical applicability remains a review task<br/>Continue numeric/reference checks"]
+    NUMERIC["Check values and full reference sets<br/>Finite numbers, ordered bounds and independently valid units<br/>Out-of-reference is descriptive; preserve qualifiers<br/>Evidence of reported practice requires contextual review"]
+    REPORT["Write checks, recommendations and sources<br/>Optional Ollama research: real search, then bounded extraction<br/>Codes, names, units, intervals and their sources<br/>Formal FHIR state, credibility and readiness remain separate"]
+    REVIEW["Clinician adjudication and scoped reuse<br/>Record reviewer, time, evidence and explicit mapping decision<br/>Recheck approved targets/factors and every bound on reuse<br/>Apply approved mappings in ETL and validate actual FHIR"]
+    INPUT --> FHIR
+    FHIR --> LOOKUP
+    LOOKUP --> FIT
     FIT --> CONVERT
-    FIT --> AMBIG
-    MATCH --> NUMERIC
+    FIT --> UNKNOWN
+    FIT --> UNCHANGED
     CONVERT --> NUMERIC
-    AMBIG --> NUMERIC
-    NUMERIC --> OUTPUT
-    OUTPUT -.-> |"optional evidence pass"| RESEARCH
-    OUTPUT -.-> |"direct review"| REVIEW
-    RESEARCH --> REVIEW
-    REVIEW --> REGISTRY
-    REGISTRY -.-> |"reviewed reuse"| LOOKUP
-    classDef normal fill:#f3f7fa,stroke:#c4d5df,color:#142d42
-    class INPUT,SOURCE,LOCAL,API,LOOKUP,UNKNOWN,FIT,CONVERT,AMBIG,NUMERIC,REVIEW normal
-    classDef teal fill:#eef7f4,stroke:#a8cfc6,color:#142d42
-    class KNOWN,MATCH,RESEARCH,OUTPUT,REGISTRY teal
-    classDef error fill:#fcf1f3,stroke:#ecc7cf,color:#142d42
-    class INVALID error
+    UNKNOWN --> NUMERIC
+    UNCHANGED --> NUMERIC
+    NUMERIC --> REPORT
+    REPORT --> REVIEW
+    classDef normal fill:#ffffff,stroke:#b7cec9,color:#142d42
+    classDef teal fill:#eef7f4,stroke:#b7cec9,color:#142d42
+    class REPORT,REVIEW teal

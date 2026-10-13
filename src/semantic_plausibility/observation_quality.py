@@ -37,6 +37,7 @@ class LoincTerm:
     designations: tuple[dict[str, str], ...] = ()
     synonyms: tuple[str, ...] = ()
     status: str = ""
+    axis_sources: dict[str, dict] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -61,6 +62,10 @@ class ResearchCandidate:
     status: str = "candidate"
     reported_value: str | None = None
     value_kind: str = ""
+    source_title: str = ""
+    source_sha256: str = ""
+    retrieved_at: str = ""
+    doi: str = ""
 
 
 class UnitAuthority(Protocol):

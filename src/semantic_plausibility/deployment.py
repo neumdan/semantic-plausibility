@@ -154,6 +154,7 @@ class Deployment:
                     "runtime",
                     "base_url",
                     "base_url_env",
+                    "container_base_url",
                     "model",
                     "api_key_env",
                     "api_key_file",
@@ -171,6 +172,8 @@ class Deployment:
                 raise ValueError("Model runtime must be ollama or external")
             if bool(row.get("base_url")) == bool(row.get("base_url_env")):
                 raise ValueError("Model needs exactly one base_url or base_url_env")
+            if "container_base_url" in row and (not isinstance(row["container_base_url"], str) or not row["container_base_url"].strip()):
+                raise ValueError("container_base_url must be a nonempty local model URL")
             if not isinstance(row.get("model"), str) or not row["model"].strip():
                 raise ValueError("Model endpoint needs a nonempty model identifier")
             if row.get("expected_digest") and (
@@ -372,6 +375,13 @@ class Deployment:
                 "PUBMED_TOOL",
                 "SQC_OBSERVATION_DEFINITIONS",
                 "SQC_PUBMED_RETMAX",
+                "SQC_EUROPE_PMC_RETMAX",
+                "SQC_EUROPE_PMC_QUERY_FILTER",
+                "SQC_RESEARCH_SOURCES",
+                "SQC_MAX_ARTICLES_PER_LOINC",
+                "LOINC_WEBSITE_BASE_URL",
+                "PUBMED_EUTILS_BASE_URL",
+                "EUROPE_PMC_BASE_URL",
                 "SQC_CFG_DB_DSN",
             }
             updates = dict.fromkeys(managed)
@@ -402,7 +412,8 @@ class Deployment:
                     raise ValueError("Unknown configured model alias")
                 row = dict(self.data["models"][selected_model])
                 with environment({"SQC_ALLOWED_HTTP_HOSTS": updates["SQC_ALLOWED_HTTP_HOSTS"]}):
-                    url = self.url(row)
+                    location = {"base_url": row["container_base_url"]} if os.getenv("SQC_IN_CONTAINER") == "1" and row.get("container_base_url") else row
+                    url = self.url(location)
                 if not url:
                     raise ValueError("Selected model endpoint is not configured")
                 fields = {
@@ -443,6 +454,7 @@ class Deployment:
                         "SQC_RESEARCH_SOURCES": ",".join(settings.get("sources", ["pubmed"])),
                         "EUROPE_PMC_BASE_URL": settings.get("europe_pmc", {}).get("base_url", "https://www.ebi.ac.uk/europepmc/webservices/rest"),
                         "SQC_EUROPE_PMC_RETMAX": settings.get("europe_pmc", {}).get("max_results", 3),
+                        "SQC_EUROPE_PMC_QUERY_FILTER": settings.get("europe_pmc", {}).get("query_filter", ""),
                         "SQC_MAX_ARTICLES_PER_LOINC": settings.get("max_articles_per_loinc", 3),
                     }
                 )
@@ -485,10 +497,10 @@ class Deployment:
                 for key in ("path", "client_cert", "client_key"):
                     if row.get(key):
                         row[key] = str(self.path_value(row[key]))
-                if row.get("token_file") and live and credentials_needed:
+                if (row.get("token_file") or row.get("token_env")) and live and credentials_needed:
                     variable = f"SQC_CFG_TX_KEY_{index}"
                     updates[variable] = self.secret(row, "token", required=True)
-                    row.pop("token_file")
+                    row.pop("token_file", None)
                     row["token_env"] = variable
                 else:
                     row.pop("token_file", None)

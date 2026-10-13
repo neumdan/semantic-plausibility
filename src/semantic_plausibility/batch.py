@@ -62,6 +62,7 @@ class BatchResult:
     summary: Path
     report: Path
     log: Path
+    fhir_validation_state: str = "disabled"
 
 
 class BatchConfiguration:
@@ -97,6 +98,7 @@ class BatchConfiguration:
                 "study",
                 "quality",
                 "packages",
+                "validation",
             },
         )
         self.version = data.get("config_version")
@@ -143,11 +145,13 @@ class BatchConfiguration:
                 "FHIR_VERSION",
                 "PROFILE",
                 "PROFILE_FILE",
+                "PROFILE_VERSION",
                 "IG_PACKAGE",
                 "IG_VERSION",
                 "IG_CANONICAL",
                 "STRUCTURE_DEFINITION",
                 "VALUE_SETS",
+                "links",
             },
         )
         if spec.get("FHIR_VERSION", "4.0.1") != "4.0.1":
@@ -155,8 +159,22 @@ class BatchConfiguration:
                 "This runner implements FHIR R4 (4.0.1); other versions need an upstream adapter"
             )
         self.profile = spec.get("PROFILE", "auto")
+        from .fhir_validation import validation_settings
+        self.validation = validation_settings(data)
         if not isinstance(spec.get("VALUE_SETS", []), list) or any(not isinstance(value, str) for value in spec.get("VALUE_SETS", [])):
             raise ValueError("specification.VALUE_SETS must be paths to installed real ValueSets")
+        from urllib.parse import urlsplit
+        links = spec.get("links", {})
+        if not isinstance(links, dict) or len(links) > 8:
+            raise ValueError("specification.links must be a table of up to eight documentation URLs")
+        for label, url in links.items():
+            try:
+                parsed = urlsplit(url) if isinstance(url, str) else None
+                valid = parsed and parsed.scheme in {"http", "https"} and parsed.hostname and not (parsed.username or parsed.password or parsed.query)
+            except ValueError:
+                valid = False
+            if not isinstance(label, str) or not label.strip() or not valid:
+                raise ValueError("Profile documentation links need HTTP(S) URLs without credentials or query strings")
         aggregation = table(data.get("aggregation", {}), "aggregation", {"engine", "group_by"})
         if aggregation.get("engine", "duckdb") != "duckdb":
             raise ValueError(
@@ -345,7 +363,9 @@ class BatchConfiguration:
         sources = research.get("sources", ["pubmed"])
         if not isinstance(sources, list) or not set(sources) <= {"pubmed", "europe_pmc"} or len(sources) != len(set(sources)):
             raise ValueError("research.sources must select pubmed and/or europe_pmc without duplicates")
-        table(research.get("europe_pmc", {}), "research.europe_pmc", {"BASE_URL", "MAX_RESULTS"})
+        europe = table(research.get("europe_pmc", {}), "research.europe_pmc", {"BASE_URL", "MAX_RESULTS", "QUERY_FILTER"})
+        if not isinstance(europe.get("QUERY_FILTER", ""), str) or len(europe.get("QUERY_FILTER", "")) > 1000:
+            raise ValueError("Europe PMC QUERY_FILTER must be a bounded public search expression")
         budget = research.get("max_articles_per_loinc", 3)
         if type(budget) is not int or not 1 <= budget <= 12:
             raise ValueError("research.max_articles_per_loinc must be 1..12")
@@ -406,6 +426,7 @@ class BatchConfiguration:
         translated["research"]["europe_pmc"] = {
             "base_url": research.get("europe_pmc", {}).get("BASE_URL", "https://www.ebi.ac.uk/europepmc/webservices/rest"),
             "max_results": research.get("europe_pmc", {}).get("MAX_RESULTS", 3),
+            "query_filter": research.get("europe_pmc", {}).get("QUERY_FILTER", ""),
         }
         self.deployment = Deployment(self.path, data=translated)
 
