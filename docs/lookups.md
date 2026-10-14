@@ -103,9 +103,9 @@ cp -n terminology.example.toml terminology.toml
 uv run --no-sync --env-file .env run-plausibility-check package-init --config terminology.toml
 # Or, with the read/write local volume used only for installation:
 # For containers, set SQC_CONFIG_FILE=terminology.toml in .env first.
-podman-compose --profile terminology run --rm --build package-init
+podman-compose --profile terminology run --rm package-init
 # Docker alternative:
-docker compose --profile terminology run --rm --build package-init
+docker compose --profile terminology run --rm package-init
 ```
 
 Ordinary `batch` runs never download packages. `package-init` checks the publisher SHA-1, records SHA-256, preserves the original archive/licence files and installs atomically. Repeated installation verifies the existing files. Dependencies are recorded, not automatically downloaded. Package version and CodeSystem version can differ; code checks use the CodeSystem edition. Installed contents stay under ignored `local/`; transfer this folder to a disconnected review machine. For offline LOINC axes/units and UCUM syntax/factors, also supply a pack captured from real APIs; a translation package alone is insufficient.

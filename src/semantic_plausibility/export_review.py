@@ -15,6 +15,7 @@ from pathlib import Path
 import shutil
 import tempfile
 import time
+from threading import RLock
 from urllib.parse import urlsplit
 import uuid
 
@@ -38,6 +39,36 @@ from .observation_quality import LoincTerm
 from .terminology_router import TerminologyRouter, artifact_files, load_sources
 from .review_feedback import REVIEW_FIELDS, ReviewRegistry
 from .report_sources import SET_FIELDS, review_set_fields
+
+_CSV_LOCK = RLock()
+
+
+def csv_rows(path, *, delimiter=",", required=()):
+    """Bounded CSV parsing shared by preflight and the full-resource reader."""
+    if not isinstance(delimiter, str) or len(delimiter) != 1:
+        raise InputContractError("CSV delimiter must be one character")
+    # The csv module's limit is process-wide; restore it even on malformed input.
+    with _CSV_LOCK:
+        previous = csv.field_size_limit(32 * 1024 * 1024)
+        try:
+            with path.open(encoding="utf-8-sig", newline="") as handle:
+                reader = csv.reader(handle, delimiter=delimiter, strict=True)
+                header = next(reader, [])
+                if not header or len(header) != len(set(header)) or any(not name for name in header):
+                    raise InputContractError("CSV headers must be unique and nonempty")
+                missing = set(required) - set(header)
+                if missing:
+                    raise InputContractError("Missing configured CSV columns: " + ", ".join(sorted(missing)))
+                for line, values in enumerate(reader, 2):
+                    if not values:
+                        continue
+                    if len(values) != len(header):
+                        raise InputContractError(f"CSV row {line} has a different number of fields than the header")
+                    yield line, dict(zip(header, values))
+        except csv.Error:
+            raise InputContractError("Malformed CSV or field exceeds the 32 MiB parsing limit") from None
+        finally:
+            csv.field_size_limit(previous)
 
 EXTRA_FIELDS = [
     *SET_FIELDS,
@@ -192,7 +223,20 @@ class ReliableLookup:
         return call
 
 
-def _file_payloads(path):
+def _file_payloads(path, *, resource_column="", delimiter=","):
+    if resource_column:
+        from decimal import Decimal
+        if path.is_symlink() or not path.is_file():
+            raise ValueError("FHIR CSV exports must be regular files")
+        for line, row in csv_rows(path, delimiter=delimiter, required=[resource_column]):
+            if len(row[resource_column].encode("utf-8")) > 32 * 1024 * 1024:
+                raise InputContractError(f"FHIR JSON in CSV row {line} exceeds 32 MiB")
+            try:
+                payload = json.loads(row[resource_column], parse_float=Decimal, parse_constant=reject_json_constant)
+            except (ValueError, RecursionError):
+                raise InputContractError(f"Invalid FHIR JSON in CSV row {line}") from None
+            yield f"file:{path.name}:row:{line}", payload
+        return
     if path.is_dir():
         files = sorted(p for p in path.iterdir() if p.suffix.lower() in {".ndjson", ".jsonl"})
         if not files:
@@ -240,14 +284,14 @@ def _resources(payload, location):
         raise ValueError("FHIR input needs resources, Bundles or a resource array")
 
 
-def fhir_records(path, context, folder):
+def fhir_records(path, context, folder, **reader_options):
     import sqlite3
 
     # Index only exported specimen metadata. Patient resources/identifiers are not copied.
     with closing(sqlite3.connect(folder / "references.sqlite")) as refs:
         refs.execute("CREATE TABLE refs (reference TEXT PRIMARY KEY, payload TEXT)")
         refs.execute("CREATE TABLE observation_ids (id TEXT PRIMARY KEY)")
-        for location, payload in _file_payloads(path):
+        for location, payload in _file_payloads(path, **reader_options):
             for _, resource, full_url in _resources(payload, location):
                 if resource.get("resourceType") == "Specimen":
                     names = [full_url, "Specimen/" + str(resource.get("id", ""))]
@@ -267,7 +311,7 @@ def fhir_records(path, context, folder):
                                     "Export contains conflicting specimen versions; select one version"
                                 )
                             refs.execute("INSERT OR IGNORE INTO refs VALUES (?,?)", (name, metadata))
-        for location, payload in _file_payloads(path):
+        for location, payload in _file_payloads(path, **reader_options):
             for source_ref, resource, _ in _resources(payload, location):
                 if resource.get("resourceType") != "Observation":
                     yield None
@@ -307,20 +351,9 @@ def fhir_records(path, context, folder):
 
 
 def validate_csv(config, path):
-    delimiter = config.input.get("delimiter", ",")
-    if not isinstance(delimiter, str) or len(delimiter) != 1:
-        raise InputContractError("CSV delimiter must be one character")
-    with path.open(encoding="utf-8-sig", newline="") as handle:
-        reader = csv.reader(handle, delimiter=delimiter, strict=True)
-        header = next(reader, [])
-        if not header or len(header) != len(set(header)) or any(not name for name in header):
-            raise InputContractError("CSV headers must be unique and nonempty")
-        missing = set(config.mapping["fields"].values()) - set(header)
-        if missing:
-            raise InputContractError("Missing configured CSV columns: " + ", ".join(sorted(missing)))
-        for line, values in enumerate(reader, 2):
-            if values and len(values) != len(header):
-                raise InputContractError(f"CSV row {line} has a different number of fields than the header")
+    for _ in csv_rows(path, delimiter=config.input.get("delimiter", ","), required=config.mapping["fields"].values()):
+        pass
+    return True
 
 
 def local_model_only(config):
@@ -484,6 +517,9 @@ def review_export(config):
     try:
         with os.fdopen(descriptor, "w") as handle:
             handle.write(str(os.getpid()))
+        if config.kind != "Observation":
+            from .medication_report import review_medication
+            return review_medication(config)
         return _review_export(config)
     finally:
         lock.unlink(missing_ok=True)
@@ -552,7 +588,7 @@ def _review_export(config):
         "log": target.with_suffix(".audit.jsonl"),
         "evidence": target.with_suffix(".evidence.jsonl"),
     }
-    if config.validation.get("enabled") and config.input_type == "fhir_file":
+    if config.validation.get("enabled") and config.full_fhir_input:
         paths["fhir_validation"] = target.with_suffix(".fhir-validation.jsonl")
     if config.output.get("lookup_pack"):
         paths["lookup_pack"] = config.path_value(config.output["lookup_pack"])
@@ -619,6 +655,7 @@ def _review_export(config):
                 network_mode=config.network_mode,
                 mode=config.output.get("mode", "distinct"),
                 operation=config.operation,
+                output_path=str(target),
             )
             with environment(updates), config.deployment.prepare() as prepared:
                 options = prepared.audit.checker_options()
@@ -669,13 +706,13 @@ def _review_export(config):
                 )
                 phase = "input_preflight"
                 fhir_validation = {"state": "not_applicable" if config.validation.get("enabled") else "disabled",
-                    "scope": "CSV/database tuples are not full FHIR resources" if config.input_type != "fhir_file" else "Full FHIR validation was not enabled"}
+                    "scope": "Scalar CSV/database tuples are not full FHIR resources" if not config.full_fhir_input else "Full FHIR validation was not enabled"}
                 if config.input_type == "csv":
                     validate_csv(config, source["path"])
                 if "fhir_validation" in paths:
                     from .fhir_validation import validate_input
                     phase = "fhir_resource_validation"
-                    fhir_validation = validate_input(config, source["path"], folder / "fhir-validation.jsonl")
+                    fhir_validation = validate_input(config, source["path"], folder / "fhir-validation.jsonl", **config.fhir_reader_options)
                     fhir_validation["operation_outcomes"] = paths["fhir_validation"].name
                     log.event("fhir_resources_validated", **fhir_validation)
                 manifest = (
@@ -712,8 +749,8 @@ def _review_export(config):
                 def laboratory():
                     nonlocal skipped
                     iterator = (
-                        fhir_records(source["path"], dict(prepared.audit.context), folder)
-                        if config.input_type == "fhir_file"
+                        fhir_records(source["path"], dict(prepared.audit.context), folder, **config.fhir_reader_options)
+                        if config.full_fhir_input
                         else records(config, prepared)
                     )
                     for record in iterator:
@@ -932,6 +969,8 @@ def _review_export(config):
                 summary = {
                     "format_version": 1,
                     "operation": config.operation,
+                    "output_path": str(target),
+                    "input_representation": "fhir_resources" if config.full_fhir_input else "mapped_columns",
                     "run_id": run_id,
                     "mode": mode,
                     "software": versions(),

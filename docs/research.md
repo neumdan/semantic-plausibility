@@ -9,9 +9,13 @@ uv run --no-sync research-evidence --config pipeline.toml --report output/labora
 uv run --no-sync --env-file .env research-evidence --config pipeline.toml --report output/laboratory-review.csv
 ```
 
+Use `--scope lookup` for AI-assisted terminology recommendations without literature retrieval, or `--scope studies` to add the configured study APIs. Omit it to use TOML `research.scope`. Both modes use the same local model and independent code/unit guards. `--plan` respects the selected scope: lookup mode shows no study queries or study extraction prompts.
+
+Without `--out`, lookup mode produces `<checked-name>.recommendations.csv/html`; studies mode produces `<checked-name>.research.csv/html`. Each has its own audit and trace. For a direct comparison, start both modes from the original checked report, not from the other AI output.
+
 No second configuration is needed. The command selects the checked CSV at TOML `output.path` by default; `--report` is optional. A raw export or an edited CSV must first be checked, and its matching summary/evidence/audit files must remain together. [One-time model setup and exact Docker/Podman/Python commands](shipped-stack.md#ollama).
 
-The plan prints the system/task prompts, profile routing and planned queries without network/model calls. The executed dossier uses `laboratory-review.research.*`: CSV, HTML, evidence JSONL, summary, trace JSONL and artifact audit. Original check statuses/readiness are retained; the dossier adds review evidence.
+The plan prints the system/task prompts, profile routing and planned queries without network/model calls. The executed dossier uses the selected output prefix: CSV, HTML, evidence JSONL, summary, trace JSONL and artifact audit. Original check statuses/readiness are retained; the dossier adds review evidence.
 
 `study_evidence_json` contains all retrieved evidence candidates. `reported_measurements_json` contains reported values or units; `reference_candidates_json` contains only reference intervals, analytical intervals and documented extremes. `matched_analyte` comes from the exact LOINC component; `suggested_analyte` and `suggested_name` are conditional target definitions. An absent or misspelled source name can receive a canonical terminology name even without a model inventing a new label. Empty fields mean that no supported extraction was obtained. Retrieved articles remain visible even when extraction fails or abstains. `extraction_unavailable` means no supported extraction was obtained from the local model; a study discovery has no implied numeric interval. Model availability and rejected responses remain visible in the trace.
 
@@ -29,7 +33,7 @@ The application performs the searches; the local model receives retrieved text a
 
 For hemoglobin, the generated searches include `(Hemoglobin) AND ("reference interval" OR "reference range")`, analogous analytical/extreme searches and `(Hemoglobin) AND (measurement OR concentration OR units)`. LOINC display brackets are removed from search syntax. PubMed and [Europe PMC](https://europepmc.org/RestfulWebService) are explicitly selectable in `research.sources`; `max_articles_per_loinc=3` caps total unique articles across providers, with small per-query limits. Results are cached per code/edition. This bounded discovery is not a systematic review or evidence-quality grading.
 
-`*.research.trace.jsonl` records actual query parameters, model instructions, supplied evidence, guarded replies and rejected/unavailable attempts. Credentials are omitted. Hospital values/reference bounds and patient IDs are compared locally and stay out of queries/prompts; published measurements in retrieved abstracts are evidence inputs. Source hashes and retrieval times accompany the dossier.
+`*.trace.jsonl` records actual query parameters, model instructions, supplied evidence, guarded replies and rejected/unavailable attempts. The HTML/summary distinguishes retrieval requests, literature searches and extraction failures; extraction failures do not count as additional searches. Credentials are omitted. Hospital values/reference bounds and patient IDs are compared locally and stay out of queries/prompts; published measurements in retrieved abstracts are evidence inputs. Source hashes and retrieval times accompany the dossier.
 
 LOINC axes returned as `LP…` part codes are resolved through exact `$lookup` requests in the same edition. Unresolved core axes prevent a model-selectable coding proposal. The primary service's bounded name `$expand` supplies candidates; each candidate still needs exact code/edition lookup and independent unit/context checks. A component-only label such as “Hemoglobin” is identified as `component_label`, not as the complete LOINC Coding display.
 
@@ -109,7 +113,7 @@ Imports require the same profile rules as the checked report. A later decision m
 
 ## Future domains and FDPG
 
-Medication needs product/ingredient, strength, dose/unit, route and timing; Condition needs edition, certainty/status, severity and site; Procedure needs edition, status, time, site and technique. These require separate MII profile/source adapters and are not yet assessed by the laboratory runner.
+Medication needs product/ingredient, strength, dose/unit, route and timing; Condition needs edition, certainty/status, severity and site; Procedure needs edition, status, time, site and technique. Medication terminology and deterministic dose checks now use a [separate adapter](../examples/medication/README.md). Medication AI/evidence research, Condition and Procedure remain unimplemented; laboratory research cannot be applied to these records.
 
 A later FDPG provider must use an authorised interface or permitted aggregate export with selection/cohort provenance. Feasibility counts alone cannot reconstruct value distributions or establish reference intervals. Evidence of practice supports final clinician evaluation.
 

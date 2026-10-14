@@ -1,0 +1,84 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Patient",
+        "id": "example-patient"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Medication",
+        "id": "example-product",
+        "code": {
+          "coding": [
+            {
+              "system": "http://www.whocc.no/atc",
+              "code": "N02BE01"
+            }
+          ],
+          "text": "Paracetamol (synthetic formulation)"
+        },
+        "form": {
+          "text": "Solution"
+        },
+        "ingredient": [
+          {
+            "itemCodeableConcept": {
+              "text": "Paracetamol"
+            },
+            "strength": {
+              "numerator": {
+                "value": 20,
+                "code": "mg",
+                "system": "http://unitsofmeasure.org"
+              },
+              "denominator": {
+                "value": 1,
+                "code": "mL",
+                "system": "http://unitsofmeasure.org"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationAdministration",
+        "id": "example-administration",
+        "status": "completed",
+        "medicationReference": {
+          "reference": "Medication/example-product"
+        },
+        "subject": {
+          "reference": "Patient/example-patient"
+        },
+        "effectivePeriod": {
+          "start": "2026-01-01T09:00:00Z",
+          "end": "2026-01-01T09:30:00Z"
+        },
+        "dosage": {
+          "text": "SYNTHETIC administration shape",
+          "route": {
+            "text": "Intravenous"
+          },
+          "dose": {
+            "value": 10,
+            "unit": "mL",
+            "system": "http://unitsofmeasure.org",
+            "code": "mL"
+          },
+          "rateQuantity": {
+            "value": 20,
+            "unit": "mL/h",
+            "system": "http://unitsofmeasure.org",
+            "code": "mL/h"
+          }
+        }
+      }
+    }
+  ]
+}

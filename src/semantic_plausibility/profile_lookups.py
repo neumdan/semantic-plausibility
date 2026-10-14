@@ -19,6 +19,9 @@ def selected_profile(config):
 
 
 def terminology_plan(config, profile=None):
+    if config.kind != "Observation":
+        from .medication_checks import terminology_plan
+        return terminology_plan(config)
     profile = profile or selected_profile(config)
     value_sets = {}
     for name in config.data.get("specification", {}).get("VALUE_SETS", []):

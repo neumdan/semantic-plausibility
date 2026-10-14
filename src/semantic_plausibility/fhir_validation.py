@@ -39,7 +39,7 @@ def fhir_json(value):
 def validation_settings(data):
     from .deployment import table
     row = table(data.get("validation", {}), "validation", {"enabled", "backend", "endpoint", "container_endpoint",
-        "timeout_seconds", "token_env", "token_file", "fail_on_error", "terminology_server", "terminology_endpoint", "additional_packages"})
+        "timeout_seconds", "token_env", "token_file", "fail_on_error", "terminology_server", "terminology_endpoint", "additional_packages", "setup_directory"})
     for key in ("enabled", "fail_on_error"):
         if type(row.get(key, False)) is not bool:
             raise ValueError(f"validation.{key} must be true or false")
@@ -50,7 +50,7 @@ def validation_settings(data):
         raise ValueError("validation.timeout_seconds must be 1..600")
     if row.get("token_env") and row.get("token_file"):
         raise ValueError("Choose validation.token_env OR token_file")
-    for key in ("endpoint", "container_endpoint", "terminology_server", "terminology_endpoint", "token_env", "token_file"):
+    for key in ("endpoint", "container_endpoint", "terminology_server", "terminology_endpoint", "token_env", "token_file", "setup_directory"):
         if key in row and not isinstance(row[key], str):
             raise ValueError(f"validation.{key} must be a string")
     for key in ("endpoint", "container_endpoint", "terminology_server", "terminology_endpoint"):
@@ -108,26 +108,26 @@ def target_profile(config):
     version = spec.get("PROFILE_VERSION", "")
     if spec.get("STRUCTURE_DEFINITION"):
         resource = json.loads(config.path_value(spec["STRUCTURE_DEFINITION"]).read_text())
-        if resource.get("resourceType") != "StructureDefinition" or resource.get("type") != "Observation":
-            raise ValueError("Full laboratory validation needs an Observation StructureDefinition")
+        if resource.get("resourceType") != "StructureDefinition" or resource.get("type") != config.kind:
+            raise ValueError("StructureDefinition type must match general.RESOURCE_TYPE")
         if canonical and canonical != resource.get("url") or version and version != resource.get("version"):
             raise ValueError("Configured profile canonical/edition differs from the StructureDefinition")
         canonical, version = resource.get("url", ""), resource.get("version", "")
     if not canonical:
-        return "http://hl7.org/fhir/StructureDefinition/Observation|4.0.1"
+        return f"http://hl7.org/fhir/StructureDefinition/{config.kind}|4.0.1"
     version = version or spec.get("IG_VERSION", "")
     if not canonical.startswith(("https://", "http://")) or not version:
         raise ValueError("Full validation needs the profile canonical and business version")
     return canonical + "|" + version
 
 
-def validation_copy(resource, profile):
-    """Request the selected Observation profile without changing the source data."""
+def validation_copy(resource, profile, kind="Observation"):
+    """Request the selected resource profile without changing the source data."""
     copy = deepcopy(resource)
     def visit(item):
         if not isinstance(item, dict):
             return
-        if item.get("resourceType") == "Observation":
+        if item.get("resourceType") == kind:
             meta = item.setdefault("meta", {})
             if isinstance(meta, dict):
                 profiles = meta.setdefault("profile", [])
@@ -160,6 +160,7 @@ def outcome_issues(response):
 
 class FhirValidator:
     def __init__(self, config):
+        self.kind = config.kind
         self.config = config
         self.settings = validation_settings(config.data)
         self.backend = self.settings.get("backend", "matchbox")
@@ -172,7 +173,7 @@ class FhirValidator:
         self.opener = build_opener(ProxyHandler({}), _NoModelRedirects())
 
     def validate(self, resource):
-        submitted = validation_copy(resource, self.profile)
+        submitted = validation_copy(resource, self.profile, self.kind)
         body = fhir_json(submitted).encode()
         original = fhir_json(resource).encode()
         provenance = {"backend": self.backend, "endpoint": self.endpoint, "requested_profile": self.profile,
@@ -221,7 +222,7 @@ class FhirValidator:
             return {**provenance, "state": "unavailable", "error_type": type(exc).__name__}
 
 
-def validate_input(config, path, output):
+def validate_input(config, path, output, **reader_options):
     """Validate whole Bundles before aggregation; NDJSON documents retain their scope."""
     from .export_review import _file_payloads
     validator = FhirValidator(config)
@@ -230,7 +231,7 @@ def validate_input(config, path, output):
     descriptor = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
         def documents():
-            for location, resource in _file_payloads(Path(path)):
+            for location, resource in _file_payloads(Path(path), **reader_options):
                 if isinstance(resource, list):
                     for index, item in enumerate(resource):
                         yield location + ":item:" + str(index), item
@@ -249,7 +250,7 @@ def validate_input(config, path, output):
     state = next((state for state in ("unavailable", "invalid", "incomplete", "passed_with_warnings") if counts[state]), "passed")
     return {"state": state, "backend": validator.backend, "endpoint": validator.endpoint,
         "profile": validator.profile, "packages": validator.packages, "documents": counts, "issues": issue_counts,
-        "scope": "Whole Bundles before element selection/aggregation; NDJSON and resource arrays are validated independently",
+        "scope": "Full documents before element selection/aggregation; Bundles stay intact, array/NDJSON resources are validated independently. CSV resource_json cells retain the same scope.",
         "operation_outcomes": Path(output).name, "source_unchanged": True}
 
 
@@ -267,7 +268,7 @@ def initialise_validator(config_path, *, overwrite=False):
         "hapi": {"fhir": {"implementationguides": guides}},
         "matchbox": {"fhir": {"context": {"fhirVersion": "4.0.1", "txServer": tx,
             "httpReadOnly": True, "txUseEcosystem": False}, "validation": {"save-statistics": False, "analyzeErrorsWithLlm": False}}}}
-    folder = config.root / "local/validation"
+    folder = config.path_value(settings.get("setup_directory", "local/validation"))
     build_application = deepcopy(application)
     build_application["spring"]["jpa"]["properties"] = {"hibernate.hbm2ddl.auto": "create",
         "jakarta.persistence.sql-load-script-source": "file:/config/matchbox-schema.sql"}
@@ -298,14 +299,15 @@ def validate_fhir(config_path, input_path=None, output=None):
     from .batch import BatchConfiguration
     config = BatchConfiguration(config_path, research=False)
     path = config.path_value(input_path or config.input.get("path"))
-    if input_path is None and config.input_type != "fhir_file":
+    if input_path is None and not config.full_fhir_input:
         raise ValueError("CSV/DB tuples are not full FHIR resources; give validate-fhir --input a FHIR JSON/NDJSON file")
     target = config.path_value(output or "output/fhir-validation.jsonl")
     summary = target.with_suffix(".summary.json")
     if target.exists() or summary.exists() or target == path or target == config.path or summary == path or summary == config.path or path.is_dir() and target.is_relative_to(path):
         raise ValueError("Choose a fresh validation output outside the input")
     target.parent.mkdir(parents=True, exist_ok=True)
-    result = validate_input(config, path, target)
+    options = config.fhir_reader_options if config.fhir_csv and path == config.path_value(config.input["path"]) else {}
+    result = validate_input(config, path, target, **options)
     target.chmod(0o600)
     summary.write_text(json.dumps({**result, "configuration_sha256": config.deployment.sha256,
         "output_sha256": hashlib.sha256(target.read_bytes()).hexdigest()}, indent=2) + "\n")

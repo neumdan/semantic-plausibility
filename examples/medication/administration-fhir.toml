@@ -1,0 +1,53 @@
+# Run in place: run-plausibility-check --config examples/medication/administration.toml
+# Synthetic source inputs; all lookup responses come from actual configured services.
+config_version = 3
+[general]
+PROJECT_NAME = "medication-administration-review"
+RESOURCE_TYPE = "MedicationAdministration"
+[input]
+type = "fhir_file"
+origin = "fhir"
+path = "administration-bundle.json"
+granularity = "individual"
+[specification]
+FHIR_VERSION = "4.0.1"
+IG_PACKAGE = "de.medizininformatikinitiative.kerndatensatz.medikation"
+IG_VERSION = "2026.0.1"
+IG_CANONICAL = "https://www.medizininformatik-initiative.de/fhir/core/modul-medikation/StructureDefinition/MedicationAdministration"
+[specification.links]
+resource = "https://hl7.org/fhir/R4/medicationadministration.html"
+guide = "https://www.medizininformatik-initiative.de/Kerndatensatz/KDS_Medikation_2026/MIIIGModulMedikation.html"
+source = "https://github.com/medizininformatik-initiative/kerndatensatzmodul-medikation"
+[network]
+mode = "lookups" # Use "offline" with installed real catalogues; missing evidence remains unknown.
+[lookups.ucum]
+enabled = true
+type = "ucum"
+role = "primary"
+endpoint = "https://ucum.nlm.nih.gov/ucum-service/v1"
+[lookups.medication_codes]
+enabled = true
+type = "fhir"
+role = "primary"
+endpoint = "https://tx.fhir.org/r4" # Public test service; coverage/availability are recorded, never presumed.
+systems = ["http://www.whocc.no/atc", "http://snomed.info/sct", "http://www.nlm.nih.gov/research/umls/rxnorm", "http://fhir.de/CodeSystem/ifa/pzn"]
+# For your authenticated server, change endpoint and uncomment:
+# token_env = "MEDICATION_TX_TOKEN" # Put the value in .env, never in TOML/Git.
+[lookups.downloads]
+enabled = false
+type = "fhir_artifacts"
+role = "source"
+path = "../../../input/terminologies/medication" # Real BfArM/other licensed artifacts.
+systems = ["http://fhir.de/CodeSystem/bfarm/atc", "http://fhir.de/CodeSystem/ifa/pzn"]
+[output]
+mode = "distinct" # Use "items" only with individual input; IDs are then retained.
+path = "../../output/medication-administration-fhir.csv"
+[validation]
+setup_directory = "../../local/validation" # Generated Compose validator files, relative to this TOML.
+enabled = true # Complete synthetic resources; MII errors are expected where required data is absent.
+backend = "matchbox"
+endpoint = "http://127.0.0.1:8081/matchboxv3/fhir"
+container_endpoint = "http://matchbox:8080/matchboxv3/fhir"
+terminology_server = "http://blaze:8080/fhir"
+terminology_endpoint = "http://127.0.0.1:8082/fhir"
+fail_on_error = true

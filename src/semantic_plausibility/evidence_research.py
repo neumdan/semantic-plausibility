@@ -22,8 +22,11 @@ from .observation_services import PublicEvidenceClient
 from .report_sources import review_set_fields
 
 
-def research_plan(config_path, report=None):
-    config = BatchConfiguration(config_path, research=False)
+def research_plan(config_path, report=None, *, scope=None):
+    config = BatchConfiguration(config_path, research=False, research_scope=scope)
+    if config.kind != "Observation":
+        raise ValueError("Medication AI recommendations and evidence research are not implemented; run the deterministic medication check")
+    scope = config.data.get("research", {}).get("scope", "studies")
     report = config.path_value(report or config.output.get("path", "output/laboratory-review.csv"))
     rows, details = report_details(report)
     verify_report_profile(config, json.loads(report.with_suffix(".summary.json").read_text()))
@@ -41,28 +44,33 @@ def research_plan(config_path, report=None):
             for k in ("component", "system")}) if item.get("loinc_axes") else LoincTerm(code or "", label)
         targets[key] = {"code": code, "version": key[1], "analyte_name": label,
             "name_lookup": row.get("analyte_name", ""), "unit": row["unit_code"],
-            "study_queries": PublicEvidenceClient.study_queries(term) if code else "After exact verification of retrieved candidates"}
+            "study_queries": (PublicEvidenceClient.study_queries(term) if code else "After exact verification of retrieved candidates") if scope == "studies" else {}}
     return {"goal": "Evidence of reported practice supports clinician semantic adjudication",
+        "scope": scope,
         "terminology_plan": terminology_plan(config), "targets": list(targets.values()),
-        "study_sources": config.data.get("research", {}).get("sources", ["pubmed"]),
-        "max_articles_per_loinc": config.data.get("research", {}).get("max_articles_per_loinc", 3),
+        "study_sources": config.data.get("research", {}).get("sources", ["pubmed"]) if scope == "studies" else [],
+        "max_articles_per_loinc": config.data.get("research", {}).get("max_articles_per_loinc", 3) if scope == "studies" else 0,
+        "europe_pmc_query_filter": config.data.get("research", {}).get("europe_pmc", {}).get("QUERY_FILTER", "") if scope == "studies" else "",
         "system_prompt": prompts.SYSTEM,
         "prompts": {name: {"instruction": getattr(prompts, name), "response_schema": response_schema(getattr(prompts, name))}
-            for name in ("NAME_QUERIES", "LOINC_REVIEW", "UNIT_SPELLING", "UNIT_CANDIDATES", "LOINC_UNITS", "LOINC_RANGES", "STUDY_BOUNDS", "STUDY_MEASUREMENTS", "TERMINOLOGY_CLAIMS")},
+            for name in ("NAME_QUERIES", "LOINC_REVIEW", "UNIT_SPELLING", "UNIT_CANDIDATES", "LOINC_UNITS", "LOINC_RANGES", "STUDY_BOUNDS", "STUDY_MEASUREMENTS", "TERMINOLOGY_CLAIMS")
+            if scope == "studies" or not name.startswith("STUDY_")},
         "source_values_and_reference_bounds": "Compared locally; not included in public search/model prompts",
         "execution": "plan_only_no_network_or_model_call"}
 
 
-def research_evidence(config_path, report=None, output=None, *, progress=None):
-    config = BatchConfiguration(config_path, research=True)
+def research_evidence(config_path, report=None, output=None, *, scope=None, progress=None):
+    config = BatchConfiguration(config_path, research=True, research_scope=scope)
+    scope = config.data.get("research", {}).get("scope", "studies")
     if config.network_mode != "lookups":
         raise ValueError("Evidence retrieval needs explicitly enabled connected lookups")
     local_model_only(config)
     source = config.path_value(report or config.output.get("path", "output/laboratory-review.csv"))
     original, details = report_details(source)
     if progress:
-        progress(f"Researching {len(original)} checked groups; source values stay local.")
-    target = config.path_value(output) if output else source.with_name(source.stem + ".research.csv")
+        progress(f"Researching {len(original)} checked groups; scope={scope}; source values stay local.")
+    suffix = ".recommendations.csv" if scope == "lookup" else ".research.csv"
+    target = config.path_value(output) if output else source.with_name(source.stem + suffix)
     paths = {name: target.with_suffix(suffix) for name, suffix in {
         "csv": ".csv", "summary": ".summary.json", "evidence": ".evidence.jsonl",
         "trace": ".trace.jsonl", "html": ".html", "audit": ".audit.jsonl"}.items()}
@@ -94,7 +102,7 @@ def research_evidence(config_path, report=None, output=None, *, progress=None):
             log = AuditLog(folder / paths["audit"].name, run_id)
             try:
                 log.event("started", operation="research-evidence", source_report_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
-                    configuration_sha256=config.deployment.sha256, software=versions())
+                    configuration_sha256=config.deployment.sha256, research_scope=scope, output_path=str(target), software=versions())
                 reviewed = []
                 with config.deployment.prepare(research=True, source_access=False) as prepared:
                     checker = configured_checker(config, prepared, profile=profile, research=True)
@@ -178,11 +186,13 @@ def research_evidence(config_path, report=None, output=None, *, progress=None):
                         (folder / paths["trace"].name).write_text("".join(encoded(row) + "\n" for row in trace))
                         summary = json.loads(source.with_suffix(".summary.json").read_text())
                         summary.update(run_id=run_id, operation="research-evidence", software=versions(),
+                            output_path=str(target),
                             source_report_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
                             configuration_sha256=config.deployment.sha256, evidence_kind="retrieved_evidence_candidates",
                             terminology_plan=terminology_plan(config, profile),
-                            research={"sources": list(getattr(evidence, "source_records", {}).values()),
-                                "queries": len(getattr(evidence, "query_log", [])), "accepted_model_calls": getattr(llm, "audit_records", []),
+                            research={"scope": scope, "sources": list(getattr(evidence, "source_records", {}).values()),
+                                "study_providers": list(evidence.research_sources) if scope == "studies" else [],
+                                **query_counts(getattr(evidence, "query_log", [])), "accepted_model_calls": getattr(llm, "audit_records", []),
                                 "max_articles_per_loinc": evidence.max_articles_per_loinc,
                                 "model_state": "responses_accepted" if getattr(llm, "audit_records", []) else "no_accepted_response",
                                 "groups_with_code_proposals": sum(bool(row.get("suggested_code")) for row in reviewed),
@@ -220,10 +230,19 @@ def research_evidence(config_path, report=None, output=None, *, progress=None):
                     os.replace(folder / paths["audit"].name, failed)
                 raise ValueError("Evidence research failed (" + type(exc).__name__ + "); incomplete artifacts were not published") from None
         return {"csv": str(paths["csv"]), "html": str(paths["html"]), "trace": str(paths["trace"]),
-                "audit": str(paths["audit"]), "groups": len(original), "source_changed": False,
+                "audit": str(paths["audit"]), "groups": len(original), "scope": scope, "source_changed": False,
                 "model_state": summary["research"]["model_state"],
                 "groups_with_study_evidence": summary["research"]["groups_with_study_evidence"]}
     finally:
         if log:
             log.close()
         lock.unlink(missing_ok=True)
+
+
+def query_counts(events):
+    """Keep retrieval requests separate from model extraction failures."""
+    retrievals = [event for event in events if "state" not in event and "task" not in event]
+    return {"queries": len(retrievals), "retrieval_requests": len(retrievals),
+        "literature_searches": sum(event.get("source") == "europe_pmc" or event.get("endpoint") == "esearch.fcgi" for event in retrievals),
+        "extraction_failures": sum("task" in event and event.get("state") == "unavailable" for event in events),
+        "retrieval_failures": sum("task" not in event and event.get("state") == "unavailable" for event in events)}

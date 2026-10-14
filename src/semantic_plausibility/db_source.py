@@ -33,8 +33,8 @@ def load_mapping(path: Path) -> dict[str, Any]:
 
 
 def validate_mapping(mapping: dict[str, Any]) -> dict[str, Any]:
-    if not isinstance(mapping, dict) or mapping.get("resource_type") != "Observation":
-        raise ValueError("DB mapping needs resource_type Observation")
+    if not isinstance(mapping, dict) or mapping.get("resource_type") not in {"Observation", "MedicationRequest", "MedicationAdministration"}:
+        raise ValueError("DB mapping needs a supported resource_type")
     if mapping.get("format") not in {None, "columns"}:
         raise ValueError("DB mapping uses laboratory columns or resource_json, not generic FHIR paths")
     if mapping.get("input_granularity", "auto") not in {"auto", "individual", "distinct"}:
@@ -125,6 +125,9 @@ def resource_from_row(row: dict[str, Any], mapping: dict[str, Any]) -> tuple[dic
         resource = json.loads(payload, parse_float=Decimal) if isinstance(payload, str) else payload
         if not isinstance(resource, dict) or resource.get("resourceType") != kind:
             raise ValueError("JSONB source has the wrong FHIR resource type")
+        from .export_review import encoding_issues
+        resource = dict(resource)
+        resource["_plausibility_input_issues"] = encoding_issues(resource)
         defaults = mapping.get("defaults") or {}
         context = {
             key: str(row.get(key) or defaults.get(key) or "")

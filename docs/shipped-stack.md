@@ -36,18 +36,32 @@ Without uv, use Python 3.14, create/activate a virtual environment and run `pyth
 ## Docker Compose
 
 ```sh
-docker compose run --rm --build run-plausibility-check
+docker compose build run-plausibility-check   # First setup or code/dependency updates
+docker compose run --rm run-plausibility-check
 ```
 
 ## Podman Compose
 
 ```sh
-podman-compose run --rm --build run-plausibility-check
+podman-compose build run-plausibility-check   # First setup or code/dependency updates
+podman-compose run --rm run-plausibility-check
 ```
 
 Use `podman-compose` directly to select that provider without changing shell settings. `podman compose` also works when your Podman installation already selects a suitable Compose provider; the documented commands use `podman-compose` consistently.
 
-Both engines use the same image and Compose file. The host TOML is mounted read-only at `/app/pipeline.toml`; `examples/`, `local/` and sibling `../input/` are read-only during a check, and `output/` receives reports. Create the TOML during first setup before starting a container. Rebuild containers (or rerun `uv sync --locked --no-editable`) after code/dependency changes; configuration/input changes require only a new run.
+Both engines use the same image and Compose file. The host TOML is mounted read-only at `/app/pipeline.toml`; `examples/`, `local/` and sibling `../input/` are read-only during a check, and `output/` receives reports. Create the TOML during first setup before starting a container. Rebuild the runner image (or rerun `uv sync --locked --no-editable`) after code/dependency changes; configuration/input changes require only a new run.
+
+## Storage and persistent data
+
+All runner commands share **`semantic-plausibility-stack:local`**. Build once with the selected engine; ordinary `run --rm` commands reuse it and remove only their temporary job container. Source updates reuse the dependency layer when `pyproject.toml` and `uv.lock` are unchanged. The runtime image contains no uv download cache.
+
+For all six examples, use `bash tools/run-podman-examples.sh`. It compares build-input fingerprints with image labels, logs image IDs, and builds the runner/Matchbox only when missing or changed. `--rebuild` forces this step. Its fixed project name is `semantic-plausibility-examples`; run from one checkout at a time. Moving that checkout reuses the same named volumes. Model files persist in `semantic-plausibility-examples_ollama_models`; Blaze data persists in `semantic-plausibility-examples_validation_blaze`. Reports remain under the checkout's `output/`, separate for every run.
+
+Manual Compose uses project `semantic-plausibility-stack` and its own volumes. Prefer one workflow/model server: running both stacks downloads models into separate stores. Python/uv with existing native Ollama avoids container and duplicate model storage; [native setup](#native-python-with-ollama). Full FHIR validation still needs a validator.
+
+Inspect with `podman system df`; optional `podman image prune` removes only dangling unused images/build layers. It may affect unused build caches in other projects, which can be rebuilt. Avoid `--all`, `--volumes` and `down --volumes` when retaining images, databases and models. Stop supporting services with `podman-compose --profile research --profile validation stop` (Docker: replace `podman-compose` with `docker compose`); the example script stops its own services automatically. Stops preserve volumes. Existing tagged releases are not automatically deleted. On macOS, reclaimed space inside the Podman VM may not immediately shrink the host disk image.
+
+Private configuration, `local/` terminology, input exports and audited reports are retained. Remove an old report only as a complete set (CSV, HTML and matching provenance files) after archiving it; never use a container volume prune as report cleanup.
 
 ## Inspect configuration and output
 
@@ -71,11 +85,46 @@ docker compose run --rm run-plausibility-check verify /app/output/laboratory-rev
 podman-compose run --rm run-plausibility-check verify /app/output/laboratory-review.audit.jsonl
 ```
 
+## Four run modes
+
+Use `pipeline.toml` with `examples/laboratory.csv` for modes 1, 3 and 4. Mode 2 uses the supplied `examples/lab/fhir-csv.toml` recipe with a complete Bundle in a CSV cell. First [start Matchbox/Blaze](validation.md#docker-or-podman-setup) for mode 2; first [prepare Ollama and the catalogue](#ollama) for modes 3–4. Neither service is started by the check command.
+
+Python:
+
+```sh
+uv run --no-sync --env-file .env run-plausibility-check --out output/01-lookup.csv
+uv run --no-sync --env-file .env run-plausibility-check --config examples/lab/fhir-csv.toml
+uv run --no-sync --env-file .env research-evidence --scope lookup --report output/01-lookup.csv --out output/03-recommendations.csv
+uv run --no-sync --env-file .env research-evidence --scope studies --report output/01-lookup.csv --out output/04-evidence.csv
+```
+
+Docker:
+
+```sh
+docker compose run --rm run-plausibility-check check --out output/01-lookup.csv
+docker compose run --rm run-plausibility-check check --config /app/examples/lab/fhir-csv.toml
+docker compose --profile research run --rm research-evidence research-evidence --scope lookup --report output/01-lookup.csv --out output/03-recommendations.csv
+docker compose --profile research run --rm research-evidence research-evidence --scope studies --report output/01-lookup.csv --out output/04-evidence.csv
+```
+
+Podman:
+
+```sh
+podman-compose run --rm run-plausibility-check check --out output/01-lookup.csv
+podman-compose run --rm run-plausibility-check check --config /app/examples/lab/fhir-csv.toml
+podman-compose --profile research run --rm research-evidence research-evidence --scope lookup --report output/01-lookup.csv --out output/03-recommendations.csv
+podman-compose --profile research run --rm research-evidence research-evidence --scope studies --report output/01-lookup.csv --out output/04-evidence.csv
+```
+
+Choose one runtime; these are alternatives, not twelve consecutive runs. Each CSV has an HTML with the same stem. Mode 2 writes `laboratory-fhir-review.*`. The repeated `research-evidence` means Compose service then CLI subcommand. Add `--plan` to inspect either AI scope without performing retrieval/model calls. `--scope` overrides TOML for one invocation and is recorded in the report. Both AI modes read the unchanged mode-1 CSV and matching sidecars; they do not scan the source database again. To repeat, choose fresh `--out` paths and update `--report` accordingly.
+
+Mode 1 includes deterministic numeric/unit/context checks and verified conversion proposals. Mode 3 can propose code/analyte/canonical name/unit candidates from terminology evidence. Mode 4 additionally seeks reported study values/units/intervals. These outputs support review; no patient resource or interval is automatically rewritten.
+
 ## Your data and repeat runs
 
 Edit `pipeline.toml`, starting with `[input]`, `[input.columns]` and `[output]`. Put your CSV under sibling `../input/` (TOML `path="../input/laboratory.csv"`) or ignored `local/`; preserve real source coding, units, names and complete reference context. Configure the real source catalogue when your LIS uses local codes. [Configuration reference and source recipes](configuration.md) · [Field contract](data-contract.md).
 
-For a repeat run, change the existing output table:
+For a repeat run, pass `--out output/laboratory-review-2.csv`, or change the existing output table:
 
 ```toml
 [output]
@@ -87,7 +136,7 @@ Then repeat the same Python/Docker/Podman command. Reports already present are p
 
 ## Select another TOML
 
-The default check and research use the same `pipeline.toml`. Python selects a different file with `--config another.toml`. Compose selects it through `SQC_CONFIG_FILE=another.toml` in `.env` or a separate selector file passed with `--env-file`; container paths still resolve against `/app/pipeline.toml`. Extra configurations are useful for another source/profile, and are not required for research. [Paths and configuration](configuration.md#paths-and-container-mounts).
+The default check and research use the same `pipeline.toml`. Python selects a different file with `--config another.toml`. Compose selects it through `SQC_CONFIG_FILE=another.toml` in `.env` or a separate selector file passed with `--env-file`; container paths still resolve against `/app/pipeline.toml`. Files already inside mounted `examples/` or `local/` can also be selected directly with a container `--config /app/examples/...` or `/app/local/...` argument; their paths then resolve against that file's actual directory. Extra configurations are useful for another source/profile, and are not required for research. [Paths and configuration](configuration.md#paths-and-container-mounts).
 
 ## Individual terminology commands
 
@@ -133,10 +182,10 @@ Edit existing tables; do not append duplicate TOML tables. Europe PMC needs no k
 
 ```sh
 docker compose --profile research up -d ollama
-docker compose --profile research run --rm --build model-init
+docker compose --profile research run --rm model-init
 docker compose --profile research run --rm catalog-init
 # Run the check if its CSV/sidecars do not exist yet:
-docker compose run --rm --build run-plausibility-check
+docker compose run --rm run-plausibility-check
 docker compose --profile research run --rm research-evidence
 ```
 
@@ -146,10 +195,10 @@ Start `podman machine start` in your terminal on macOS/Windows, then:
 
 ```sh
 podman-compose --profile research up -d ollama
-podman-compose --profile research run --rm --build model-init
+podman-compose --profile research run --rm model-init
 podman-compose --profile research run --rm catalog-init
 # Run the check if its CSV/sidecars do not exist yet:
-podman-compose run --rm --build run-plausibility-check
+podman-compose run --rm run-plausibility-check
 podman-compose --profile research run --rm research-evidence
 ```
 
@@ -203,7 +252,7 @@ Matchbox/HL7 validates actual FHIR inputs against the pinned MII guide; the MII 
 
 ## Local terminology and disconnected checking
 
-Install real artifacts under `local/terminologies/` or configure APIs with secret references. For BfArM setup, copy `terminology.example.toml` to `terminology.toml`, select `SQC_CONFIG_FILE=terminology.toml` in `.env`, and run `docker compose --profile terminology run --rm --build package-init` (or `podman-compose`). Package download conditions must be explicitly accepted; normal checks never download packages automatically. [Local/API setup](lookups.md#choose-local-files-or-an-api).
+Install real artifacts under `local/terminologies/` or configure APIs with secret references. For BfArM setup, copy `terminology.example.toml` to `terminology.toml`, select `SQC_CONFIG_FILE=terminology.toml` in `.env`, and run `docker compose --profile terminology run --rm package-init` (or `podman-compose`). Package download conditions must be explicitly accepted; normal checks never download packages automatically. [Local/API setup](lookups.md#choose-local-files-or-an-api).
 
 For disconnected operation, provide installed artifacts and actual captured UCUM/LOINC evidence in `input.snapshot`, then set `network.mode="offline"`. Select that TOML before running a prebuilt image with either engine:
 
@@ -213,3 +262,15 @@ podman-compose -f compose.yaml -f compose.offline.yaml run --rm run-plausibility
 ```
 
 Missing evidence remains unknown. Model provisioning/research need connectivity or transferred artifacts. Local values/IDs are not sent to public terminology/study services. Scope hashes check integrity; institutional authorisation determines who may approve mappings.
+
+## Medication examples
+
+The same installed library/container runs [MedicationRequest and MedicationAdministration](../examples/medication/README.md). No model setup is needed:
+
+```sh
+uv run --no-sync --env-file .env run-plausibility-check --config examples/medication/request.toml
+docker compose run --rm run-plausibility-check check --config /app/examples/medication/request.toml
+podman-compose run --rm run-plausibility-check check --config /app/examples/medication/administration.toml
+```
+
+These are alternative runtimes; don't run them sequentially against the same output prefix. The configs produce `output/medication-request.csv` / `.html` or `output/medication-administration.csv` / `.html`. For full resource validation, select the matching `*-fhir.toml` recipe and rebuild the validator with its pinned medication guide first. Clinical dosage appropriateness and medication AI research are not implemented.

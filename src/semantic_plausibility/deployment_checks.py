@@ -10,7 +10,6 @@ import time
 from urllib.request import Request
 
 from .model_config import select_model
-from .batch_quality import CsvMapping
 from .db_source import load_mapping
 from .profile_config import load_profile
 from .observation_services import NlmUcumClient, LoincFhirClient, _NoModelRedirects
@@ -97,13 +96,16 @@ def check_configuration(path, *, source_alias=None, connections=False, research=
         source = prepared.source
         if source["kind"] == "file":
             probe("input_file", lambda: bool(source["path"] and source["path"].exists()))
-            if source["path"] and source["path"].suffix.lower() == ".csv":
-                probe(
-                    "csv_columns", lambda: bool(source.get("columns") and CsvMapping.read(source["columns"]))
-                )
+            if configuration.input_type == "csv":
+                from .export_review import validate_csv
+                from .batch_quality import CsvMapping
+                def csv_preflight():
+                    validate_csv(configuration, source["path"])
+                    return configuration.fhir_csv or configuration.kind != "Observation" or bool(CsvMapping.read(source["columns"]))
+                probe("csv_columns", csv_preflight)
         if source["kind"] == "postgres":
             probe("database_mapping", lambda: bool(source.get("mapping") and load_mapping(source["mapping"])))
-        if prepared.audit.profile != "auto" or prepared.audit.profile_config:
+        if configuration.kind == "Observation" and (prepared.audit.profile != "auto" or prepared.audit.profile_config):
             probe(
                 "audit_policy",
                 lambda: bool(load_profile(prepared.audit.profile, prepared.audit.profile_config)),

@@ -16,12 +16,13 @@ The named check reads an export, writes local artifacts and exits. Evidence rese
 | Optional local-model extraction, code/name proposals and guards | `laboratory_suggestions.py`, `research_prompts.py`, `model_schemas.py`, `unit_catalog.py` |
 | Profile-derived service plan | `profile_lookups.py`; primary/source/optional routes |
 | Clinician decisions and scoped reuse | `review_feedback.py`; append history, target rechecks and context guards |
-| Separate evidence dossier and prompt/query trace | `evidence_research.py`; audited export, bounded PubMed/Europe PMC retrieval |
+| Separate evidence dossier and prompt/query trace | `evidence_research.py`; scope=lookup for terminology AI, scope=studies adds bounded PubMed/Europe PMC retrieval |
+| Medication input, checks and reports | `medication_input.py`, `medication_checks.py`, `medication_report.py`; full regimen grouping, real source routing, conditional strength/infusion arithmetic |
 | CSV/HTML, audit and comparisons | `export_report.py`, `study_compare.py` |
 
 The command prints input, active lookup sources and model enablement. The CSV/evidence file contain row-level findings; the summary records source versions, timing, coverage and failed lookup operations. The audit is a redacted hash chain with artifact hashes. Detailed reports can contain sensitive measurements.
 
-Lookup results are cached per run. Three consecutive request failures open a source circuit; affected findings stay unverified. Model inputs exclude measured values and identifiers, permit only local/LAN endpoints, bound response sizes and require supporting quotations. No automatic coding/value rewrite occurs.
+Lookup results are cached per run. Laboratory lookups open a source circuit after three consecutive request failures; medication caches code/unit results and failed conversions per run; affected findings stay unverified. Model inputs exclude measured values and identifiers, permit only local/LAN endpoints, bound response sizes and require supporting quotations. No automatic coding/value rewrite occurs.
 
 ## Libraries
 
@@ -49,6 +50,13 @@ Matchbox 4.1.21 and MII validator 0.0.1-alpha.8 are pinned; the latter uses the 
 Live FHIR tests require a running local Matchbox with the real MII guide: `SQC_LIVE_FHIR_VALIDATION_TESTS=1 uv run --no-sync python -m unittest discover -s tests -p test_fhir_validation.py -v`. The valid/invalid source inputs are illustrative; every validation response comes from the actual service.
 
 ## Current verification
+
+0.12.0 adds executable medication terminology/dose checks to the four laboratory modes. Both medication recipes ran against actual NLM UCUM and FHIR terminology services on 13 October 2026: ATC N02BE01 returned paracetamol; 5 mL at a source-declared 20 mg/mL yielded a conditional 100 mg; the contradictory constant-infusion example was flagged. The final installed-package suite ran **75 tests: 52 passed, 23 integrations skipped** without service opt-ins. All **14 medication tests passed** with the real-service opt-in. The public server reported ATC edition **2025**, independently of the selected MII guide version. No medication FHIR conformance or clinical-dose safety result is claimed from these terminology calls.
+
+The suite covers source contracts, all dosage instructions, negative/string quantities, strength denominators, timing bounds, liquid/tablet mismatch, unknown counts, distinct context, CSV/SQLite/resource-CSV equivalence, local reference resolution, output protection and missing-validator reporting. Generic FHIR terminology calls reject redirects (including credential-forwarding redirects), limit response size, and retain the returned CodeSystem edition when supplied. No synthetic lookup replies are used. Live medication checks: `SQC_LIVE_MEDICATION_TESTS=1 uv run --no-sync python -m unittest discover -s tests -p test_medication.py -v` (an optional test flag, not runtime configuration).
+
+
+The previous live evidence run is retained below as a versioned result; changing the model or source content can change proposals.
 
 Verified on 13 October 2026 for 0.11.2: **49 tests; 46 passed, 3 explicit skips**. Actual LOINC/NLM, Europe PMC/PubMed, existing BfArM files and native Ollama requests passed. The skipped integrations were a running Matchbox instance, a new protected BfArM download and credentialed WHO access. The prior live Matchbox/MII-guide test returned 0 errors for the complete example Bundle and 2 for its missing-identifier variant; it was not restarted for this CSV run.
 

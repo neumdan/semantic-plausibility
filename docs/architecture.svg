@@ -1,77 +1,110 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1090" role="img" aria-labelledby="title desc"><title id="title">Architecture: local FHIR validation and laboratory semantic review</title><desc id="desc">Local full FHIR validation, real terminology evidence and auditable clinician proposals.</desc><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10" fill="#537487"/></marker></defs><rect width="1200" height="100%" fill="#f4f7f9"/>
-<path data-edge="INPUT-VALIDATE" d="M300.0 180 V200.0 H600.0 V220" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
-<text x="458.0" y="195.0" font-family="system-ui,sans-serif" font-size="13" fill="#526978">FHIR</text>
-<path data-edge="CONFIG-VALIDATE" d="M900.0 180 V200.0 H600.0 V220" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
-<text x="758.0" y="195.0" font-family="system-ui,sans-serif" font-size="13" fill="#526978">guide</text>
-<path data-edge="VALIDATE-GROUP" d="M600.0 345 V365.0 H600.0 V385" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
-<text x="608.0" y="360.0" font-family="system-ui,sans-serif" font-size="13" fill="#526978">attach outcomes</text>
-<path data-edge="INPUT-GROUP" d="M40 117 H20 V445 H340" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
-<text x="458.0" y="277.5" font-family="system-ui,sans-serif" font-size="13" fill="#526978">CSV / DB</text>
-<path data-edge="GROUP-CHECK" d="M600.0 510 V530.0 H600.0 V550" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
-<text x="608.0" y="525.0" font-family="system-ui,sans-serif" font-size="13" fill="#526978">sets</text>
-<path data-edge="LOCAL-CHECK" d="M360 612.5 L410 622.5" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
-<text x="393.0" y="612.5" font-family="system-ui,sans-serif" font-size="13" fill="#526978">files</text>
-<path data-edge="API-CHECK" d="M840 612.5 L790 622.5" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
-<text x="823.0" y="612.5" font-family="system-ui,sans-serif" font-size="13" fill="#526978">API</text>
-<path data-edge="CHECK-REPORT" d="M600.0 695 V720.0 H600.0 V745" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
-<text x="608.0" y="715.0" font-family="system-ui,sans-serif" font-size="13" fill="#526978">checks + proposals</text>
-<path data-edge="REPORT-RESEARCH" d="M600.0 870 V890.0 H300.0 V910" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
-<text x="458.0" y="885.0" font-family="system-ui,sans-serif" font-size="13" fill="#526978">optional evidence pass</text>
-<path data-edge="REPORT-REVIEW" d="M600.0 870 V890.0 H900.0 V910" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
-<text x="758.0" y="885.0" font-family="system-ui,sans-serif" font-size="13" fill="#526978">review</text>
-<path data-edge="RESEARCH-REVIEW" d="M560 977.5 L640 977.5" fill="none" stroke="#537487" stroke-width="2" marker-end="url(#arrow)"/>
-<text x="608.0" y="972.5" font-family="system-ui,sans-serif" font-size="13" fill="#526978">dossier</text>
-<g data-node="INPUT"><rect x="40" y="55" width="520" height="125" rx="8" fill="#ffffff" stroke="#b7cec9"/><text x="56" y="84" fill="#142d42" font-family="system-ui,sans-serif" font-size="17" font-weight="600">Input and source contract</text>
-<text x="56" y="108" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">LIS / CSV / DB exports or actual FHIR Bundle / NDJSON</text>
-<text x="56" y="129" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Names, code/system/version, value, unit/system</text>
-<text x="56" y="150" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">All reference intervals, specimen, method and known counts</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1250" viewBox="0 0 1100 1250" role="img" aria-labelledby="title desc">
+<title id="title">Laboratory and medication review architecture</title><desc id="desc">Scalar exports; Complete FHIR exports; One TOML + secrets; 2 · Optional FHIR validation; Standardise and group; Real terminology evidence; 1 · Deterministic check; Optional local model; 3 · Laboratory terminology AI; CSV + HTML review report; 4 · Laboratory AI + studies; Laboratory review registry; Clinician review; Complementary MII checks</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#537487"/></marker></defs>
+<style>text{font-family:Arial,sans-serif;fill:#142d42}.heading{font-size:19px;font-weight:700}.body{font-size:17px}.label{font-size:14px;fill:#526978}</style><rect width="1100" height="100%" fill="white"/>
+<g data-node="SCALAR"><rect x="20" y="20" width="330" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="36" y="49" class="heading">Scalar exports</text>
+<text x="36" y="77" class="body" style="font-size:16px">LIS / CDS Hub CSV or DB view</text>
+<text x="36" y="102" class="body" style="font-size:16px">Individual rows or distinct sets</text>
+<text x="36" y="127" class="body" style="font-size:16px">Explicit columns and real counts</text>
 </g>
-<g data-node="CONFIG"><rect x="640" y="55" width="520" height="125" rx="8" fill="#ffffff" stroke="#b7cec9"/><text x="656" y="84" fill="#142d42" font-family="system-ui,sans-serif" font-size="17" font-weight="600">One TOML configuration</text>
-<text x="656" y="108" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Input/output and columns; pinned MII guide/profile</text>
-<text x="656" y="129" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Primary / source / optional terminology services</text>
-<text x="656" y="150" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Local model and credentials by environment/file reference</text>
+<g data-node="FHIR"><rect x="385" y="20" width="330" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="401" y="49" class="heading">Complete FHIR exports</text>
+<text x="401" y="77" class="body" style="font-size:16px">Bundle / resource array / NDJSON</text>
+<text x="401" y="102" class="body" style="font-size:16px">or CSV resource_json cells</text>
+<text x="401" y="127" class="body" style="font-size:16px">TORCH / CQL selection upstream</text>
 </g>
-<g data-node="VALIDATE"><rect x="340" y="220" width="520" height="125" rx="8" fill="#eef7f4" stroke="#b7cec9"/><text x="356" y="249" fill="#142d42" font-family="system-ui,sans-serif" font-size="17" font-weight="600">Full FHIR validation when the input is FHIR</text>
-<text x="356" y="273" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Local Matchbox + official HL7 validator, or MII validator</text>
-<text x="356" y="294" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Pinned guide and dependencies; local Blaze terminology</text>
-<text x="356" y="315" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Retain OperationOutcome; unavailable stays unverified</text>
+<g data-node="CONFIG"><rect x="750" y="20" width="330" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="766" y="49" class="heading">One TOML + secrets</text>
+<text x="766" y="77" class="body" style="font-size:16px">Input, profile, real lookups, output</text>
+<text x="766" y="102" class="body" style="font-size:16px">Local model and research budgets</text>
+<text x="766" y="127" class="body" style="font-size:16px">Credentials in .env / secret files</text>
 </g>
-<g data-node="GROUP"><rect x="340" y="385" width="520" height="125" rx="8" fill="#ffffff" stroke="#b7cec9"/><text x="356" y="414" fill="#142d42" font-family="system-ui,sans-serif" font-size="17" font-weight="600">Standardise and aggregate locally</text>
-<text x="356" y="438" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Preserve the complete semantic set and context</text>
-<text x="356" y="459" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">DuckDB: distinct sets or items with source IDs</text>
-<text x="356" y="480" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Known frequencies: mean/SE and median/IQR</text>
+<g data-node="VALIDATE"><rect x="385" y="220" width="330" height="132" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="401" y="249" class="heading">2 · Optional FHIR validation</text>
+<text x="401" y="277" class="body" style="font-size:16px">Full resources → local Matchbox</text>
+<text x="401" y="302" class="body" style="font-size:16px">HL7 validator + pinned MII guide</text>
+<text x="401" y="327" class="body" style="font-size:16px">Outcome stays separate from fit</text>
 </g>
-<g data-node="LOCAL"><rect x="40" y="550" width="320" height="125" rx="8" fill="#ffffff" stroke="#b7cec9"/><text x="56" y="579" fill="#142d42" font-family="system-ui,sans-serif" font-size="17" font-weight="600">Downloaded terminology</text>
-<text x="56" y="603" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Real BfArM JSON / source catalogue</text>
-<text x="56" y="624" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Versioned labels and exact membership</text>
-<text x="56" y="645" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Supplements do not prove conversions</text>
+<g data-node="NORMAL"><rect x="385" y="420" width="330" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="401" y="449" class="heading">Standardise and group</text>
+<text x="401" y="477" class="body" style="font-size:16px">Lab set or complete medication dose</text>
+<text x="401" y="502" class="body" style="font-size:16px">DuckDB distinct groups; lab statistics</text>
+<text x="401" y="527" class="body" style="font-size:16px">or items with original ID / locator</text>
 </g>
-<g data-node="CHECK"><rect x="410" y="550" width="380" height="145" rx="8" fill="#eef7f4" stroke="#b7cec9"/><text x="426" y="579" fill="#142d42" font-family="system-ui,sans-serif" font-size="17" font-weight="600">Laboratory semantic checks</text>
-<text x="426" y="603" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Source validity and target profile fit</text>
-<text x="426" y="624" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">LOINC axes / UCUM grammar and factors</text>
-<text x="426" y="645" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Numeric values and full reference context</text>
-<text x="426" y="666" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Explicit transformation proposals</text>
+<g data-node="SOURCES"><rect x="20" y="620" width="330" height="157" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="36" y="649" class="heading">Real terminology evidence</text>
+<text x="36" y="677" class="body" style="font-size:16px">Local BfArM / site catalogues</text>
+<text x="36" y="702" class="body" style="font-size:16px">UCUM / LOINC / medication APIs</text>
+<text x="36" y="727" class="body" style="font-size:16px">Primary / source / optional roles</text>
+<text x="36" y="752" class="body" style="font-size:16px">Retain editions, hashes, failures</text>
 </g>
-<g data-node="API"><rect x="840" y="550" width="320" height="125" rx="8" fill="#ffffff" stroke="#b7cec9"/><text x="856" y="579" fill="#142d42" font-family="system-ui,sans-serif" font-size="17" font-weight="600">Configured terminology APIs</text>
-<text x="856" y="603" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">NLM UCUM / LOINC / selected services</text>
-<text x="856" y="624" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Exact lookups; known versions and coverage</text>
-<text x="856" y="645" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Only enabled services are contacted</text>
+<g data-node="CHECK"><rect x="385" y="620" width="330" height="157" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="401" y="649" class="heading">1 · Deterministic check</text>
+<text x="401" y="677" class="body" style="font-size:16px">Source identity + target profile rules</text>
+<text x="401" y="702" class="body" style="font-size:16px">Code / name / unit fit and numbers</text>
+<text x="401" y="727" class="body" style="font-size:16px">Lab ranges / medication dose checks</text>
+<text x="401" y="752" class="body" style="font-size:16px">Supported unit transformations</text>
 </g>
-<g data-node="REPORT"><rect x="340" y="745" width="520" height="125" rx="8" fill="#eef7f4" stroke="#b7cec9"/><text x="356" y="774" fill="#142d42" font-family="system-ui,sans-serif" font-size="17" font-weight="600">Audited check report</text>
-<text x="356" y="798" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">CSV / HTML, summary, evidence and hash-chained log</text>
-<text x="356" y="819" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Formal FHIR outcomes and semantic findings stay separate</text>
-<text x="356" y="840" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Source set → linked terminology → complete proposal</text>
+<g data-node="MODEL"><rect x="750" y="420" width="330" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="766" y="449" class="heading">Optional local model</text>
+<text x="766" y="477" class="body" style="font-size:16px">Ollama: ministral-3:3b starter</text>
+<text x="766" y="502" class="body" style="font-size:16px">or local compatible endpoint</text>
+<text x="766" y="527" class="body" style="font-size:16px">Guarded JSON; sources required</text>
 </g>
-<g data-node="RESEARCH"><rect x="40" y="910" width="520" height="135" rx="8" fill="#eef7f4" stroke="#b7cec9"/><text x="56" y="939" fill="#142d42" font-family="system-ui,sans-serif" font-size="17" font-weight="600">Separate evidence research with local Ollama</text>
-<text x="56" y="963" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">LOINC pages + Europe PMC / PubMed abstracts</text>
-<text x="56" y="984" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Sourced alternatives, quoted values, units and intervals</text>
-<text x="56" y="1005" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Article title / URL / DOI, response hash and retrieval time</text>
-<text x="56" y="1026" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Prompts and guarded replies in the research trace</text>
+<g data-node="AI"><rect x="750" y="620" width="330" height="157" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="766" y="649" class="heading">3 · Laboratory terminology AI</text>
+<text x="766" y="677" class="body" style="font-size:16px">Checked report → candidates</text>
+<text x="766" y="702" class="body" style="font-size:16px">Real names, codes and unit lists</text>
+<text x="766" y="727" class="body" style="font-size:16px">LOINC pages; no study queries</text>
+<text x="766" y="752" class="body" style="font-size:16px">Exact rechecks; may abstain</text>
 </g>
-<g data-node="REVIEW"><rect x="640" y="910" width="520" height="135" rx="8" fill="#eef7f4" stroke="#b7cec9"/><text x="656" y="939" fill="#142d42" font-family="system-ui,sans-serif" font-size="17" font-weight="600">Clinician review and future mapping reuse</text>
-<text x="656" y="963" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Review semantic correctness and evidence applicability</text>
-<text x="656" y="984" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Approve/reject/defer/revoke code, name, unit and factor</text>
-<text x="656" y="1005" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Scoped registry rechecks target and transformation</text>
-<text x="656" y="1026" fill="#142d42" font-family="system-ui,sans-serif" font-size="14">Apply in ETL, then validate the resulting FHIR resources</text>
+<g data-node="OUTPUT"><rect x="385" y="850" width="330" height="157" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="401" y="879" class="heading">CSV + HTML review report</text>
+<text x="401" y="907" class="body" style="font-size:16px">Source → linked data → proposal</text>
+<text x="401" y="932" class="body" style="font-size:16px">Checks and citations beside each set</text>
+<text x="401" y="957" class="body" style="font-size:16px">Summary + evidence + audit hashes</text>
+<text x="401" y="982" class="body" style="font-size:16px">Input remains unchanged</text>
 </g>
+<g data-node="STUDIES"><rect x="750" y="850" width="330" height="157" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="766" y="879" class="heading">4 · Laboratory AI + studies</text>
+<text x="766" y="907" class="body" style="font-size:16px">Original report → same AI pass</text>
+<text x="766" y="932" class="body" style="font-size:16px">Plus Europe PMC / PubMed</text>
+<text x="766" y="957" class="body" style="font-size:16px">Quoted reported values and bounds</text>
+<text x="766" y="982" class="body" style="font-size:16px">Independent sourced dossier</text>
+</g>
+<g data-node="REGISTRY"><rect x="20" y="1080" width="330" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="36" y="1109" class="heading">Laboratory review registry</text>
+<text x="36" y="1137" class="body" style="font-size:16px">Approved / rejected / revoked</text>
+<text x="36" y="1162" class="body" style="font-size:16px">Source + profile + context scope</text>
+<text x="36" y="1187" class="body" style="font-size:16px">Reverify target and factor on reuse</text>
+</g>
+<g data-node="EXPERT"><rect x="385" y="1080" width="330" height="132" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="401" y="1109" class="heading">Clinician review</text>
+<text x="401" y="1137" class="body" style="font-size:16px">Decide semantic correctness</text>
+<text x="401" y="1162" class="body" style="font-size:16px">Apply approved mappings in ETL</text>
+<text x="401" y="1187" class="body" style="font-size:16px">Validate resulting FHIR resources</text>
+</g>
+<g data-node="MII"><rect x="20" y="850" width="330" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="36" y="879" class="heading">Complementary MII checks</text>
+<text x="36" y="907" class="body" style="font-size:16px">FHIR conformance: validator</text>
+<text x="36" y="932" class="body" style="font-size:16px">Availability / completeness: FDE</text>
+<text x="36" y="957" class="body" style="font-size:16px">This tool: semantic-set review</text>
+</g>
+<path data-edge="SCALAR-NORMAL" d="M185 152 V486 H382" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="FHIR-VALIDATE" d="M550 152 V217" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="FHIR-NORMAL" d="M715 125 H732 V486 H718" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="CONFIG-VALIDATE" d="M915 152 V285 H718" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="VALIDATE-NORMAL" d="M550 352 V417" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="NORMAL-CHECK" d="M550 552 V617" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="SOURCES-CHECK" d="M350 693 H382" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="CHECK-OUTPUT" d="M550 777 V847" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="MODEL-AI" d="M915 552 V617" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="OUTPUT-AI" d="M715 905 H737 V715 H747" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="OUTPUT-STUDIES" d="M715 970 H747" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="OUTPUT-EXPERT" d="M550 1007 V1077" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="AI-EXPERT" d="M1080 695 H1090 V1040 H650 V1077" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="STUDIES-EXPERT" d="M915 1007 V1040 H650 V1077" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="EXPERT-REGISTRY" d="M385 1145 H353" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="REGISTRY-CHECK" d="M185 1080 V1030 H370 V750 H382" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
 </svg>

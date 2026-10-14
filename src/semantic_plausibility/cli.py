@@ -1,4 +1,4 @@
-"""Command line interface for the current local laboratory export workflow."""
+"""Command line interface for the local laboratory and medication export workflows."""
 
 from __future__ import annotations
 
@@ -10,18 +10,20 @@ import sys
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Local laboratory export review; proposals for expert assessment"
+        description="Local laboratory/medication review; proposals for expert assessment"
     )
     sub = parser.add_subparsers(dest="command", required=True)
     batch = sub.add_parser("batch", help="Review an export and write CSV, HTML, evidence and an audit log")
     batch.add_argument("--config", type=Path, default=Path("pipeline.toml"))
     check = sub.add_parser("check", help="Check source sets and target profile; reuse approved mappings, no model research")
     check.add_argument("--config", type=Path, default=Path("pipeline.toml"))
+    check.add_argument("--out", type=Path, help="Fresh CSV output prefix; relative to the selected TOML")
     research = sub.add_parser("research-evidence", help="Research real evidence from a completed check report")
     research.add_argument("--config", type=Path, default=Path("pipeline.toml"))
     research.add_argument("--report", type=Path)
     research.add_argument("--out", type=Path)
     research.add_argument("--plan", action="store_true", help="Print exact prompts/planned searches without network/model calls")
+    research.add_argument("--scope", choices=("lookup", "studies"), help="Override TOML: terminology-only AI or AI plus literature retrieval")
     feedback = sub.add_parser("review-import", help="Import clinician decisions into a scoped, versioned mapping registry")
     feedback.add_argument("--config", type=Path, default=Path("pipeline.toml"))
     feedback.add_argument("--report", type=Path, required=True)
@@ -74,16 +76,18 @@ def main(argv: list[str] | None = None) -> int:
         if args.command in {"batch", "check"}:
             from .batch import BatchConfiguration, run_batch, run_plausibility_check
 
-            configuration = BatchConfiguration(args.config, research=False if args.command == "check" else None)
+            configuration = BatchConfiguration(args.config, research=False if args.command == "check" else None,
+                                               output_path=getattr(args, "out", None))
             print(f"Input: {configuration.input_type}; {configuration.input.get('path', 'configured database view')}", flush=True)
             print(f"Grouping: {configuration.output.get('mode', 'distinct')}; network: {configuration.network_mode}", flush=True)
             for name, lookup in configuration.data.get("lookups", {}).items():
                 if lookup.get("enabled", False):
                     print(f"Lookup {name}: {lookup.get('endpoint', lookup.get('path', 'configured source'))}", flush=True)
             print("Local-model research: " + ("enabled" if configuration.data.get("research", {}).get("enabled", False) else "disabled"), flush=True)
-            print("Processing: read -> group -> terminology/fit -> numeric/reference checks -> report", flush=True)
-            result = run_plausibility_check(args.config) if args.command == "check" else run_batch(args.config)
-            print(f"{result.input_records} input rows -> {result.distinct_tuples} laboratory review rows.")
+            print("Full FHIR input: " + ("yes" if configuration.full_fhir_input else "no; scalar sets receive semantic checks"), flush=True)
+            print("Processing: read -> group -> terminology -> " + ("numeric/reference checks" if configuration.kind == "Observation" else "dose/timing consistency") + " -> report", flush=True)
+            result = run_plausibility_check(args.config, output=args.out) if args.command == "check" else run_batch(args.config)
+            print(f"{result.input_records} source records -> {result.distinct_tuples} {configuration.kind} review rows.")
             print("Status counts: " + json.dumps(result.statuses, sort_keys=True))
             print(f"Review CSV: {result.csv}")
             print(f"HTML report: {result.report}")
@@ -91,16 +95,16 @@ def main(argv: list[str] | None = None) -> int:
             summary = json.loads(result.summary.read_text())
             validation = summary.get("fhir_validation", {})
             print(f"FHIR resource validation: {validation.get('state', 'disabled')}")
-            metric = summary["metrics"]["mii_numeric_set_ready"]
+            metric = summary["metrics"].get("mii_numeric_set_ready", summary["metrics"].get("terminology_and_dose_consistent"))
             print(
-                f"Numeric semantic readiness: {metric['numerator']}/{metric['denominator']} (not full FHIR validation)."
+                f"Verified check coverage: {metric['numerator']}/{metric['denominator']} (not full FHIR validation)."
             )
             if configuration.validation.get("fail_on_error") and validation.get("state") in {"invalid", "incomplete", "unavailable"}:
                 return 1
         elif args.command == "research-evidence":
             from .evidence_research import research_evidence, research_plan
-            result = research_plan(args.config, args.report) if args.plan else research_evidence(args.config, args.report, args.out,
-                progress=lambda message: print(message, flush=True))
+            result = research_plan(args.config, args.report, scope=args.scope) if args.plan else research_evidence(args.config, args.report, args.out,
+                scope=args.scope, progress=lambda message: print(message, flush=True))
             print(json.dumps(result, ensure_ascii=False, indent=2))
         elif args.command == "validator-init":
             from .fhir_validation import initialise_validator

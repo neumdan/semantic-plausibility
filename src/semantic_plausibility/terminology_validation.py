@@ -8,9 +8,14 @@ import re
 import ssl
 from typing import Any
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.request import Request, HTTPSHandler, HTTPRedirectHandler, build_opener
 
 from .model_config import allowed_endpoint
+
+
+class _NoTerminologyRedirects(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise ValueError("Terminology redirects are disabled; configure the final endpoint explicitly")
 
 
 class FhirTerminologyClient:
@@ -105,9 +110,14 @@ class FhirTerminologyClient:
         headers = {"Accept": "application/fhir+json"}
         if self.bearer_token:
             headers["Authorization"] = "Bearer " + self.bearer_token
-        options = {"context": self.tls_context} if self.tls_context else {}
-        with urlopen(Request(url, headers=headers), timeout=self.timeout, **options) as response:
-            payload: dict[str, Any] = json.load(response)
+        handlers = [_NoTerminologyRedirects()]
+        if self.tls_context:
+            handlers.append(HTTPSHandler(context=self.tls_context))
+        with build_opener(*handlers).open(Request(url, headers=headers), timeout=self.timeout) as response:
+            raw = response.read(4 * 1024 * 1024 + 1)
+            if len(raw) > 4 * 1024 * 1024:
+                raise ValueError("Terminology response exceeds the 4 MiB lookup budget")
+            payload: dict[str, Any] = json.loads(raw)
         if payload.get("resourceType") != "Parameters":
             raise ValueError("Terminology server did not return FHIR Parameters")
         return payload
@@ -170,6 +180,7 @@ class FhirTerminologyClient:
                 properties.append({"code": property_code, "value": property_value})
         metadata = {
             "display": display,
+            "version": next((part.get("valueString", "") for part in payload.get("parameter", []) if part.get("name") == "version"), ""),
             "properties": properties[:30],
             "source": self.base_url + "/CodeSystem/$lookup",
         }

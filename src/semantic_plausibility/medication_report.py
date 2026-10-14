@@ -1,0 +1,201 @@
+"""One-shot medication review: bounded DuckDB grouping, sourced reports and audit."""
+from contextlib import closing
+import csv
+from decimal import Decimal
+import hashlib
+from html import escape
+import json
+import os
+from pathlib import Path
+import tempfile
+import time
+import uuid
+from urllib.parse import urlsplit
+
+import duckdb
+
+from .audit import encoded
+from .support import _csv_text
+from .batch import BatchResult
+from .deployment import environment
+from .export_report import AuditLog, ratio, versions
+from .export_review import InputContractError, _input_hash, reference_artifacts
+from .fhir_validation import fhir_json, validate_input
+from .medication_checks import MedicationChecker, SCOPE, terminology_plan
+from .medication_input import records
+
+FIELDS = ["tuple_id", "resource_type", "source_rows", "occurrence_count", "frequency_known", "status",
+          "medication_status", "intent", "product_name", "product_codings_json", "medication_json",
+          "dosage_json", "duration_json", "constant_rate_asserted", "source_set_json",
+          "code_check", "unit_check", "dose_check", "canonical_names_json", "findings_json",
+          "recommendations_json", "sources_json", "clinical_dose_safety", "fhir_validation_state"]
+
+
+def html_report(path, rows, summary, csv_name):
+    def text(value):
+        return escape(str(value))
+    def source(value):
+        if not isinstance(value, str):
+            return text(value)
+        try:
+            url = urlsplit(value)
+            if url.scheme in {"https", "http"} and url.hostname and not (url.username or url.password):
+                return f'<a href="{text(value)}" rel="noreferrer">{text(value)}</a>'
+        except ValueError:
+            pass
+        return text(value)
+    blocks = []
+    for row, detail in rows:
+        recommendations = "".join("<li><b>" + text(p["type"]) + "</b>: <pre>" + text(json.dumps(p, indent=2, ensure_ascii=False)) + "</pre>Source: " + source(p.get("source", "Source export")) + "</li>" for p in detail["recommendations"])
+        findings = "".join(f'<li><b>{text(f["state"])} · {text(f["path"])}</b>: {text(f["message"])}<br>Source: {source(f["source"])}</li>' for f in detail["findings"])
+        checks = "".join(f'<tr><td>{text(r["path"])}</td><td>{text(r.get("system", ""))}<br>{text(r.get("code", ""))}</td><td>{text(r["state"])}</td><td>{source(r.get("source") or "No configured source established membership")}</td></tr>' for r in detail["terminology"])
+        blocks.append(f'<section><h2>{text(row["product_name"] or row["tuple_id"])} — {text(row["status"])}</h2><p>{text(row["resource_type"])} · {text(row["occurrence_count"] if row["frequency_known"] else "Unknown")} occurrences</p><details><summary>Source set</summary><pre>{text(json.dumps(detail["source_set"], ensure_ascii=False, indent=2, default=str))}</pre></details><h3>Checks and explanations</h3><ul>{findings or "<li>No inconsistency found in the implemented checks.</li>"}</ul><table><thead><tr><th>Element</th><th>Code/system</th><th>Check</th><th>Source</th></tr></thead><tbody>{checks}</tbody></table><h3>Recommendations and calculations</h3><ul>{recommendations or "<li>No supported recommendation; review missing evidence.</li>"}</ul></section>')
+    path.write_text(f'''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';"><title>Medication plausibility review</title><style>body{{font:16px system-ui;margin:2rem auto;max-width:1100px;padding:0 1rem;color:#182e42;background:#f6f8fa}}section{{background:white;border:1px solid #cfd9df;padding:1rem;margin:1.5rem 0;border-radius:8px}}table{{border-collapse:collapse;width:100%;font-size:.9rem}}td,th{{padding:.6rem;border:1px solid #ddd;text-align:left;overflow-wrap:anywhere}}pre{{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f6f8;padding:.8rem}}li{{margin:.7rem 0}}a{{color:#006f82}}</style><h1>Medication plausibility review</h1><p>{text(SCOPE)}</p><p>{summary["input_records"]} source rows → {summary["distinct_tuples"]} report rows. <a href="{text(csv_name)}">Full CSV</a></p><p>FHIR validation: {text(summary["fhir_validation"]["state"])}. Counts: {text(summary["statuses"])}. This preview shows at most 2,000 rows; the CSV contains all results.</p><p>Strength is source-declared. Conversions are conditional review proposals, never dose replacements or automatic corrections.</p>{"".join(blocks)}</html>''', encoding="utf-8")
+
+
+def ordered(value):
+    return {key: ordered(value[key]) for key in sorted(value)} if isinstance(value, dict) else [ordered(v) for v in value] if isinstance(value, list) else value
+
+
+def states(rows):
+    values = {r["state"] for r in rows}
+    return "invalid" if "invalid" in values else "valid" if values == {"valid"} else "unknown"
+
+
+def review_medication(config):
+    target = config.path_value(config.output.get("path", "output/medication-review.csv"))
+    if target.suffix.lower() != ".csv":
+        raise ValueError("Medication output.path must end in .csv")
+    paths = {key: target.with_suffix(ext) for key, ext in {"csv": ".csv", "report": ".html", "summary": ".summary.json", "log": ".audit.jsonl", "evidence": ".evidence.jsonl"}.items()}
+    if config.validation.get("enabled") and config.full_fhir_input:
+        paths["fhir_validation"] = target.with_suffix(".fhir-validation.jsonl")
+    protected = {config.path}
+    def path_refs(value):
+        if isinstance(value, dict):
+            for k, v in value.items():
+                if isinstance(v, str) and (k == "path" or k.endswith(("_file", "_FILE")) or k in {"STRUCTURE_DEFINITION", "PATH_TO_DB_CONFIG_TOML"}) and v:
+                    protected.add(config.path_value(v))
+                elif k == "VALUE_SETS":
+                    protected.update(config.path_value(x) for x in v)
+                else:
+                    path_refs(v)
+    path_refs({k: v for k, v in config.data.items() if k != "output"})
+    if any(p == ref or ref.is_dir() and p.is_relative_to(ref) for p in paths.values() for ref in protected):
+        raise ValueError("Output cannot replace source data, configuration, secrets or terminology files")
+    if any(p.exists() for p in paths.values()) and not config.output.get("overwrite", False):
+        raise ValueError("Output already exists; choose a new path or set output.overwrite=true")
+    run_id, start = str(uuid.uuid4()), time.monotonic()
+    updates = {"SQC_BATCH_CDS_DSN": config.toolchain_database()} if config.input_type == "postgres" and config.database.get("PATH_TO_DB_CONFIG_TOML") else {}
+    with tempfile.TemporaryDirectory(prefix=".medication-review-", dir=target.parent) as directory:
+        folder, checker = Path(directory), None
+        log = AuditLog(folder / paths["log"].name, run_id)
+        phase = "configuration"
+        try:
+            log.event("started", software=versions(), configuration_sha256=config.deployment.sha256,
+                      operation=config.operation, resource_type=config.kind, network_mode=config.network_mode,
+                      mode=config.output.get("mode", "distinct"), output_path=str(target))
+            with environment(updates), config.deployment.prepare(research=False) as prepared, closing(duckdb.connect(str(folder / "groups.duckdb"))) as db:
+                routes = terminology_plan(config)
+                artifacts = reference_artifacts(config)
+                log.event("reference_artifacts", artifacts=artifacts, terminology_plan=routes)
+                validation = {"state": "not_applicable" if config.validation.get("enabled") else "disabled",
+                              "scope": "Full resource validation requires native FHIR/JSON-in-CSV input; scalar/DB rows receive semantic checks only"}
+                if "fhir_validation" in paths:
+                    phase = "fhir_resource_validation"
+                    validation = validate_input(config, prepared.source["path"], folder / paths["fhir_validation"].name, **config.fhir_reader_options)
+                    validation["operation_outcomes"] = paths["fhir_validation"].name
+                    log.event("fhir_resources_validated", **validation)
+                phase = "standardization_and_grouping"
+                db.execute("CREATE TABLE groups (key VARCHAR PRIMARY KEY, payload VARCHAR, source_rows BIGINT, occurrences HUGEINT, known BOOLEAN, id VARCHAR, ref VARCHAR)")
+                db.execute("CREATE TABLE ids (id VARCHAR PRIMARY KEY)")
+                count = skipped = 0
+                mode = config.output.get("mode", "distinct")
+                input_hash = _input_hash(prepared.source["path"]) if config.input_type != "postgres" else None
+                for record in records(config, prepared, folder):
+                    if record is None:
+                        skipped += 1
+                        continue
+                    payload, frequency, identifier, ref = record
+                    count += 1
+                    if identifier and config.input.get("granularity", "individual") == "individual":
+                        try:
+                            db.execute("INSERT INTO ids VALUES (?)", [identifier])
+                        except duckdb.ConstraintException:
+                            raise InputContractError("Repeated medication source ID; choose one version upstream") from None
+                    canonical = fhir_json(ordered(payload))
+                    key = hashlib.sha256((canonical + (f":item:{count}" if mode == "items" else "")).encode()).hexdigest()
+                    # No IDs in distinct payload/group identity; every dose/timing/context field is retained.
+                    db.execute("INSERT INTO groups VALUES (?,?,?,?,?,?,?) ON CONFLICT (key) DO UPDATE SET source_rows=groups.source_rows+1, occurrences=groups.occurrences+excluded.occurrences, known=groups.known AND excluded.known",
+                               [key, fhir_json(payload), 1, frequency or 0, frequency is not None, identifier if mode == "items" else "", ref if mode == "items" else ""])
+                if not count:
+                    raise InputContractError("Input contains no selected medication records")
+                log.event("grouped", input_records=count, skipped_resources=skipped, groups=db.execute("SELECT COUNT(*) FROM groups").fetchone()[0])
+                phase = "terminology_and_dose_checks"
+                checker = MedicationChecker(config, prepared)
+                preview, statuses, total, ready, known_occurrences, unknown_groups = [], {}, 0, 0, 0, 0
+                fields = FIELDS + (["source_id", "source_ref"] if mode == "items" else [])
+                with (folder / paths["csv"].name).open("w", encoding="utf-8-sig", newline="") as out, (folder / paths["evidence"].name).open("w", encoding="utf-8") as evidence:
+                    writer = csv.DictWriter(out, fieldnames=fields)
+                    writer.writeheader()
+                    cursor = db.execute("SELECT * FROM groups ORDER BY key")
+                    while batch := cursor.fetchmany(100):
+                        for key, text, nrows, occurrences, known, identifier, ref in batch:
+                            payload = json.loads(text, parse_float=Decimal)
+                            detail = {**checker.assess(payload), "tuple_id": key, "source_set": payload}
+                            product = payload["medication"].get("code", {})
+                            terms = detail["terminology"]
+                            row = dict(tuple_id=key, resource_type=config.kind, source_rows=nrows,
+                                       occurrence_count=occurrences if known else "", frequency_known=known,
+                                       status=detail["status"], medication_status=payload["status"], intent=payload["intent"],
+                                       product_name=product.get("text") or "; ".join(c.get("display", "") for c in product.get("coding", []) if isinstance(c, dict)),
+                                       product_codings_json=encoded(product.get("coding", [])), medication_json=fhir_json(payload["medication"]),
+                                       dosage_json=fhir_json(payload["dosages"]), duration_json=fhir_json(payload["duration"]),
+                                       constant_rate_asserted=payload["constant_rate"], source_set_json=fhir_json(payload),
+                                       code_check=states([x for x in terms if x["path"] == "Medication.code"]),
+                                       unit_check=states([x for x in terms if x.get("kind") == "quantity"]),
+                                       dose_check="inconsistent" if any(f["state"] == "error" and f["path"].startswith(("dosage", "duration", "Medication.ingredient")) for f in detail["findings"]) else "review_required",
+                                       canonical_names_json=encoded([p for p in detail["recommendations"] if p["type"] == "canonical_name"]),
+                                       findings_json=encoded(detail["findings"]), recommendations_json=encoded(detail["recommendations"]),
+                                       sources_json=encoded(terms), clinical_dose_safety="not_assessed", fhir_validation_state=validation["state"])
+                            if mode == "items":
+                                row.update(source_id=identifier, source_ref=ref)
+                            writer.writerow({k: _csv_text(v) if isinstance(v, str) else v for k, v in row.items()})
+                            evidence.write(fhir_json(detail) + "\n")
+                            if len(preview) < 2000:
+                                preview.append((row, detail))
+                            total += 1
+                            ready += detail["status"] == "passed"
+                            known_occurrences += occurrences
+                            unknown_groups += not known
+                            statuses[detail["status"]] = statuses.get(detail["status"], 0) + 1
+                            if total % 100 == 0:
+                                log.event("check_progress", assessed_groups=total, statuses=statuses)
+                summary = {"format_version": 1, "resource_type": config.kind, "operation": config.operation,
+                           "output_path": str(target), "mode": mode, "input_records": count, "distinct_tuples": total,
+                           "skipped_resources": skipped, "input_sha256": input_hash, "configuration_sha256": config.deployment.sha256,
+                           "statuses": statuses, "known_source_occurrences": known_occurrences, "groups_with_unknown_frequency": unknown_groups,
+                           "fhir_validation": validation, "specification": config.data.get("specification", {}), "terminology_plan": routes,
+                           "metrics": {"terminology_and_dose_consistent": ratio(ready, total)}, "scope": SCOPE,
+                           "source_strength": "Source assertion only; not a verified drug label", "elapsed_seconds": round(time.monotonic()-start, 2),
+                           "software": versions(), "reference_artifacts": artifacts}
+                summary["output_hashes"] = {paths[k].name: _input_hash(folder / paths[k].name) for k in paths if k not in {"summary", "report", "log"}}
+                (folder / paths["summary"].name).write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n")
+                html_report(folder / paths["report"].name, preview, summary, target.name)
+                log.event("completed", output_rows=total, statuses=statuses, output_hashes={**summary["output_hashes"],
+                          paths["summary"].name: _input_hash(folder / paths["summary"].name), paths["report"].name: _input_hash(folder / paths["report"].name)})
+                log.close()
+                for key in [k for k in paths if k != "summary"] + ["summary"]:
+                    source = folder / paths[key].name
+                    os.chmod(source, 0o600)
+                    os.replace(source, paths[key])
+                return BatchResult(target, count, total, statuses, skipped, paths["summary"], paths["report"], paths["log"], validation["state"])
+        except Exception as exc:
+            if not log.handle.closed:
+                log.event("failed", phase_name=phase, error_type=type(exc).__name__, diagnostic=str(exc) if isinstance(exc, InputContractError) else "redacted_external_or_data_exception")
+                log.close()
+                failed = target.with_name(target.stem + ".failed." + run_id + ".audit.jsonl")
+                os.replace(folder / paths["log"].name, failed)
+            raise ValueError(f"Medication batch failed during {phase} ({type(exc).__name__}); check the failure audit") from None
+        finally:
+            if checker:
+                checker.close()

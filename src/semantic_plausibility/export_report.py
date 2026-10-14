@@ -255,6 +255,8 @@ def ratio(numerator, denominator):
 def write_html(path, rows, summary, csv_name, log_name):
     from .report_sources import recommendation_html, source_set_html, linked_data_html, source_html
     title = "Laboratory evidence research" if summary.get("operation") == "research-evidence" else "Laboratory export review"
+    if summary.get("operation") == "research-evidence" and summary.get("research", {}).get("scope") == "lookup":
+        title = "Laboratory terminology recommendations"
     metrics = summary["metrics"]
     head = "<th>Source set</th><th>Linked terminology</th><th>Complete proposal and supporting sources</th><th>Checks</th>"
     body = ""
@@ -271,7 +273,7 @@ def write_html(path, rows, summary, csv_name, log_name):
     research = summary.get("research", {})
     research_html = ""
     if summary.get("operation") == "research-evidence":
-        research_html = '<section><h2>Research execution</h2><p>Local model: <strong>' + escape(str(research.get("model_state", "unknown"))) + '</strong>; accepted calls: ' + str(len(research.get("accepted_model_calls", []))) + '; searches: ' + str(research.get("queries", 0)) + '.</p><p><a href="' + escape(Path(csv_name).with_suffix(".trace.jsonl").name, quote=True) + '">Executed searches, prompts and responses</a>. No accepted model response means extraction may be missing; inspect rejected/unavailable attempts before review.</p></section>'
+        research_html = '<section><h2>Research execution</h2><p>Scope: <strong>' + escape(str(research.get("scope", "not_recorded"))) + '</strong>. Local model: <strong>' + escape(str(research.get("model_state", "unknown"))) + '</strong>; accepted calls: ' + str(len(research.get("accepted_model_calls", []))) + '; retrieval requests: ' + str(research.get("retrieval_requests", "not_recorded")) + '; literature searches: ' + str(research.get("literature_searches", "not_recorded")) + '; extraction failures: ' + str(research.get("extraction_failures", "not_recorded")) + '.</p><p><a href="' + escape(Path(csv_name).with_suffix(".trace.jsonl").name, quote=True) + '">Executed searches, prompts and responses</a>. No accepted model response means extraction may be missing; inspect rejected/unavailable attempts before review.</p></section>'
     counts = " · ".join(f"{escape(key)}: {value}" for key, value in sorted(summary["statuses"].items()))
     readiness = metrics["mii_numeric_set_ready"]
     percent = f"{100 * readiness['ratio']:.1f}%" if readiness["ratio"] is not None else "unavailable"

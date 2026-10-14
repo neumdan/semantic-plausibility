@@ -1,26 +1,37 @@
 %% Same node/edge contract as decision-flow.svg.
 flowchart TD
-    INPUT["Input contract and selected guide<br/>Verify source shape, versions, units, references and frequency<br/>Preserve original source records and meaningful context"]
-    FHIR["Actual FHIR resources supplied?<br/>Yes: local Matchbox/HL7 or MII full guide validation<br/>No: CSV/DB set checks; no synthetic patient resources<br/>Retain formal issues separately; missing coverage is incomplete"]
-    LOOKUP["Look up declared code and unit systems<br/>Configured primary APIs, actual local catalogues and labels<br/>Retain editions and sources; supplements enrich names<br/>Verified / invalid / unknown are distinct outcomes"]
-    FIT["Assess the whole semantic set<br/>Name, LOINC axes, unit dimension and specimen/method fit<br/>UCUM validity alone does not prove analyte compatibility<br/>Known example units support proposals, not universal limits"]
-    CONVERT["Supported transformation<br/>Verified target unit and linear factor<br/>Transform value and each bound independently<br/>A sourced spelling is still a review proposal"]
-    UNKNOWN["Ambiguous or unsupported<br/>Missing denominator or evidence<br/>Retain error / unresolved finding<br/>No guessed correction or factor"]
-    UNCHANGED["Documented unchanged fit<br/>Keep supplied code/unit/value<br/>Clinical applicability remains a review task<br/>Continue numeric/reference checks"]
-    NUMERIC["Check values and full reference sets<br/>Finite numbers, ordered bounds and independently valid units<br/>Out-of-reference is descriptive; preserve qualifiers<br/>Evidence of reported practice requires contextual review"]
-    REPORT["Write checks, recommendations and sources<br/>Optional Ollama research: real search, then bounded extraction<br/>Codes, names, units, intervals and their sources<br/>Formal FHIR state, credibility and readiness remain separate"]
-    REVIEW["Clinician adjudication and scoped reuse<br/>Record reviewer, time, evidence and explicit mapping decision<br/>Recheck approved targets/factors and every bound on reuse<br/>Apply approved mappings in ETL and validate actual FHIR"]
-    INPUT --> FHIR
-    FHIR --> LOOKUP
-    LOOKUP --> FIT
-    FIT --> CONVERT
-    FIT --> UNKNOWN
-    FIT --> UNCHANGED
-    CONVERT --> NUMERIC
-    UNKNOWN --> NUMERIC
-    UNCHANGED --> NUMERIC
-    NUMERIC --> REPORT
-    REPORT --> REVIEW
-    classDef normal fill:#ffffff,stroke:#b7cec9,color:#142d42
-    classDef teal fill:#eef7f4,stroke:#b7cec9,color:#142d42
-    class REPORT,REVIEW teal
+    CONTRACT["1. Check input contract<br/>Observation / MedicationRequest / MedicationAdministration; explicit source mapping<br/>Malformed input fails; preserve every reference interval or dosage instruction"]
+    VALIDATION["2. Formal validation requested?<br/>Full FHIR file or CSV resource_json → local Matchbox/HL7 + pinned guide<br/>Scalar sets → not_applicable; unavailable/invalid validation remains explicit"]
+    LOOKUP["3. Verify the declared code/system and unit/system using configured sources<br/>Local real catalogue and/or enabled API; preserve edition and source<br/>Lab: selected profile rules + LOINC axes; medication: supplied coding and dose context"]
+    INVALID["Confirmed invalid<br/>Record deterministic error<br/>Continue other independent checks"]
+    VERIFIED["Verified identity / syntax<br/>Check code-unit-context fit<br/>Membership alone is insufficient"]
+    UNKNOWN["Unverified / unavailable<br/>Keep evidence gap visible<br/>Do not call absence invalid"]
+    FIT["4. Assess unit fit and transformation<br/>Lab: documented code–unit fit; verified conversion → factor for value and bounds<br/>Medication: dose × source strength → conditional conversion with sources and factor<br/>Missing evidence / ambiguous strength or count units → expert review, no forced map"]
+    NUMERIC["5. Check quantities and context; write the checked CSV<br/>Lab: numeric values and reference bounds; medication: dose, timing, range and units<br/>Infusion rate × duration is conditional unless constant uninterrupted delivery is asserted"]
+    NO_AI["Modes 1 / 2: lab or medication<br/>Deterministic findings + sources<br/>Optional full FHIR outcome<br/>No model calls"]
+    AI["Lab mode 3: scope=lookup<br/>Local AI suggests code/name/unit<br/>Real candidate retrieval + recheck<br/>No literature retrieval"]
+    EVIDENCE["Lab mode 4: scope=studies<br/>Same AI + configured study APIs<br/>Quote values / units / intervals<br/>Keep gaps and failures visible"]
+    REVIEW["6. Review the whole proposal with its evidence<br/>Original set → linked code/analyte/name/units → proposal with transformations<br/>Physician records decision, reviewer, time and rationale; source remains unchanged<br/>Numeric readiness, FHIR conformance and clinical correctness stay distinct"]
+    REUSE["7. Optional laboratory mapping reuse<br/>Import clinician decisions; recheck target code, unit, factor and reference bounds<br/>Source, catalogue, profile or context changes require renewed review<br/>Apply approved transformations in institutional ETL and validate the resulting FHIR<br/>No automated resource rewrite or model retraining"]
+    CONTRACT --> VALIDATION
+    VALIDATION --> LOOKUP
+    LOOKUP --> INVALID
+    LOOKUP --> VERIFIED
+    LOOKUP --> UNKNOWN
+    INVALID --> FIT
+    VERIFIED --> FIT
+    UNKNOWN --> FIT
+    FIT --> NUMERIC
+    NUMERIC --> NO_AI
+    NUMERIC -.-> |"explicit second pass"| AI
+    NUMERIC -.-> |"explicit second pass"| EVIDENCE
+    NO_AI --> REVIEW
+    AI --> REVIEW
+    EVIDENCE --> REVIEW
+    REVIEW --> REUSE
+    classDef normal fill:#f3f7fa,stroke:#c4d5df,color:#142d42
+    class CONTRACT,VALIDATION,LOOKUP,UNKNOWN,FIT,NO_AI,REVIEW normal
+    classDef teal fill:#eef7f4,stroke:#a8cfc6,color:#142d42
+    class VERIFIED,NUMERIC,AI,EVIDENCE,REUSE teal
+    classDef error fill:#fcf1f3,stroke:#ecc7cf,color:#142d42
+    class INVALID error

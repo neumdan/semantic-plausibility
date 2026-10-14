@@ -1,4 +1,4 @@
-"""Laboratory configuration, source mapping and the single export-review workflow."""
+"""Configuration and source mapping for the laboratory and medication export workflows."""
 
 from __future__ import annotations
 from dataclasses import dataclass
@@ -68,7 +68,7 @@ class BatchResult:
 class BatchConfiguration:
     """Validate operator settings and normalize source roles; no data/network access."""
 
-    def __init__(self, path, *, research=None, output_path=None):
+    def __init__(self, path, *, research=None, output_path=None, research_scope=None):
         self.path = Path(path).resolve()
         self.root = self.path.parent
         try:
@@ -80,6 +80,8 @@ class BatchConfiguration:
             self.data.setdefault("research", {})["enabled"] = research
         if output_path is not None:
             self.data.setdefault("output", {})["path"] = str(output_path)
+        if research_scope is not None:
+            self.data.setdefault("research", {})["scope"] = research_scope
         data = table(
             self.data,
             "batch",
@@ -110,9 +112,9 @@ class BatchConfiguration:
             )
         general = table(data.get("general", {}), "general", {"PROJECT_NAME", "RESOURCE_TYPE", "MODEL_ALIAS"})
         self.kind = general.get("RESOURCE_TYPE", "Observation")
-        if self.kind != "Observation":
+        if self.kind not in {"Observation", "MedicationRequest", "MedicationAdministration"}:
             raise ValueError(
-                "This batch supports laboratory Observation only; medication and diagnosis are later work"
+                "RESOURCE_TYPE must be Observation, MedicationRequest or MedicationAdministration; diagnosis is not implemented"
             )
         self.input = table(
             data.get("input", {}),
@@ -181,6 +183,11 @@ class BatchConfiguration:
                 "This workflow uses DuckDB grouping. SQLite is an input format; CQL is upstream extraction"
             )
         self.group_by = aggregation.get("group_by", sorted(REQUIRED_GROUP))
+        if self.kind != "Observation":
+            if "group_by" in aggregation:
+                raise ValueError("Medication grouping always retains the full product, dosage and context; omit aggregation.group_by")
+            from .medication_input import validate_options
+            validate_options(self, data)
         if (
             not isinstance(self.group_by, list)
             or any((not isinstance(x, str) for x in self.group_by))
@@ -240,7 +247,13 @@ class BatchConfiguration:
             },
         )
         self.elements = self.input.get("elements", {})
-        if self.elements and self.input_type != "fhir_file":
+        columns = roles(self.input.get("columns", {}))
+        defaults = roles(self.input.get("defaults", {}))
+        self.fhir_csv = self.input_type == "csv" and "resource_json" in columns
+        self.full_fhir_input = self.input_type == "fhir_file" or self.fhir_csv
+        self.fhir_reader_options = ({"resource_column": self.input["columns"]["resource_json"],
+                                     "delimiter": self.input.get("delimiter", ",")} if self.fhir_csv else {})
+        if self.elements and not self.full_fhir_input:
             raise ValueError("input.elements is for FHIR; use input.columns for CSV/SQL")
         if not isinstance(self.elements, dict):
             raise ValueError("input.elements must be a table of semantic roles to FHIR element paths")
@@ -276,16 +289,19 @@ class BatchConfiguration:
         granularity = self.input.get("granularity", "individual")
         if granularity not in {"individual", "distinct"}:
             raise ValueError("input.granularity must be individual or distinct")
-        columns = roles(self.input.get("columns", {}))
-        defaults = roles(self.input.get("defaults", {}))
-        if self.input_type == "fhir_file" and granularity != "individual":
+        if self.full_fhir_input and granularity != "individual":
             raise ValueError(
-                "Native FHIR Observations are individual records; export distinct frequency sets as mapped CSV/DB rows"
+                "Native FHIR resources are individual records; export distinct frequency sets as mapped CSV/DB rows"
             )
         if self.input_type == "fhir_file" and (columns or defaults):
             raise ValueError(
                 "FHIR files use native elements/input.elements; input.columns/defaults are for CSV or database rows"
             )
+        if "resource_json" in columns:
+            if set(columns) != {"resource_json"} or defaults or not columns["resource_json"]:
+                raise ValueError("FHIR JSON columns need only input.columns.resource_json; use native fields and no scalar defaults/counts")
+            if granularity != "individual":
+                raise ValueError("Full resource JSON requires individual granularity; export distinct sets as scalar columns")
         supported = {
             "id",
             "code",
@@ -322,12 +338,15 @@ class BatchConfiguration:
             }
         for prefix in ("range_type", "range_applies_to"):
             supported |= {prefix + "_" + name for name in ("system", "code", "text")}
+        if self.kind != "Observation":
+            from .medication_input import FIELDS as MEDICATION_FIELDS
+            supported = MEDICATION_FIELDS
         if (set(columns) | set(defaults)) - supported:
-            raise ValueError("Unknown semantic column/default role; use the documented laboratory field map")
+            raise ValueError("Unknown semantic column/default role; use the documented field map for RESOURCE_TYPE")
         if "value" in columns and {"value_min", "value_max"} & set(columns):
             raise ValueError("Choose point values OR aggregate min/max, not an ambiguous combination")
         mapping = {
-            "resource_type": "Observation",
+            "resource_type": self.kind,
             "profile": self.profile,
             "input_granularity": granularity,
             "fields": columns,
@@ -343,6 +362,9 @@ class BatchConfiguration:
             mapping["relation"] = f"{schema}.{relation}" if schema else relation
             validate_mapping(mapping)
         self.mapping = mapping
+        if self.kind != "Observation" and not self.full_fhir_input:
+            from .medication_input import validate_fields
+            validate_fields(mapping)
         postgres = {}
         if self.input_type == "postgres":
             source = {**source, "kind": "postgres", "mapping": mapping}
@@ -353,8 +375,12 @@ class BatchConfiguration:
             "research",
             {"enabled", "scope", "unit_catalog", "pubmed", "loinc_website_base_url", "sources", "europe_pmc", "max_articles_per_loinc"},
         )
+        if self.kind != "Observation" and research.get("enabled", False):
+            raise ValueError("Medication supports deterministic terminology and dose checks; AI recommendations/evidence research currently require Observation")
         if type(research.get("enabled", False)) is not bool:
             raise ValueError("research.enabled must be true or false")
+        if research.get("scope", "studies") not in {"lookup", "studies"}:
+            raise ValueError("research.scope must be lookup or studies")
         pubmed = table(
             research.get("pubmed", {}),
             "research.pubmed",
@@ -678,13 +704,13 @@ def records(config, prepared):
 
 
 def run_batch(path: str | Path) -> BatchResult:
-    """Review a laboratory export with one explicit TOML configuration."""
+    """Review a laboratory or medication export with one explicit TOML configuration."""
     from .export_review import review_export
 
     return review_export(BatchConfiguration(path))
 
 
-def run_plausibility_check(path: str | Path) -> BatchResult:
+def run_plausibility_check(path: str | Path, *, output: str | Path | None = None) -> BatchResult:
     """Deterministic source/target checks and approved mapping reuse; no model research."""
     from .export_review import review_export
-    return review_export(BatchConfiguration(path, research=False))
+    return review_export(BatchConfiguration(path, research=False, output_path=output))

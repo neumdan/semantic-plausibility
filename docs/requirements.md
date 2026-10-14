@@ -36,16 +36,8 @@ Medication needs ingredient/product identity, strength numerator/denominator, do
 
 FDPG access is not a public literature lookup. A future provider must use an authorised feasibility/research interface or permitted aggregate export, retain selection/cohort provenance and keep observed practice separate from reference-interval validation.
 
-## Medication next
+## Medication checks
 
-The laboratory semantic runner rejects medication input today. The next adapter should use the published [MII Medication 2026.0.1 guide](https://www.medizininformatik-initiative.de/Kerndatensatz/KDS_Medikation_2026/MIIIGModulMedikation.html) and preserve linked product/ingredient records alongside the prescription or administration.
+MedicationRequest and MedicationAdministration are implemented for source terminology, unit/quantity checks, timing/range consistency and conditional strength/infusion calculations. The [executable recipes and contract](../examples/medication/README.md) retain every ingredient and dosage instruction. The published MII Medication 2026.0.1 guide is selected for optional full-resource validation.
 
-| Required context | FHIR R4 source / proposed check |
-| --- | --- |
-| Product, formulation, ingredients, concentration and package amount | [Medication](https://hl7.org/fhir/R4/medication.html): `code`, `form`, `ingredient.strength`, `amount`; verify product catalogue definitions/editions |
-| Dose, route, timing, duration and conditional use | [Dosage](https://hl7.org/fhir/R4/dosage.html) in request/statement; retain every dose/rate instruction and Timing qualifier |
-| Actual administration | MedicationAdministration medication reference, effective time/period, dose, rate and route; keep administration distinct from prescription |
-
-**Illustrative shape checks, not prescribing guidance:** `20 mg/mL × 5 mL = 100 mg` requires a verified product concentration. A liquid product paired with `1 tablet` is a formulation/unit mismatch; do not convert it by spelling correction. Without verified strength, volume-to-mass conversion stays unresolved. Separate package amount from per-administration dose and daily total. ATC alone does not identify a formulation/concentration. Count-unit annotations cannot establish pharmaceutical form.
-
-Reuse the same source → terminology/product definitions → full proposal/evidence → clinician review design, with a separate domain adapter and profile-scoped mapping registry. Medication semantic checks and clinical dosage appropriateness are not implemented by this release.
+Source strength is not catalogue evidence. Clinical dose appropriateness, product/form/route compatibility beyond the explicit lexical check, medication AI literature research and clinician-registry reuse remain future work. ATC alone cannot establish formulation or concentration. Condition and Procedure still need domain adapters.

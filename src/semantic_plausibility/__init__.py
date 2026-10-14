@@ -1,4 +1,4 @@
-"""Local laboratory export review: read-only inputs and auditable proposals."""
+"""Local laboratory and medication export review: read-only inputs and auditable proposals."""
 from ._version import __version__
 from .batch import BatchResult, run_batch, run_plausibility_check
 from .study_compare import compare_reports, verify_audit
@@ -6,14 +6,14 @@ from .terminology_lookup import lookup_terminology
 from .fhir_validation import validate_fhir
 
 
-def research_evidence(config_path, report=None, output=None):
+def research_evidence(config_path, report=None, output=None, *, scope=None):
     from .evidence_research import research_evidence as run
-    return run(config_path, report, output)
+    return run(config_path, report, output, scope=scope)
 
 
-def research_plan(config_path, report=None):
+def research_plan(config_path, report=None, *, scope=None):
     from .evidence_research import research_plan as plan
-    return plan(config_path, report)
+    return plan(config_path, report, scope=scope)
 
 
 def import_reviews(report, reviewed, registry, config_path):

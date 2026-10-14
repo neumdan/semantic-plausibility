@@ -74,7 +74,7 @@ response_mode = "json_schema"
 
 [research]
 enabled = false                     # check stays deterministic; research-evidence explicitly enables research
-scope = "studies"                   # lookup restricts research to terminology pages
+scope = "studies"                   # Override per call with research-evidence --scope lookup|studies
 sources = ["europe_pmc", "pubmed"]
 max_articles_per_loinc = 3
 unit_catalog = "local/unit-catalog.json"
@@ -82,7 +82,7 @@ loinc_website_base_url = "https://loinc.org"
 
 [output]
 mode = "distinct"                   # items requires individual input and retains IDs.
-path = "output/laboratory-review.csv"
+path = "output/laboratory-review.csv" # Optional per-run override: run-plausibility-check --out output/01-lookup.csv
 # Existing reports are protected; use a new filename or explicitly overwrite=true.
 # lookup_pack = "output/lookups.json" # Optional capture of actual service responses.
 
@@ -109,7 +109,8 @@ path = "local/terminologies/bfarm-lab"
 systems = ["http://loinc.org", "http://unitsofmeasure.org"]
 
 [validation]
-# Matchbox uses the official HL7 validator. Applied only to actual FHIR input.
+# Matchbox uses the official HL7 validator: fhir_file or CSV resource_json input.
+# Mode-2 recipe: examples/lab/fhir-csv.toml; scalar tuples remain not_applicable.
 enabled = false
 backend = "matchbox"
 endpoint = "http://127.0.0.1:8081/matchboxv3/fhir"

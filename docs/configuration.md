@@ -1,16 +1,16 @@
-# Configure a laboratory review
+# Configure a laboratory or medication review
 
 Start by copying `pipeline.example.toml` to **`pipeline.toml`**. For the first check, leave the example unchanged. For your data, edit its existing `[input]`, `[input.columns]` and `[output]` tables. Enable other features only when you need them. [First setup and run commands](shipped-stack.md#first-setup).
 
-TOML carries the pipeline settings. `.env` or secret files carry credentials; no shell exports are required. The runner supports laboratory **Observation in FHIR R4 (4.0.1)**. Medication, Condition and Procedure remain later adapters.
+TOML carries the pipeline settings. `.env` or secret files carry credentials; no shell exports are required. The runner supports laboratory **Observation in FHIR R4 (4.0.1)**. **MedicationRequest and MedicationAdministration** also have executable [medication recipes and their full column map](../examples/medication/README.md). Condition and Procedure remain later adapters. The lab settings below do not automatically apply to medication.
 
 ## Select the configuration
 
 | Runtime | Select the TOML | Default |
 | --- | --- | --- |
 | Python / uv | `run-plausibility-check --config pipeline.toml`; uv loads credentials with `--env-file .env` | `pipeline.toml` in the current directory |
-| Docker Compose | `.env` contains `SQC_CONFIG_FILE=pipeline.toml`; run `docker compose run --rm --build run-plausibility-check` | Host `pipeline.toml`, mounted at `/app/pipeline.toml` |
-| Podman Compose | Same `.env`; run `podman-compose run --rm --build run-plausibility-check` | Same host/container paths |
+| Docker Compose | `.env` contains `SQC_CONFIG_FILE=pipeline.toml`; run `docker compose run --rm run-plausibility-check` | Host `pipeline.toml`, mounted at `/app/pipeline.toml` |
+| Podman Compose | Same `.env`; run `podman-compose run --rm run-plausibility-check` | Same host/container paths |
 
 For another container TOML, change the selector in `.env` or use `--env-file local/research.env` with a selector file. [Exact examples](shipped-stack.md#select-another-toml). This Compose parameter chooses a host mount; it is different from the runner's `--config` parameter. The services continue to load project `.env` credentials.
 
@@ -23,7 +23,7 @@ These sections cover the supported workflow. Unknown settings are rejected. Use 
 | Section | Main settings | Purpose |
 | --- | --- | --- |
 | Root | `config_version=3` | Current configuration schema, separate from the software version |
-| `general` | `PROJECT_NAME`, `RESOURCE_TYPE="Observation"`, `MODEL_ALIAS` | Run label, supported resource type, selected named model (default alias `local`) |
+| `general` | `PROJECT_NAME`, `RESOURCE_TYPE` (Observation / MedicationRequest / MedicationAdministration), `MODEL_ALIAS` | Run label, supported resource type, selected named model (default alias `local`) |
 | `input` | `type`, `origin`, `source_namespace`, `path`, `granularity`, `delimiter` | Location, source/site identity and input representation |
 | `input.columns` / `input.defaults` | Semantic role → column / known constant | CSV/database field mapping; defaults only for documented source facts |
 | `input.elements` | Semantic role → `Observation.*` path | Optional scalar FHIR selection; the native adapter normally needs no mapping |
@@ -31,7 +31,7 @@ These sections cover the supported workflow. Unknown settings are rejected. Use 
 | `input.snapshot` | Captured real lookup-pack path | UCUM/LOINC evidence for offline checks |
 | `database` | `DB_TABLE`, optional `DB_SCHEMA`, connection references | Read-only PostgreSQL or SQLite selection |
 | `specification` | `FHIR_VERSION`, `PROFILE`, `PROFILE_VERSION`, `STRUCTURE_DEFINITION` or `PROFILE_FILE`, `VALUE_SETS`, `IG_*`, `links` | Selected target rules and pinned artifacts |
-| `validation` | `enabled`, `backend`, `endpoint`, `container_endpoint`, `terminology_server`, `additional_packages`, `timeout_seconds`, `fail_on_error` | Local full-resource/guide validation before grouping FHIR input |
+| `validation` | `enabled`, `backend`, `endpoint`, `container_endpoint`, `terminology_server`, `setup_directory`, `additional_packages`, `timeout_seconds`, `fail_on_error` | Local full-resource/guide validation before grouping FHIR input |
 | `aggregation` | `engine="duckdb"`, `group_by` | Grouped sets; optional exact point-value grouping |
 | `output` | `path`, `mode`, `overwrite`, `include_distribution`, `lookup_pack` | CSV report prefix, item/group mode and optional captured evidence |
 | `network` | `mode`, `allowed_http_hosts` | Offline/connected lookups and explicit local plain-HTTP hosts |
@@ -99,6 +99,26 @@ group_by = ["code", "code_system", "unit", "unit_system", "reference_range", "va
 
 The five non-value fields above are mandatory grouping keys. Min/max-only inputs cannot use exact-value grouping or reconstruct mean/SE/median/IQR. `output.mode="items"` preserves IDs/locators and requires individual input; distinct input cannot restore them.
 
+## Complete FHIR resources in CSV
+
+For a CSV-to-CSV run that includes formal validation, use the complete source JSON rather than reconstructing resources from scalar tuples. Replace the input tables with:
+
+```toml
+[input]
+type = "csv"
+origin = "fhir"
+source_namespace = "site-fhir-a"
+path = "../input/resources.csv"
+granularity = "individual"
+
+[input.columns]
+resource_json = "resource_json"
+```
+
+Each cell contains one complete R4 resource, Bundle or resource array, quoted according to CSV rules. Map **only** `resource_json`; remove scalar mappings/defaults and counts. Native fields supply IDs, codings, quantities and all reference ranges. Additional unmapped columns are ignored. Set `validation.enabled=true` for the same local validation used by native FHIR files. Bundle references stay together; independent resources/array entries have independent validation scope. CSV cells are bounded to 32 MiB; use native files for large exports.
+
+The [working recipe](../examples/lab/fhir-csv.toml) reads [laboratory-fhir.csv](../examples/laboratory-fhir.csv). It works in place with Python `--config examples/lab/fhir-csv.toml` or Compose `--config /app/examples/lab/fhir-csv.toml`. Its paths resolve from `examples/lab/`, so it needs no extra config mount. The invalid example removes the MII identifier and should fail formal validation while preserving the same numeric set. Never copy one resource into a distinct row and use a count to claim validation of all original resources.
+
 ## FHIR Bundle and NDJSON
 
 Replace `[input]` with:
@@ -139,6 +159,8 @@ Put the real DSN in ignored `.env`; load it with uv's `--env-file .env` or Compo
 
 Other supported connection fields are `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER_ENV`, `DB_PASSWORD_ENV` or `DB_PASSWORD_FILE`, and `DB_SSLMODE`. Choose a DSN or these separate fields. `PATH_TO_DB_CONFIG_TOML` alternatively reuses flat CDS Toolchain `DB_*` settings; `DB_USER_KEY`/`DB_PASSWORD_KEY` select its credential keys. Keep that existing credential-bearing file under ignored `local/`. [Source grouping SQL](../examples/studies/distinct-export.postgres.sql).
 
+For a PostgreSQL JSON/JSONB Observation column, map `resource_json="resource"` and use individual granularity; actual resource type must be Observation. Do not mix this with scalar value/code/unit overrides. Direct database JSON receives semantic checks in this release. For full-resource validation, export those resources as native FHIR files or the resource CSV above. Choose a curated current-version Observation view upstream; the runner never guesses the CDS Hub schema.
+
 For SQLite, use `input.type="sqlite"`, `input.path="local/lab.sqlite"`, the column mapping and `database.DB_TABLE="lab"`; omit PostgreSQL connection fields. It opens read-only. DuckDB is the aggregation engine for every input type, not an additional database server.
 
 ## Profiles and terminology roles
@@ -171,7 +193,7 @@ Supported types: `ucum`, `loinc`, generic `fhir`, `csv`, `sqlite`, `fhir_artifac
 
 ## Full FHIR validation
 
-`validator-init` derives Matchbox/MII server settings from the selected profile/package, then the container build installs the guide dependencies. Native Python uses `validation.endpoint`; the container uses `container_endpoint`. Full resources are only sent to a local/LAN service; redirects and proxy forwarding are disabled. `validation.token_env`/`token_file` are optional references for a protected validator. `additional_packages` accepts pinned `package#version` entries. CSV/scalar database tuples are not full FHIR resources. [Exact setup and OperationOutcome outputs](validation.md).
+`validator-init` derives Matchbox/MII server settings from the selected profile/package, then the container build installs the guide dependencies. Native Python uses `validation.endpoint`; the container uses `container_endpoint`. Full resources are only sent to a local/LAN service; redirects and proxy forwarding are disabled. `validation.token_env`/`token_file` are optional references for a protected validator. `additional_packages` accepts pinned `package#version` entries. Scalar CSV/database tuples are not full FHIR resources. Native FHIR files and complete `resource_json` CSV cells support full validation; direct database JSON currently receives semantic checks only. [Exact setup and OperationOutcome outputs](validation.md).
 
 ## Network and credentials
 
@@ -193,7 +215,7 @@ Environment references name a variable whose value lives in `.env` or the runtim
 
 ## Local models and research
 
-A deterministic `run-plausibility-check` does not use a model, even if the TOML enables research. Use the separate `research-evidence` command on the completed audited report. The legacy `plausibility batch` command still honours `research.enabled`.
+A deterministic `run-plausibility-check` does not use a model, even if the TOML enables research. `research-evidence --scope lookup` selects terminology AI without study queries; `--scope studies` adds the configured literature providers. A scope argument overrides TOML for that invocation and is retained in the report/trace. Use the separate `research-evidence` command on the completed audited report. The legacy `plausibility batch` command still honours `research.enabled`.
 
 ```toml
 [models.local]
@@ -247,6 +269,8 @@ include_distribution = true
 # lookup_pack = "output/reference-pack.json"
 ```
 
+`run-plausibility-check --out output/another-check.csv` selects a fresh prefix without editing TOML. Relative `--out` and `--report` paths resolve against the selected TOML. The effective output path and research scope are audited separately from the unchanged configuration hash.
+
 Only CSV is the batch data output format; HTML, summary, evidence and audit sidecars are always produced. Pick a fresh path to preserve prior reports; research needs a fresh output prefix too. [Artifact contents](data-contract.md#output-artifacts).
 
 For reviewed mappings, set a stable `input.source_namespace` before collecting feedback. After `review-import` creates the local registry, enable:
@@ -277,6 +301,16 @@ guide = "https://www.medizininformatik-initiative.de/Kerndatensatz/KDS_Laborbefu
 source = "https://github.com/medizininformatik-initiative/kerndatensatzmodul-labor"
 ```
 
-Links are for readers; they neither download nor substitute validation artifacts. Install a real R4 StructureDefinition **snapshot**, supply `STRUCTURE_DEFINITION`, pin `IG_PACKAGE`/`IG_VERSION` and configure actual `VALUE_SETS`. Matchbox/HL7 (or MII) validates the individual FHIR document against the installed guide before grouping. CSV/DB aggregates receive semantic-set checks and cannot establish full resource conformance. Validate the actual generated FHIR after applying approved mappings. [Validator setup](validation.md).
+Links are for readers; they neither download nor substitute validation artifacts. Install a real R4 StructureDefinition **snapshot**, supply `STRUCTURE_DEFINITION`, pin `IG_PACKAGE`/`IG_VERSION` and configure actual `VALUE_SETS`. Matchbox/HL7 (or MII) validates the individual FHIR document against the installed guide before grouping. Scalar CSV/DB aggregates receive semantic-set checks and cannot establish full resource conformance. Validate the actual generated FHIR after applying approved mappings. [Validator setup](validation.md).
 
 A GitHub branch can change; the guide edition and source-file hashes establish what was actually checked. Use HTTP(S) documentation URLs without embedded credentials or query strings. Endpoint credentials stay in `.env` or `local/secrets/`, not these links.
+
+## Medication configuration differences
+
+Start with `examples/medication/request.toml` or `administration.toml` and run them **in place** with `--config`; their relative paths also work under `/app/examples/medication/` in Compose. These select MII Medication 2026.0.1 by `IG_PACKAGE`, `IG_VERSION` and `IG_CANONICAL`. Do not copy a laboratory `PROFILE`, `PROFILE_FILE` or column map into them.
+
+Use the [medication input contract](../examples/medication/README.md#input-contract) for product/ingredient/strength, full dosage JSON, route/timing and source duration. The same `database`, `lookups`, secrets and `output.mode` settings apply. Medication grouping always preserves the complete regimen; omit `aggregation.group_by`. `input.context.constant_rate=true` is optional for a full FHIR export **only if the source guarantees constant, uninterrupted infusion delivery for every selected event**; otherwise leave it absent/false. Scalar inputs support a per-row `constant_rate` column.
+
+Medication does not support laboratory `input.elements`, snapshots/context files/manifests, lookup-pack capture, study comparison, clinician mapping registries or research. Unsupported settings are rejected. Installed real terminology artifacts remain usable offline. Full FHIR input can additionally use the local Matchbox/HL7 or MII validator. The selected guide controls formal bindings; the medication semantic pass checks supplied systems, quantities and dose relationships, not every guide constraint.
+
+`validation.setup_directory` defaults to `local/validation` beside the TOML. Nested example configs explicitly use `../../local/validation` so generated files reach the repository Compose build directory. This setup path does not change the validator endpoint or the input data.

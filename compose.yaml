@@ -3,11 +3,14 @@ name: semantic-plausibility-stack
 # Runtime configuration: pipeline.toml. Credentials: .env or local/ secret files.
 # Portable CPU setup; optional Linux GPU overlay: compose.gpu.yaml.
 x-runner: &runner
-  image: semantic-plausibility-stack:0.11.2
+  image: semantic-plausibility-stack:local
   build:
     context: .
     dockerfile: deploy/Dockerfile
     args: {INSTALL_POSTGRES: "1"}
+    labels:
+      io.semantic-plausibility.component: runner
+      io.semantic-plausibility.build-inputs: ${SQC_RUNNER_BUILD_INPUTS:-manual}
   env_file: .env
   read_only: true
   cap_drop: [ALL]
@@ -17,7 +20,7 @@ x-runner: &runner
     - ./${SQC_CONFIG_FILE:-pipeline.toml}:/app/pipeline.toml:ro
     - ./examples:/app/examples:ro
     - ${SQC_INPUT_DIR:-../input}:/input:ro
-    - ./local:/app/local:ro
+    - ${SQC_LOCAL_DIR:-./local}:/app/local:ro
     - ./output:/app/output
   restart: "no"
   networks: [default, validation]
@@ -38,7 +41,7 @@ services:
       - ./${SQC_CONFIG_FILE:-pipeline.toml}:/app/pipeline.toml:ro
       - ./examples:/app/examples:ro
       - ${SQC_INPUT_DIR:-../input}:/input:ro
-      - ./local:/app/local
+      - ${SQC_LOCAL_DIR:-./local}:/app/local
       - ./output:/app/output
   model-init:
     <<: *runner
@@ -54,7 +57,7 @@ services:
       - ./${SQC_CONFIG_FILE:-pipeline.toml}:/app/pipeline.toml:ro
       - ./examples:/app/examples:ro
       - ${SQC_INPUT_DIR:-../input}:/input:ro
-      - ./local:/app/local
+      - ${SQC_LOCAL_DIR:-./local}:/app/local
       - ./output:/app/output
   package-init:
     <<: *runner
@@ -64,7 +67,7 @@ services:
       - ./${SQC_CONFIG_FILE:-pipeline.toml}:/app/pipeline.toml:ro
       - ./examples:/app/examples:ro
       - ${SQC_INPUT_DIR:-../input}:/input:ro
-      - ./local:/app/local
+      - ${SQC_LOCAL_DIR:-./local}:/app/local
       - ./output:/app/output
   validator-init:
     <<: *runner
@@ -74,7 +77,7 @@ services:
       - ./${SQC_CONFIG_FILE:-pipeline.toml}:/app/pipeline.toml:ro
       - ./examples:/app/examples:ro
       - ${SQC_INPUT_DIR:-../input}:/input:ro
-      - ./local:/app/local
+      - ${SQC_LOCAL_DIR:-./local}:/app/local
       - ./output:/app/output
   validate-fhir:
     <<: *runner
@@ -90,18 +93,21 @@ services:
       - ./${SQC_CONFIG_FILE:-pipeline.toml}:/app/pipeline.toml:ro
       - ./examples:/app/examples:ro
       - ${SQC_INPUT_DIR:-../input}:/input:ro
-      - ./local:/app/local
+      - ${SQC_LOCAL_DIR:-./local}:/app/local
       - ./output:/app/output
   matchbox:
     profiles: [validation]
     image: semantic-plausibility-matchbox:4.1.21
     build:
-      context: ./local/validation/matchbox
+      context: ${SQC_LOCAL_DIR:-./local}/validation/matchbox
       dockerfile: Dockerfile
+      labels:
+        io.semantic-plausibility.component: matchbox
+        io.semantic-plausibility.build-inputs: ${SQC_MATCHBOX_BUILD_INPUTS:-manual}
     mem_limit: 4g
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
-    ports: ["127.0.0.1:${SQC_MATCHBOX_PORT:-8081}:8080"]
+    ports: ["127.0.0.1:${SQC_MATCHBOX_PORT-8081}:8080"]
     networks: [validation]
     depends_on:
       blaze: {condition: service_healthy}
@@ -122,7 +128,7 @@ services:
       ENABLE_TERMINOLOGY_LOINC: "true"
       ENABLE_TERMINOLOGY_SNOMED_CT: "false"
     mem_limit: 2g
-    ports: ["127.0.0.1:${SQC_BLAZE_PORT:-8082}:8080"]
+    ports: ["127.0.0.1:${SQC_BLAZE_PORT-8082}:8080"]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     volumes: ["validation_blaze:/app/data"]
@@ -145,7 +151,7 @@ services:
       OLLAMA_KEEP_ALIVE: 2m
       OLLAMA_NO_CLOUD: "true"
     volumes: ["ollama_models:/root/.ollama"]
-    ports: ["127.0.0.1:${SQC_OLLAMA_PORT:-11434}:11434"]
+    ports: ["127.0.0.1:${SQC_OLLAMA_PORT-11434}:11434"]
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 5s

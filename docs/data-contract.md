@@ -1,13 +1,14 @@
-# Laboratory input and output contract (0.11.1)
+# Laboratory input and output contract (0.11.3)
 
 ## Minimum export
 
 Select the hospital cohort/time window upstream. Prefer one row per distinct **code + code system + value + unit code/display + unit system + complete reference set + semantic qualifiers**, with its real `count`. Preserve comparators (`<`, `<=`, `>=`, `>`), versions, status, method, specimen and population/age/type qualifiers. Do not retain a random first code/range or discard outliers before review.
 
-Supported inputs: CSV, FHIR R4 Bundle/JSON/NDJSON, mapped PostgreSQL view, read-only SQLite extract. Medication/diagnosis fail explicitly in this batch workflow. LIS vendor APIs and TORCH/CQL run upstream and produce these formats.
+Supported inputs: scalar CSV, complete FHIR JSON in a CSV cell, FHIR R4 Bundle/JSON/array/NDJSON, mapped PostgreSQL view, read-only SQLite extract. MedicationRequest/Administration use their separate [product/dose input contract](../examples/medication/README.md); diagnosis is not implemented. LIS vendor APIs and TORCH/CQL run upstream and produce these formats.
 
 | TOML role | Source meaning |
 | --- | --- |
+| `resource_json` | Full FHIR document in CSV, or Observation JSON in a DB column; alternative to scalar mappings, individual input only |
 | `code`, `code_system`, `code_version` | Declared terminology identity and edition; no implicit LOINC assignment |
 | `analyte_name` / `code_text`, `code_display` | Source analyte/test name → CodeableConcept.text; optional coding display → Coding.display. Native FHIR retains both |
 | `value` | Point value, including genuine zero; finite decimal required for numeric readiness |
@@ -24,7 +25,7 @@ Supported inputs: CSV, FHIR R4 Bundle/JSON/NDJSON, mapped PostgreSQL view, read-
 
 Use defaults only for facts established by the source contract. Do not label all LIS units as UCUM or all codes as LOINC merely to satisfy the checker. Numeric strings are allowed in CSV; in native FHIR `Quantity.value` and reference bound values must be JSON numbers. FHIR JSON numbers use decimal parsing; booleans/non-finite literals cannot pass as values. Malformed FHIR numeric encoding is reported as an error.
 
-CSV headers must be unique/nonempty and mapped columns present. Mismatched row width fails the batch with a redacted failure audit. Invalid measurement numbers within an otherwise valid CSV become review findings. A numeric encoding budget (1,024 coefficient digits, at most 1,024 digits before the decimal point and absolute decimal exponent at most 1,024; input text at most 4,096 characters) prevents pathological fixed-point expansion. It is not a biological plausibility threshold. Native FHIR uses `granularity="individual"` and native elements/`input.elements`; CSV column/default mappings and a distinct frequency declaration are rejected rather than ignored. Export already aggregated frequency sets as mapped CSV/DB rows. Native FHIR exports must contain one current version per Observation ID; duplicate IDs fail rather than silently doubling counts.
+CSV headers must be unique/nonempty and mapped columns present. Mismatched row width fails the batch with a redacted failure audit. Invalid measurement numbers within an otherwise valid CSV become review findings. A numeric encoding budget (1,024 coefficient digits, at most 1,024 digits before the decimal point and absolute decimal exponent at most 1,024; input text at most 4,096 characters) prevents pathological fixed-point expansion. It is not a biological plausibility threshold. Native FHIR and full-resource CSV use `granularity="individual"` and native elements/`input.elements`; Scalar column/default mappings and a distinct frequency declaration are rejected rather than ignored; full-resource CSV maps only `resource_json`. Export already aggregated frequency sets as mapped CSV/DB rows. Native FHIR exports must contain one current version per Observation ID; duplicate IDs fail rather than silently doubling counts.
 
 ## Frequency and aggregation
 
@@ -54,7 +55,7 @@ For `output.path="output/review.csv"`:
 | `review.summary.json` | Counts, explicit numerators/denominators, versions, hashes, profile provenance and scope |
 | `review.evidence.jsonl` | Detailed per-group assessment with original semantic metadata and evidence |
 | `review.audit.jsonl` | UTC phases/progress, software, hashes, counters, redacted errors; hash chain |
-| `review.fhir-validation.jsonl` when enabled for FHIR input | Full local validator OperationOutcomes, requested profile/packages and source/submitted resource hashes |
+| `review.fhir-validation.jsonl` when enabled for native FHIR or full-resource CSV input | Full local validator OperationOutcomes, requested profile/packages and source/submitted resource hashes |
 | Optional captured pack | Only queried verdicts/terms/verified linear factors for offline reuse; same report directory |
 
 An existing prefix requires `overwrite=true` or a new filename. Concurrent runs with the same output prefix are blocked. Files publish from staged temporary files; the summary is published last as the completion marker. Failed runs retain `.failed.<run-id>.audit.jsonl`, with safe diagnostics and no completed summary. A stale `.run.lock` should be removed only after confirming its owning process is no longer running.
@@ -67,7 +68,7 @@ The main statuses are `passed`, `suggestion`, `unclear`, `error`; `not_applicabl
 
 Names/research: `analyte_name` is supplied; `canonical_name` is the exact lookup display. `suggested_code`/`suggested_name` record a model-selected, independently verified candidate or remain empty on abstention. `suggestion_state`, `laboratory_suggestions_json` retain the shortlist, conflicts, unresolved axes and provenance; `reference_candidates_json` contains quoted candidate intervals with context. Retrieved candidates are never asserted equivalent to the source test.
 
-Formal FHIR: `fhir_validation_state` and `fhir_validation_scope` describe the full input-document check before grouping. States are `passed`, `passed_with_warnings`, `invalid`, `incomplete`, `unavailable`, `disabled` or `not_applicable` for scalar CSV/DB input. Aggregated rows share the input-level result; this is not a per-group conformance certification. The HTML links the full outcomes and places supporting citations beside each proposal. [Validation setup](validation.md).
+Formal FHIR: `fhir_validation_state` and `fhir_validation_scope` describe the full input-document check before grouping. States are `passed`, `passed_with_warnings`, `invalid`, `incomplete`, `unavailable`, `disabled` or `not_applicable` for scalar CSV/DB input and direct database JSON. Aggregated rows share the input-level result; this is not a per-group conformance certification. The HTML links the full outcomes and places supporting citations beside each proposal. [Validation setup](validation.md).
 
 Credibility is an evidence category, **not a calibrated probability**: `supported_by_configured_sources`, `partial`, `unverified`, `rejected`. Numerical readiness is defined in the report independently of credibility. `clinical_value_evidence` and `clinical_reference_evidence` remain `not_established` by the numeric core. Grounded research candidates do not change that into clinical approval.
 
