@@ -15,7 +15,8 @@ from .db_source import _identifier_parts, scan
 from .export_review import InputContractError, _file_payloads, _resources, csv_rows, reject_json_constant
 from .fhir_validation import fhir_json
 
-KINDS = {"MedicationRequest", "MedicationAdministration"}
+KINDS = {"Medication", "MedicationRequest", "MedicationAdministration", "MedicationStatement"}
+REGIMEN_KINDS = {"MedicationRequest", "MedicationStatement"}
 FIELDS = {"resource_json", "id", "resource_type", "count", "product_code", "product_system", "product_version",
           "product_name", "form_text", "ingredient_text", "medication_json", "status", "intent",
           "dosage_instructions_json", "dosage_json", "do_not_perform", "duration_value", "duration_code",
@@ -44,14 +45,21 @@ def validate_fields(mapping):
     fields = set(mapping["fields"]) | set(mapping.get("defaults", {}))
     if fields == {"resource_json"}:
         return
-    required = {"status", "dosage_instructions_json" if mapping["resource_type"] == "MedicationRequest" else "dosage_json"}
-    if mapping["resource_type"] == "MedicationRequest":
+    kind = mapping["resource_type"]
+    required = set() if kind == "Medication" else {"status"}
+    if kind == "MedicationRequest":
         required.add("intent")
     if not required <= fields or not ({"product_code", "product_system"} <= fields or "medication_json" in fields):
-        raise ValueError("Medication columns need status, request intent and dosage JSON, plus medication_json OR product_code/product_system")
+        raise ValueError("Medication columns need medication_json OR product_code/product_system; events also need status, requests intent")
     if "medication_json" in fields and any(f.startswith(("product_", "strength_")) or f in {"form_text", "ingredient_text"} for f in fields):
         raise ValueError("Choose medication_json OR flat product/strength columns; do not mix competing product definitions")
-    wrong = {"dosage_json", "duration_value", "duration_code", "duration_system", "constant_rate"} if mapping["resource_type"] == "MedicationRequest" else {"dosage_instructions_json", "intent", "do_not_perform"}
+    administration_only = {"dosage_json", "duration_value", "duration_code", "duration_system", "constant_rate"}
+    request_only = {"intent", "do_not_perform"}
+    wrong = administration_only if kind in REGIMEN_KINDS else {"dosage_instructions_json"}
+    if kind != "MedicationRequest":
+        wrong |= request_only
+    if kind == "Medication":
+        wrong |= administration_only
     if fields & wrong:
         raise ValueError("Medication columns contain fields for the other medication resource type")
 
@@ -110,13 +118,19 @@ def from_row(row, config):
         if any(strength.values()) or row.get("ingredient_text"):
             medication["ingredient"] = [{"itemCodeableConcept": {"text": row.get("ingredient_text", "")}, "strength": strength}]
     resource = {"resourceType": kind, "status": row.get("status", ""), "id": row.get("id", "")}
+    if kind in REGIMEN_KINDS:
+        field = "dosageInstruction" if kind == "MedicationRequest" else "dosage"
+        resource[field] = decode(row.get("dosage_instructions_json") or "[]", list, "dosage instructions")
     if kind == "MedicationRequest":
-        resource.update(intent=row.get("intent", ""), dosageInstruction=decode(row.get("dosage_instructions_json") or "[]", list, "dosage instructions"))
+        resource["intent"] = row.get("intent", "")
         flag = boolean(row.get("do_not_perform"), "do_not_perform")
         if flag is not None:
             resource["doNotPerform"] = flag
-    else:
+    elif kind == "MedicationAdministration":
         resource["dosage"] = decode(row.get("dosage_json") or "{}", dict, "dosage")
+    elif kind == "Medication":
+        if "status" not in row and "status" in medication:
+            resource["status"] = medication["status"]
     payload = normalize(resource, medication, config)
     if kind == "MedicationAdministration":
         payload["duration"] = quantity(row, "duration_")
@@ -138,7 +152,9 @@ def normalize(resource, medication, config):
     medication = deepcopy(medication or {})
     # Keep all product semantics, never copy product identifiers/batches/manufacturer identities.
     medication = {k: v for k, v in medication.items() if k in {"code", "form", "ingredient", "amount", "extension", "modifierExtension"}}
-    instructions = resource.get("dosageInstruction", []) if config.kind == "MedicationRequest" else [resource.get("dosage", {})]
+    instructions = (resource.get("dosageInstruction", []) if config.kind == "MedicationRequest" else
+                    resource.get("dosage", []) if config.kind == "MedicationStatement" else
+                    [resource.get("dosage", {})] if config.kind == "MedicationAdministration" else [])
     if not isinstance(instructions, list) or any(not isinstance(x, dict) for x in instructions):
         raise InputContractError("Medication dosage instructions must be objects in an array")
     result = {"resource_type": config.kind, "medication": medication, "dosages": deepcopy(instructions),
@@ -152,9 +168,9 @@ def normalize(resource, medication, config):
         result["unresolved_reference_sha256"] = hashlib.sha256(str(resource.get("medicationReference", {})).encode()).hexdigest()
     if "medicationReference" in resource and "medicationCodeableConcept" in resource:
         result["input_issues"].append("Medication reference and code are both present (FHIR choice conflict)")
-    if config.kind == "MedicationAdministration":
+    if config.kind in {"MedicationAdministration", "MedicationStatement"}:
         period = resource.get("effectivePeriod", {})
-        if period.get("start") and period.get("end"):
+        if config.kind == "MedicationAdministration" and period.get("start") and period.get("end"):
             try:
                 # Do not infer missing timezone/date precision.
                 start, end = (datetime.fromisoformat(period[k].replace("Z", "+00:00")) for k in ("start", "end"))
@@ -197,7 +213,7 @@ def native_rows(payloads, config, folder):
                         db.execute("INSERT INTO ids VALUES (?)", (identifier,))
                     except sqlite3.IntegrityError:
                         raise InputContractError("Export repeats a medication resource ID; select one version upstream") from None
-                medication = {"code": resource["medicationCodeableConcept"]} if resource.get("medicationCodeableConcept") else None
+                medication = resource if config.kind == "Medication" else {"code": resource["medicationCodeableConcept"]} if resource.get("medicationCodeableConcept") else None
                 reference = resource.get("medicationReference", {}).get("reference", "")
                 if reference.startswith("#"):
                     matches = [r for r in resource.get("contained", []) if r.get("id") == reference[1:] and r.get("resourceType") == "Medication"]
@@ -224,6 +240,8 @@ def records(config, prepared, folder):
         columns = ",".join(f'"{column}" AS "{role}"' for role, column in config.mapping["fields"].items())
         def sqlite_rows():
             with closing(sqlite3.connect("file:" + quote(str(prepared.source["path"]), safe="/") + "?mode=ro", uri=True)) as db:
+                from .db_source import sqlite_columns_present
+                sqlite_columns_present(db, config.mapping)
                 db.execute("PRAGMA query_only=ON")
                 db.row_factory = sqlite3.Row
                 yield from enumerate((dict(row) for row in db.execute(f"SELECT {columns} FROM {relation}")), 1)
@@ -256,8 +274,14 @@ def check_structure(resource, medication):
     for key in ("code", "form"):
         if key in medication and not isinstance(medication[key], dict):
             raise InputContractError("Medication." + key + " must be an object")
-    for key in ("medicationReference", "medicationCodeableConcept", "effectivePeriod", "dosage"):
+    for key in ("medicationReference", "medicationCodeableConcept", "effectivePeriod"):
         if key in resource and not isinstance(resource[key], dict):
             raise InputContractError(key + " must be an object")
+    if "dosage" in resource:
+        value = resource["dosage"]
+        valid = (isinstance(value, list) and all(isinstance(row, dict) for row in value)
+                 if resource.get("resourceType") == "MedicationStatement" else isinstance(value, dict))
+        if not valid:
+            raise InputContractError("dosage must be an array for MedicationStatement and an object for MedicationAdministration")
     walk(resource, "resource")
     walk(medication, "Medication")

@@ -7,7 +7,7 @@ The named check reads an export, writes local artifacts and exits. Evidence rese
 | Parse TOML, source roles, selected R4 rules | `batch.py`, `profile_import.py`, `profile_config.py` |
 | Read CSV/FHIR/SQLite/PostgreSQL | `audit.py`, `batch_quality.py`, `db_source.py`, `export_review.py` |
 | Guarded grouping and weighted statistics | `export_grouping.py` (embedded DuckDB) |
-| Real UCUM syntax/factors and LOINC metadata | `observation_services.py` |
+| Real UCUM syntax/factors and LOINC metadata | `observation_services.py`; `local_terminology.py` reads official LOINC CSV and preserves published ATC/DDD text |
 | Local full FHIR/IG validation | `fhir_validation.py`, pinned Matchbox/HL7 or MII service |
 | Source → linked terminology → complete proposal and citations | `report_sources.py`, provider-origin metadata in `observation_services.py` |
 | Additional configured CodeSystems/ValueSets | `terminology_router.py`, `terminology_validation.py` |
@@ -20,7 +20,7 @@ The named check reads an export, writes local artifacts and exits. Evidence rese
 | Medication input, checks and reports | `medication_input.py`, `medication_checks.py`, `medication_report.py`; full regimen grouping, real source routing, conditional strength/infusion arithmetic |
 | CSV/HTML, audit and comparisons | `export_report.py`, `study_compare.py` |
 
-The command prints input, active lookup sources and model enablement. The CSV/evidence file contain row-level findings; the summary records source versions, timing, coverage and failed lookup operations. The audit is a redacted hash chain with artifact hashes. Detailed reports can contain sensitive measurements.
+The command logs input type, resource, enabled source aliases and phases via `progress.py`; `logging.level` or `--log-level` controls DEBUG/INFO/WARNING/ERROR output. The CSV/evidence file contain row-level findings; the summary records source versions, timing, coverage and failed lookup operations. The audit is a redacted hash chain with artifact hashes. Detailed reports can contain sensitive measurements.
 
 Lookup results are cached per run. Laboratory lookups open a source circuit after three consecutive request failures; medication caches code/unit results and failed conversions per run; affected findings stay unverified. Model inputs exclude measured values and identifiers, permit only local/LAN endpoints, bound response sizes and require supporting quotations. No automatic coding/value rewrite occurs.
 
@@ -50,6 +50,14 @@ Matchbox 4.1.21 and MII validator 0.0.1-alpha.8 are pinned; the latter uses the 
 Live FHIR tests require a running local Matchbox with the real MII guide: `SQC_LIVE_FHIR_VALIDATION_TESTS=1 uv run --no-sync python -m unittest discover -s tests -p test_fhir_validation.py -v`. The valid/invalid source inputs are illustrative; every validation response comes from the actual service.
 
 ## Current verification
+
+Version **0.13.0**, 14 October 2026: adds MedicationStatement/Medication adapters, local official LOINC CSV support, published ATC/DDD context, local-first/all-source routing with visible attempts, configuration summaries and log levels. SQLite rejects missing mapped columns before querying (quoted unknown names must never become literal values).
+
+The offline suite ran **86 tests: 61 passed, 25 optional integrations skipped**. Real public checks exercised NLM/LOINC, source-name provenance, captured-response replay, BfArM metadata, an unprotected real gematik package, SemLookP and the already-downloaded BfArM laboratory supplements. All **15 medication tests passed** with real UCUM/medication services enabled. Full official Loinc.csv and the protected ATC/DDD package were not available for this run: their artifact tests remain explicit opt-ins. No protected download conditions were accepted automatically. Database deployment, new medication FHIR profile conformance and model accuracy are not established by these tests.
+
+For your installed real tables, set `SQC_TEST_LOINC_CSV`, `SQC_TEST_LOINC_VERSION` and/or `SQC_TEST_ATC_DIR` in an ignored test environment file, then run `uv run --no-sync --env-file .env.tests python -m unittest discover -s tests -v`. The two artifact tests read the actual publisher data. No synthetic lookup tables or service replies are introduced.
+
+### Earlier verification
 
 0.12.0 adds executable medication terminology/dose checks to the four laboratory modes. Both medication recipes ran against actual NLM UCUM and FHIR terminology services on 13 October 2026: ATC N02BE01 returned paracetamol; 5 mL at a source-declared 20 mg/mL yielded a conditional 100 mg; the contradictory constant-infusion example was flagged. The final installed-package suite ran **75 tests: 52 passed, 23 integrations skipped** without service opt-ins. All **14 medication tests passed** with the real-service opt-in. The public server reported ATC edition **2025**, independently of the selected MII guide version. No medication FHIR conformance or clinical-dose safety result is claimed from these terminology calls.
 

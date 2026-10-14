@@ -6,6 +6,7 @@ import argparse
 import json
 from pathlib import Path
 import sys
+import tomllib
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -71,21 +72,25 @@ def main(argv: list[str] | None = None) -> int:
         command.add_argument("--config", type=Path, default=Path("pipeline.toml"))
         if name != "catalog-init":
             command.add_argument("--model-alias", default=None)
+    from .progress import LEVELS, configure, LOGGER
+    for command in sub.choices.values():
+        command.add_argument("--log-level", choices=LEVELS, help="Console verbosity; the audit always retains every event")
     args = parser.parse_args(argv)
     try:
+        settings = tomllib.loads(args.config.read_text()).get("logging", {}) if hasattr(args, "config") else {}
+        configure(args.log_level or settings.get("level", "INFO"))
         if args.command in {"batch", "check"}:
             from .batch import BatchConfiguration, run_batch, run_plausibility_check
 
             configuration = BatchConfiguration(args.config, research=False if args.command == "check" else None,
                                                output_path=getattr(args, "out", None))
-            print(f"Input: {configuration.input_type}; {configuration.input.get('path', 'configured database view')}", flush=True)
-            print(f"Grouping: {configuration.output.get('mode', 'distinct')}; network: {configuration.network_mode}", flush=True)
+            LOGGER.info("Input type: %s; resource: %s", configuration.input_type, configuration.kind)
+            LOGGER.info("Grouping: %s; network: %s", configuration.output.get('mode', 'distinct'), configuration.network_mode)
             for name, lookup in configuration.data.get("lookups", {}).items():
                 if lookup.get("enabled", False):
-                    print(f"Lookup {name}: {lookup.get('endpoint', lookup.get('path', 'configured source'))}", flush=True)
-            print("Local-model research: " + ("enabled" if configuration.data.get("research", {}).get("enabled", False) else "disabled"), flush=True)
-            print("Full FHIR input: " + ("yes" if configuration.full_fhir_input else "no; scalar sets receive semantic checks"), flush=True)
-            print("Processing: read -> group -> terminology -> " + ("numeric/reference checks" if configuration.kind == "Observation" else "dose/timing consistency") + " -> report", flush=True)
+                    LOGGER.info("Lookup %s: %s", name, lookup.get('type'))
+            LOGGER.info("Full FHIR input: %s", configuration.full_fhir_input)
+            LOGGER.info("Processing: read -> group -> terminology -> consistency checks -> report")
             result = run_plausibility_check(args.config, output=args.out) if args.command == "check" else run_batch(args.config)
             print(f"{result.input_records} source records -> {result.distinct_tuples} {configuration.kind} review rows.")
             print("Status counts: " + json.dumps(result.statuses, sort_keys=True))

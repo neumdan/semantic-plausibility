@@ -471,10 +471,12 @@ class Deployment:
                         "terminology source",
                         {
                             "kind",
+                            "alias",
                             "role",
                             "systems",
                             "path",
                             "complete",
+                            "version",
                             "base_url",
                             "token_env",
                             "token_file",

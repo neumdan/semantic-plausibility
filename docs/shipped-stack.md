@@ -9,6 +9,7 @@ Run from the repository directory. Choose Python with uv, Docker with Compose, o
 ```sh
 cp -n pipeline.example.toml pipeline.toml
 cp -n .env.example .env
+chmod 600 .env
 mkdir -p ../input local output
 ```
 
@@ -265,7 +266,7 @@ Missing evidence remains unknown. Model provisioning/research need connectivity 
 
 ## Medication examples
 
-The same installed library/container runs [MedicationRequest and MedicationAdministration](../examples/medication/README.md). No model setup is needed:
+The same installed library/container runs [Medication, MedicationRequest, MedicationAdministration and MedicationStatement](../examples/medication/README.md). No model setup is needed:
 
 ```sh
 uv run --no-sync --env-file .env run-plausibility-check --config examples/medication/request.toml

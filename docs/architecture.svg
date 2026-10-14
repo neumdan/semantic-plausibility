@@ -34,9 +34,9 @@
 </g>
 <g data-node="SOURCES"><rect x="20" y="620" width="330" height="157" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
 <text x="36" y="649" class="heading">Real terminology evidence</text>
-<text x="36" y="677" class="body" style="font-size:16px">Local BfArM / site catalogues</text>
+<text x="36" y="677" class="body" style="font-size:16px">Local LOINC / BfArM / ATC + DDD</text>
 <text x="36" y="702" class="body" style="font-size:16px">UCUM / LOINC / medication APIs</text>
-<text x="36" y="727" class="body" style="font-size:16px">Primary / source / optional roles</text>
+<text x="36" y="727" class="body" style="font-size:16px">Local first; fallback or all sources</text>
 <text x="36" y="752" class="body" style="font-size:16px">Retain editions, hashes, failures</text>
 </g>
 <g data-node="CHECK"><rect x="385" y="620" width="330" height="157" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>

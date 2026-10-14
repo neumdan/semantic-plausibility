@@ -30,7 +30,7 @@ def _configured_lookup(config, alias, *, system, code, version, name):
     if not code and not name:
         raise ValueError("Supply a code and/or a terminology name")
     kind = row["type"]
-    if config.network_mode == "offline" and kind not in {"csv", "sqlite", "fhir_artifacts"}:
+    if config.network_mode == "offline" and kind not in {"csv", "sqlite", "fhir_artifacts", "loinc_csv"}:
         raise ValueError("This lookup needs network.mode=lookups")
     expected = {"loinc": "http://loinc.org", "ucum": "http://unitsofmeasure.org"}.get(kind)
     systems = [expected] if expected else row.get("systems", [])

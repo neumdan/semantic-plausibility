@@ -1,5 +1,17 @@
 # Configure a laboratory or medication review
 
+## Setup in six decisions
+
+1. **Select a resource and representation.** Lab Observation; or Medication, MedicationRequest, MedicationAdministration, MedicationStatement. CSV / PostgreSQL / SQLite use mapped columns. Native FHIR JSON, Bundle or NDJSON uses built-in resource fields. Select/export FHIR server resources with TORCH/CQL upstream.
+2. **Map the actual source.** For example `code="lab_test_id"` means the column `lab_test_id` contains the source code. Set its real `code_system`; do not label unmapped LIS identifiers as LOINC. Use a database view when joins or conversions are needed, under a read-only account.
+3. **Choose target rules.** The shipped recipes pin MII Laboratory 2026.0.3 or Medication 2026.0.1 on FHIR R4. Without a custom profile, the matching international R4 resource is the formal-validation fallback. An IG cannot determine the meanings of site column names. `specification.links` are documentation; installed snapshots/packages perform checks.
+4. **Install/enable terminology.** Select local catalogues or named APIs in `[lookups]`. For offline LOINC use `loinc_csv`; for BfArM ATC/DDD use `fhir_artifacts`; use real captured UCUM responses or an enabled UCUM API. Add your LIS catalogue for unmapped local codes. [Exact recipes](lookups.md).
+5. **Choose reports.** `output.mode="distinct"` groups guarded sets; `items` retains identifiers. Set `output.path` to a new CSV filename. The runner always adds HTML/evidence/summary/audit. It does not produce an OMOP database or write FHIR back to a server. CDS Hub/OMOP can be mapped input views; semantic roles and target rules remain explicit.
+6. **Check then execute.** Run `config-check`, optionally `--connections`, then `check` using the same TOML. Review gaps as well as suggestions. Add validation or laboratory AI only after this basic run works.
+
+The source column map, target clinical specification and report representation are three independent choices. All paths are relative to the selected TOML. `../input/` and `local/` are the standard private-data locations; credentials live in `.env` or referenced secret files.
+
+
 Start by copying `pipeline.example.toml` to **`pipeline.toml`**. For the first check, leave the example unchanged. For your data, edit its existing `[input]`, `[input.columns]` and `[output]` tables. Enable other features only when you need them. [First setup and run commands](shipped-stack.md#first-setup).
 
 TOML carries the pipeline settings. `.env` or secret files carry credentials; no shell exports are required. The runner supports laboratory **Observation in FHIR R4 (4.0.1)**. **MedicationRequest and MedicationAdministration** also have executable [medication recipes and their full column map](../examples/medication/README.md). Condition and Procedure remain later adapters. The lab settings below do not automatically apply to medication.
@@ -175,7 +187,7 @@ Profiles define constraints/bindings, not API endpoint URLs or credentials. The 
 | `source` | Check what the LIS's original local codes/units mean | Real site CSV, SQLite, FHIR artifacts or API |
 | `optional` | Additional labels, aliases and candidates | BfArM supplements, SemLookP / OLS or a configured website |
 
-An optional result cannot reverse a confirmed primary rejection. A valid local code/unit is separate from target compatibility. Without a real source catalogue, membership stays unknown.
+The `fallback` strategy orders local sources before APIs, with primary/source/optional roles within each group. It tries enabled compatible sources until valid; `all` cross-checks every enabled source. Conflicting valid/invalid results stay `unknown` and require review. A partial catalogue absence is never a rejection. A valid local code/unit is separate from target compatibility. Without a real source catalogue, membership stays unknown.
 
 ```toml
 [lookups.lis_catalogue]
@@ -187,9 +199,9 @@ systems = ["https://your-site.example/lis/tests", "https://your-site.example/lis
 complete = false
 ```
 
-This references your actual file; the project does not generate local terminology. CSV catalogues require `system,code`, optionally `version,display,definition,expected_unit_code,expected_unit_system,specimen,method`. Set `complete=true` only for a complete edition.
+This references your actual file; the project does not generate local terminology. CSV catalogues require `system,code`, optionally `version,display,definition,expected_unit_code,expected_unit_system,specimen,method,ddd`. Set `complete=true` only for a complete edition.
 
-Supported types: `ucum`, `loinc`, generic `fhir`, `csv`, `sqlite`, `fhir_artifacts`, `website`, `ols`, `who_icd`. Set `enabled=true` deliberately, one dedicated UCUM and LOINC service each. API adapters use `endpoint`; dedicated UCUM/LOINC also accept `endpoint_env`. Local adapters use `path` and declared `systems`. WHO ICD-11 is a standalone lookup, not a Condition batch check. [Adapter-specific fields, access and setup](lookups.md#choose-local-files-or-an-api) · [Optional terminology TOML](../terminology.example.toml).
+Supported types: `ucum`, `loinc`, `loinc_csv`, generic `fhir`, `csv`, `sqlite`, `fhir_artifacts`, `website`, `ols`, `who_icd`. Set `enabled=true` deliberately, one dedicated UCUM and LOINC service each. API adapters use `endpoint`; dedicated UCUM/LOINC also accept `endpoint_env`. Local adapters use `path` and declared `systems`. WHO ICD-11 is a standalone lookup, not a Condition batch check. [Adapter-specific fields, access and setup](lookups.md#choose-local-files-or-an-api) · [Optional terminology TOML](../terminology.example.toml).
 
 ## Full FHIR validation
 
@@ -307,10 +319,27 @@ A GitHub branch can change; the guide edition and source-file hashes establish w
 
 ## Medication configuration differences
 
-Start with `examples/medication/request.toml` or `administration.toml` and run them **in place** with `--config`; their relative paths also work under `/app/examples/medication/` in Compose. These select MII Medication 2026.0.1 by `IG_PACKAGE`, `IG_VERSION` and `IG_CANONICAL`. Do not copy a laboratory `PROFILE`, `PROFILE_FILE` or column map into them.
+Start with `examples/medication/request.toml`, `administration.toml`, `statement.toml` or `product.toml` and run them **in place** with `--config`; their relative paths also work under `/app/examples/medication/` in Compose. These select MII Medication 2026.0.1 by `IG_PACKAGE`, `IG_VERSION` and `IG_CANONICAL`. Do not copy a laboratory `PROFILE`, `PROFILE_FILE` or column map into them.
 
 Use the [medication input contract](../examples/medication/README.md#input-contract) for product/ingredient/strength, full dosage JSON, route/timing and source duration. The same `database`, `lookups`, secrets and `output.mode` settings apply. Medication grouping always preserves the complete regimen; omit `aggregation.group_by`. `input.context.constant_rate=true` is optional for a full FHIR export **only if the source guarantees constant, uninterrupted infusion delivery for every selected event**; otherwise leave it absent/false. Scalar inputs support a per-row `constant_rate` column.
 
 Medication does not support laboratory `input.elements`, snapshots/context files/manifests, lookup-pack capture, study comparison, clinician mapping registries or research. Unsupported settings are rejected. Installed real terminology artifacts remain usable offline. Full FHIR input can additionally use the local Matchbox/HL7 or MII validator. The selected guide controls formal bindings; the medication semantic pass checks supplied systems, quantities and dose relationships, not every guide constraint.
 
 `validation.setup_directory` defaults to `local/validation` beside the TOML. Nested example configs explicitly use `../../local/validation` so generated files reach the repository Compose build directory. This setup path does not change the validator endpoint or the input data.
+
+## Fallbacks and logging
+
+```toml
+[terminology]
+strategy = "fallback"  # Local first; enabled APIs for the exact system if needed.
+# strategy = "all"    # Cross-check every enabled compatible source; more requests.
+
+[logging]
+level = "INFO"        # DEBUG, INFO, WARNING, ERROR.
+```
+
+The inventory never enables a service automatically. Missing code/system, uncovered systems, version mismatch, unavailability and source disagreement remain explicit. Laboratory `lookup_attempts_json` and medication `sources_json` show attempts, states, editions and available source hashes. The HTML includes these traces. A dedicated UCUM grammar service is configured separately; finite unit catalogues do not replace its grammar/conversion checks. Laboratory offline packs cover only queries actually captured.
+
+`--log-level DEBUG` overrides TOML for one command and adds source-attempt states. INFO shows phases/counts; WARNING/ERROR reduce console output. No credentials or clinical values are printed by the progress logger. Reports/trace files do contain source-derived data and must remain private. Audit recording is independent of console verbosity.
+
+`config-check` lists mappings, target rules, active sources, strategy and output. It verifies local catalogue readability and CSV/SQLite columns. `--connections` adds read-only PostgreSQL table/column checks and supported service readiness probes. A successful readiness probe does not promise that every code, edition or clinical assertion in your dataset can be verified.

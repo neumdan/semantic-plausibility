@@ -38,6 +38,7 @@ class LoincTerm:
     synonyms: tuple[str, ...] = ()
     status: str = ""
     axis_sources: dict[str, dict] = field(default_factory=dict)
+    lookup_attempts: tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True)

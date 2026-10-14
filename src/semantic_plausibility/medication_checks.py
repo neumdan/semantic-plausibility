@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 import os
 
-from .medication_input import UCUM, decimal, check_structure
+from .medication_input import UCUM, REGIMEN_KINDS, decimal, check_structure
 from .observation_services import NlmUcumClient
 from .terminology_router import TerminologyRouter, load_sources
 
@@ -14,8 +14,9 @@ SCOPE = "Terminology, numeric and dimensional consistency. No clinical dose safe
 def terminology_plan(config):
     from .fhir_validation import target_profile
     return {"profile": target_profile(config), "formal_fhir_validation": "local validator on full resources only",
-            "elements": ["Medication.code", "Medication.form", "Medication.ingredient.itemCodeableConcept",
-                         config.kind + ".medication[x]", config.kind + (".dosageInstruction" if config.kind == "MedicationRequest" else ".dosage")],
+            "elements": ["Medication.code", "Medication.form", "Medication.ingredient.itemCodeableConcept"] +
+                        ([] if config.kind == "Medication" else [config.kind + ".medication[x]",
+                         config.kind + (".dosageInstruction" if config.kind == "MedicationRequest" else ".dosage")]),
             "services": [{"alias": alias, "role": entry.get("role", "primary"),
                           "systems": [UCUM] if entry.get("type") == "ucum" else entry.get("systems", []),
                           "location": entry.get("path") or entry.get("endpoint") or "endpoint reference"}
@@ -25,7 +26,7 @@ def terminology_plan(config):
 
 class MedicationChecker:
     def __init__(self, config, prepared):
-        self.router = TerminologyRouter(load_sources(prepared.audit.terminology_sources) if prepared.audit.terminology_sources else [])
+        self.router = TerminologyRouter(load_sources(prepared.audit.terminology_sources) if prepared.audit.terminology_sources else [], strategy=config.lookup_strategy)
         self.ucum = NlmUcumClient(os.environ["UCUM_NLM_BASE_URL"]) if config.network_mode == "lookups" and any(
             x.get("enabled") and x.get("type") == "ucum" for x in config.data.get("lookups", {}).values()) else None
         self.cache, self.factors = {}, {}
@@ -155,16 +156,21 @@ class MedicationChecker:
         for issue in data["input_issues"]:
             add("review", "input", issue, FHIR + "medication.html")
         status = data["status"]
-        allowed = {"active", "on-hold", "cancelled", "completed", "entered-in-error", "stopped", "draft", "unknown"} if data["resource_type"] == "MedicationRequest" else {"in-progress", "not-done", "on-hold", "completed", "entered-in-error", "stopped", "unknown"}
+        allowed = {
+            "Medication": {"", "active", "inactive", "entered-in-error"},
+            "MedicationRequest": {"active", "on-hold", "cancelled", "completed", "entered-in-error", "stopped", "draft", "unknown"},
+            "MedicationAdministration": {"in-progress", "not-done", "on-hold", "completed", "entered-in-error", "stopped", "unknown"},
+            "MedicationStatement": {"active", "completed", "entered-in-error", "intended", "stopped", "on-hold", "unknown", "not-taken"},
+        }[data["resource_type"]]
         if not isinstance(status, str) or status not in allowed:
             add("error", "status", "Missing or invalid FHIR R4 status", FHIR + data["resource_type"].lower() + ".html")
         if data["resource_type"] == "MedicationRequest" and (not isinstance(data["intent"], str) or data["intent"] not in {"proposal", "plan", "order", "original-order", "reflex-order", "filler-order", "instance-order", "option"}):
             add("error", "intent", "Missing or invalid FHIR R4 request intent", FHIR + "medicationrequest.html")
         if type(data["do_not_perform"]) is not bool:
             add("error", "doNotPerform", "Expected a Boolean")
-        inactive = not isinstance(status, str) or status in {"not-done", "entered-in-error", "cancelled", "stopped", "unknown"} or data["do_not_perform"] is not False
+        inactive = not isinstance(status, str) or status in {"not-done", "not-taken", "inactive", "entered-in-error", "cancelled", "stopped", "unknown"} or data["do_not_perform"] is not False
         if inactive:
-            add("review", "status", "Inactive, uncertain or prohibited administration: no dose transformation is proposed")
+            add("review", "status", "Inactive, uncertain, not-taken or prohibited medication: no dose transformation is proposed")
         product = data["medication"]
         concept(product.get("code", {}), "Medication.code", True)
         # Inspect every ingredient and dosage; never collapse to the first instruction.
@@ -179,14 +185,14 @@ class MedicationChecker:
                 add("review", f"Medication.ingredient[{index}]", "Referenced ingredient is not expanded; export its coded identity/strength for review")
             if ingredient.get("strength") and not all(ingredient["strength"].get(k, {}).get("value") is not None for k in ("numerator", "denominator")):
                 add("review", f"Medication.ingredient[{index}].strength", "Both strength numerator and denominator are needed")
-        if not data["dosages"] or not any(data["dosages"]):
+        if data["resource_type"] != "Medication" and (not data["dosages"] or not any(data["dosages"])):
             add("review", "dosage", "No structured dosage supplied; terminology can still be checked")
         for index, dosage in enumerate(data["dosages"]):
             path = f"dosage[{index}]"
             walk(dosage, path)
             if not dosage.get("route"):
                 add("review", path + ".route", "Route not supplied; route/form compatibility is unassessed")
-            dose_entries = dosage.get("doseAndRate", []) if data["resource_type"] == "MedicationRequest" else [{"doseQuantity": dosage.get("dose")}]
+            dose_entries = dosage.get("doseAndRate", []) if data["resource_type"] in REGIMEN_KINDS else [{"doseQuantity": dosage.get("dose")}]
             if not isinstance(dose_entries, list):
                 add("error", path, "doseAndRate must be an array")
                 continue
@@ -206,21 +212,23 @@ class MedicationChecker:
                     if form in {"liquid", "solution", "lösung", "suspension"} and any(x in unit for x in ("tablet", "tablett", "capsul", "kapsel")):
                         add("review", path, "Source form describes a liquid but dose describes tablets/capsules; verify product, reconstitution and dose unit", "Source export: Medication.form and dose unit")
                     if not inactive and not self.has_modifiers(data):
-                        proposals.extend(self.strength_proposals(product, dose, f"{path}.doseAndRate[{j}]" if data["resource_type"] == "MedicationRequest" else path + ".dose"))
+                        proposals.extend(self.strength_proposals(product, dose, f"{path}.doseAndRate[{j}]" if data["resource_type"] in REGIMEN_KINDS else path + ".dose"))
             if data["resource_type"] == "MedicationAdministration" and dosage.get("rateQuantity"):
                 if data["duration"]:
                     qty(data["duration"], "duration")
                 self.infusion(data, dosage, path, add, proposals, inactive)
             if dosage.get("rateRatio"):
                 add("review", path + ".rateRatio", "Rate ratio quantities are checked; delivery integration is not calculated for this representation")
-        if not any(x.get("type") == "strength_conversion" for x in proposals) and product.get("ingredient"):
+        if data["resource_type"] != "Medication" and not any(x.get("type") == "strength_conversion" for x in proposals) and product.get("ingredient"):
             add("review", "Medication.ingredient.strength", "No unambiguous dose/strength conversion: check ingredient identity, exact quantities and compatible units", "Source export")
         if proposals and any(p["type"] == "strength_conversion" for p in proposals):
             add("review", "Medication.ingredient.strength", "Strength is source-declared; conditional transformations require product/ingredient verification", "Source export")
         if any(f["state"] == "error" for f in findings):
             proposals = [p for p in proposals if p["type"] != "strength_conversion"]
         state = "error" if any(f["state"] == "error" for f in findings) else "needs_review" if any(f["state"] == "review" for f in findings) else "passed"
+        from .local_terminology import ddd_references
         return {"status": state, "findings": findings, "terminology": lookups, "recommendations": proposals, "scope": SCOPE,
+                "ddd_references": [reference for lookup in lookups for reference in ddd_references(lookup)],
                 "product_strength_authority": "source_assertion_only", "clinical_dose_safety": "not_assessed"}
 
     @staticmethod

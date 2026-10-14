@@ -142,3 +142,19 @@ systems = ["http://loinc.org"]
 endpoint = "https://semanticlookup.zbmed.de/ols/api"
 ontology = "loinc"
 limit = 5
+
+[terminology]
+strategy = "fallback" # Local first; then enabled sources for the exact system. "all" cross-checks them all.
+
+[logging]
+level = "INFO" # Override per run with --log-level DEBUG; values and credentials are not console-logged.
+
+# Optional full official LOINC table; local membership, names, axes and example units.
+# [lookups.loinc_local]
+# enabled = true
+# role = "primary"
+# type = "loinc_csv"
+# systems = ["http://loinc.org"]
+# path = "../input/terminologies/loinc/Loinc.csv"
+# version = "2.83"               # Actual downloaded edition.
+# complete = true                # Full release only.

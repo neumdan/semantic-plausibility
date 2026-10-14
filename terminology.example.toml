@@ -75,3 +75,36 @@ release = "2026-01"
 language = "en"
 client_id_env = "WHO_ICD_CLIENT_ID"
 client_secret_env = "WHO_ICD_CLIENT_SECRET"
+
+# Official BfArM German ATC/DDD edition. Read and accept its conditions yourself.
+# Package version 2026.0.0 contains CodeSystem version 2026.
+[packages.atc_de]
+enabled = false
+registry = "https://terminologien.bfarm.de"
+name = "bfarm.terminologien.atcgm"
+version = "2026.0.0"
+path = "local/terminologies/atc-2026"
+accept_download_conditions = false
+
+[lookups.atc_de]
+enabled = false # Enable after installation; also copy this table into your medication TOML.
+role = "primary"
+type = "fhir_artifacts"
+systems = ["http://fhir.de/CodeSystem/bfarm/atc"]
+path = "local/terminologies/atc-2026"
+
+# Download the full LOINC release from loinc.org, then point to its unchanged Loinc.csv.
+[lookups.loinc_local]
+enabled = false
+role = "primary"
+type = "loinc_csv"
+systems = ["http://loinc.org"]
+path = "../input/terminologies/loinc/Loinc.csv"
+version = "2.83" # Set the actual downloaded release, not VersionLastChanged.
+complete = true # Full edition only; a subset must use false.
+
+[terminology]
+strategy = "fallback" # Local first; try enabled compatible APIs until verified. "all" cross-checks all.
+
+[logging]
+level = "INFO" # DEBUG, INFO, WARNING or ERROR. The audit is always retained.

@@ -28,7 +28,7 @@ FIELDS = ["tuple_id", "resource_type", "source_rows", "occurrence_count", "frequ
           "medication_status", "intent", "product_name", "product_codings_json", "medication_json",
           "dosage_json", "duration_json", "constant_rate_asserted", "source_set_json",
           "code_check", "unit_check", "dose_check", "canonical_names_json", "findings_json",
-          "recommendations_json", "sources_json", "clinical_dose_safety", "fhir_validation_state"]
+          "recommendations_json", "sources_json", "ddd_references_json", "clinical_dose_safety", "fhir_validation_state"]
 
 
 def html_report(path, rows, summary, csv_name):
@@ -49,7 +49,9 @@ def html_report(path, rows, summary, csv_name):
         recommendations = "".join("<li><b>" + text(p["type"]) + "</b>: <pre>" + text(json.dumps(p, indent=2, ensure_ascii=False)) + "</pre>Source: " + source(p.get("source", "Source export")) + "</li>" for p in detail["recommendations"])
         findings = "".join(f'<li><b>{text(f["state"])} · {text(f["path"])}</b>: {text(f["message"])}<br>Source: {source(f["source"])}</li>' for f in detail["findings"])
         checks = "".join(f'<tr><td>{text(r["path"])}</td><td>{text(r.get("system", ""))}<br>{text(r.get("code", ""))}</td><td>{text(r["state"])}</td><td>{source(r.get("source") or "No configured source established membership")}</td></tr>' for r in detail["terminology"])
-        blocks.append(f'<section><h2>{text(row["product_name"] or row["tuple_id"])} — {text(row["status"])}</h2><p>{text(row["resource_type"])} · {text(row["occurrence_count"] if row["frequency_known"] else "Unknown")} occurrences</p><details><summary>Source set</summary><pre>{text(json.dumps(detail["source_set"], ensure_ascii=False, indent=2, default=str))}</pre></details><h3>Checks and explanations</h3><ul>{findings or "<li>No inconsistency found in the implemented checks.</li>"}</ul><table><thead><tr><th>Element</th><th>Code/system</th><th>Check</th><th>Source</th></tr></thead><tbody>{checks}</tbody></table><h3>Recommendations and calculations</h3><ul>{recommendations or "<li>No supported recommendation; review missing evidence.</li>"}</ul></section>')
+        trace = '<details><summary>Lookup attempts and catalogue editions</summary><pre>' + text(json.dumps(detail['terminology'], ensure_ascii=False, indent=2)) + '</pre></details>'
+        ddd = '<h3>Published DDD context</h3><pre>' + text(json.dumps(detail['ddd_references'], ensure_ascii=False, indent=2)) + '</pre>' if detail['ddd_references'] else '<p>DDD: no published value retrieved from the configured catalogue. Clinical dose safety remains unassessed.</p>'
+        blocks.append(f'<section><h2>{text(row["product_name"] or row["tuple_id"])} — {text(row["status"])}</h2><p>{text(row["resource_type"])} · {text(row["occurrence_count"] if row["frequency_known"] else "Unknown")} occurrences</p><details><summary>Source set</summary><pre>{text(json.dumps(detail["source_set"], ensure_ascii=False, indent=2, default=str))}</pre></details><h3>Checks and explanations</h3><ul>{findings or "<li>No inconsistency found in the implemented checks.</li>"}</ul><table><thead><tr><th>Element</th><th>Code/system</th><th>Check</th><th>Source</th></tr></thead><tbody>{checks}</tbody></table>{trace}{ddd}<h3>Recommendations and calculations</h3><ul>{recommendations or "<li>No supported recommendation; review missing evidence.</li>"}</ul></section>')
     path.write_text(f'''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';"><title>Medication plausibility review</title><style>body{{font:16px system-ui;margin:2rem auto;max-width:1100px;padding:0 1rem;color:#182e42;background:#f6f8fa}}section{{background:white;border:1px solid #cfd9df;padding:1rem;margin:1.5rem 0;border-radius:8px}}table{{border-collapse:collapse;width:100%;font-size:.9rem}}td,th{{padding:.6rem;border:1px solid #ddd;text-align:left;overflow-wrap:anywhere}}pre{{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f6f8;padding:.8rem}}li{{margin:.7rem 0}}a{{color:#006f82}}</style><h1>Medication plausibility review</h1><p>{text(SCOPE)}</p><p>{summary["input_records"]} source rows → {summary["distinct_tuples"]} report rows. <a href="{text(csv_name)}">Full CSV</a></p><p>FHIR validation: {text(summary["fhir_validation"]["state"])}. Counts: {text(summary["statuses"])}. This preview shows at most 2,000 rows; the CSV contains all results.</p><p>Strength is source-declared. Conversions are conditional review proposals, never dose replacements or automatic corrections.</p>{"".join(blocks)}</html>''', encoding="utf-8")
 
 
@@ -153,10 +155,11 @@ def review_medication(config):
                                        constant_rate_asserted=payload["constant_rate"], source_set_json=fhir_json(payload),
                                        code_check=states([x for x in terms if x["path"] == "Medication.code"]),
                                        unit_check=states([x for x in terms if x.get("kind") == "quantity"]),
-                                       dose_check="inconsistent" if any(f["state"] == "error" and f["path"].startswith(("dosage", "duration", "Medication.ingredient")) for f in detail["findings"]) else "review_required",
+                                       dose_check="not_applicable" if config.kind == "Medication" else "inconsistent" if any(f["state"] == "error" and f["path"].startswith(("dosage", "duration", "Medication.ingredient")) for f in detail["findings"]) else "review_required",
                                        canonical_names_json=encoded([p for p in detail["recommendations"] if p["type"] == "canonical_name"]),
                                        findings_json=encoded(detail["findings"]), recommendations_json=encoded(detail["recommendations"]),
-                                       sources_json=encoded(terms), clinical_dose_safety="not_assessed", fhir_validation_state=validation["state"])
+                                       sources_json=encoded(terms), ddd_references_json=encoded(detail["ddd_references"]),
+                                       clinical_dose_safety="not_assessed", fhir_validation_state=validation["state"])
                             if mode == "items":
                                 row.update(source_id=identifier, source_ref=ref)
                             writer.writerow({k: _csv_text(v) if isinstance(v, str) else v for k, v in row.items()})

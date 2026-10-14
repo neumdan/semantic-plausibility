@@ -101,6 +101,8 @@ class BatchConfiguration:
                 "quality",
                 "packages",
                 "validation",
+                "logging",
+                "terminology",
             },
         )
         self.version = data.get("config_version")
@@ -111,10 +113,17 @@ class BatchConfiguration:
                 "Use config_version=3 and the current pipeline.example.toml; retired config versions are unsupported"
             )
         general = table(data.get("general", {}), "general", {"PROJECT_NAME", "RESOURCE_TYPE", "MODEL_ALIAS"})
+        logging = table(data.get("logging", {}), "logging", {"level"})
+        if logging.get("level", "INFO") not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
+            raise ValueError("logging.level must be DEBUG, INFO, WARNING or ERROR")
+        routing = table(data.get("terminology", {}), "terminology", {"strategy"})
+        self.lookup_strategy = routing.get("strategy", "fallback")
+        if self.lookup_strategy not in {"fallback", "all"}:
+            raise ValueError("terminology.strategy must be fallback or all")
         self.kind = general.get("RESOURCE_TYPE", "Observation")
-        if self.kind not in {"Observation", "MedicationRequest", "MedicationAdministration"}:
+        if self.kind not in {"Observation", "Medication", "MedicationRequest", "MedicationAdministration", "MedicationStatement"}:
             raise ValueError(
-                "RESOURCE_TYPE must be Observation, MedicationRequest or MedicationAdministration; diagnosis is not implemented"
+                "RESOURCE_TYPE must be Observation, Medication, MedicationRequest, MedicationAdministration or MedicationStatement"
             )
         self.input = table(
             data.get("input", {}),
@@ -403,7 +412,7 @@ class BatchConfiguration:
                 "sources": [
                     row
                     for row in terminology.get("sources", [])
-                    if row["kind"] in {"csv", "sqlite", "fhir_artifacts"}
+                    if row["kind"] in {"csv", "sqlite", "fhir_artifacts", "loinc_csv"}
                 ]
             }
         audit = {
@@ -521,6 +530,7 @@ class BatchConfiguration:
                     "token_file",
                     "path",
                     "complete",
+                    "version",
                     "url_template",
                     "keywords",
                     "ontology",
@@ -536,6 +546,8 @@ class BatchConfiguration:
             )
             if type(row.get("enabled", False)) is not bool:
                 raise ValueError("lookup.enabled must be true or false")
+            if type(row.get('complete', False)) is not bool:
+                raise ValueError('lookup.complete must be true or false')
             if not row.get("enabled", False):
                 continue
             if row.get("role", "primary") not in {"primary", "source", "optional"}:
@@ -563,7 +575,9 @@ class BatchConfiguration:
                         "password_file",
                     }
                 }
-            elif kind in {"fhir", "csv", "sqlite", "website", "fhir_artifacts", "ols", "who_icd"}:
+            elif kind in {"fhir", "csv", "sqlite", "website", "fhir_artifacts", "loinc_csv", "ols", "who_icd"}:
+                if kind == "loinc_csv" and (row.get("systems") != ["http://loinc.org"] or not isinstance(row.get("version"), str) or not row["version"].strip()):
+                    raise ValueError("loinc_csv needs systems=[http://loinc.org] and the downloaded release version")
                 if kind in {"ols", "who_icd"}:
                     from .terminology_apis import OlsNameSource, WhoIcdSource, ICD11_MMS
                     if kind == "ols":
@@ -586,6 +600,7 @@ class BatchConfiguration:
                 result["sources"].append(
                     {
                         "kind": kind,
+                        "alias": name,
                         **{
                             "base_url" if key == "endpoint" else key: value
                             for key, value in row.items()
@@ -598,6 +613,7 @@ class BatchConfiguration:
                                 "token_file",
                                 "path",
                                 "complete",
+                                "version",
                                 "url_template",
                                 "keywords",
                                 "ontology",
@@ -695,6 +711,8 @@ def records(config, prepared):
         )
         uri = "file:" + quote(str(source["path"]), safe="/") + "?mode=ro"
         with closing(sqlite3.connect(uri, uri=True)) as db:
+            from .db_source import sqlite_columns_present
+            sqlite_columns_present(db, config.mapping)
             db.row_factory = sqlite3.Row
             db.execute("PRAGMA query_only=ON")
             for index, row in enumerate(db.execute(f"SELECT {columns} FROM {relation}"), 1):

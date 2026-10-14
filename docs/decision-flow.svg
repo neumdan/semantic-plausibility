@@ -4,7 +4,7 @@
 <style>text{font-family:Arial,sans-serif;fill:#142d42}.heading{font-size:19px;font-weight:700}.body{font-size:17px}.label{font-size:14px;fill:#526978}</style><rect width="1100" height="100%" fill="white"/>
 <g data-node="CONTRACT"><rect x="130" y="20" width="840" height="106" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
 <text x="146" y="49" class="heading">1. Check input contract</text>
-<text x="146" y="77" class="body">Observation / MedicationRequest / MedicationAdministration; explicit source mapping</text>
+<text x="146" y="77" class="body">Observation / Medication / MedicationRequest / Administration / Statement</text>
 <text x="146" y="102" class="body">Malformed input fails; preserve every reference interval or dosage instruction</text>
 </g>
 <g data-node="VALIDATION"><rect x="130" y="185" width="840" height="106" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
@@ -14,7 +14,7 @@
 </g>
 <g data-node="LOOKUP"><rect x="130" y="350" width="840" height="106" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
 <text x="146" y="379" class="heading">3. Verify the declared code/system and unit/system using configured sources</text>
-<text x="146" y="407" class="body">Local real catalogue and/or enabled API; preserve edition and source</text>
+<text x="146" y="407" class="body">Local first → enabled APIs for the exact system; retain every attempt and edition</text>
 <text x="146" y="432" class="body">Lab: selected profile rules + LOINC axes; medication: supplied coding and dose context</text>
 </g>
 <g data-node="INVALID"><rect x="20" y="515" width="330" height="106" rx="9" fill="#fcf1f3" stroke="#ecc7cf"/>

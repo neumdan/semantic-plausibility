@@ -37,7 +37,7 @@ def build_site(root, output):
         shutil.copyfile(root / "docs" / name, output / "docs" / name)
     shutil.copytree(root / "examples" / "studies", output / "examples" / "studies")
     for name in ("laboratory.csv", "laboratory.bundle.json", "laboratory-research.csv", "laboratory-fhir.csv", "laboratory-fhir-invalid.csv",
-                 "medication-request.csv", "medication-administration.csv", "README.md"):
+                 "medication-request.csv", "medication-administration.csv", "medication-statement.csv", "medication-product.csv", "README.md"):
         shutil.copyfile(root / "examples" / name, output / "examples" / name)
     shutil.copytree(root / "examples" / "lab", output / "examples" / "lab")
     shutil.copytree(root / "examples" / "profiles", output / "examples" / "profiles")

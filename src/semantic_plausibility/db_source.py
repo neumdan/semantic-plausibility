@@ -32,8 +32,18 @@ def load_mapping(path: Path) -> dict[str, Any]:
     return validate_mapping(json.loads(path.read_text(encoding="utf-8")))
 
 
+def sqlite_columns_present(connection, mapping):
+    """Reject unknown columns before SQLite treats quoted names as string literals."""
+    relation = _identifier_parts(mapping['relation'], relation=True)
+    schema = '"' + relation[0] + '".' if len(relation) == 2 else ''
+    actual = {row[1] for row in connection.execute('PRAGMA ' + schema + 'table_info("' + relation[-1] + '")')}
+    if not set(mapping['fields'].values()) <= actual:
+        raise ValueError('SQLite table is missing one or more mapped columns')
+    return True
+
+
 def validate_mapping(mapping: dict[str, Any]) -> dict[str, Any]:
-    if not isinstance(mapping, dict) or mapping.get("resource_type") not in {"Observation", "MedicationRequest", "MedicationAdministration"}:
+    if not isinstance(mapping, dict) or mapping.get("resource_type") not in {"Observation", "Medication", "MedicationRequest", "MedicationAdministration", "MedicationStatement"}:
         raise ValueError("DB mapping needs a supported resource_type")
     if mapping.get("format") not in {None, "columns"}:
         raise ValueError("DB mapping uses laboratory columns or resource_json, not generic FHIR paths")

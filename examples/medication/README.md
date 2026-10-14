@@ -1,6 +1,6 @@
 # Medication terminology and dose checks
 
-Executable adapters for **MedicationRequest** and **MedicationAdministration**, using FHIR R4. The examples select the published **MII Medication 2026.0.1** guide. All example clinical/formulation data are synthetic input. No synthetic terminology responses or drug catalogue are supplied.
+Executable adapters for **Medication**, **MedicationRequest**, **MedicationAdministration** and **MedicationStatement**, using FHIR R4. The examples select the published **MII Medication 2026.0.1** guide. All example clinical/formulation data are synthetic input. No synthetic terminology responses or drug catalogue are supplied.
 
 ## Run once
 
@@ -9,6 +9,8 @@ From the repository root, after the [standard setup](../../docs/shipped-stack.md
 ```sh
 uv run --no-sync --env-file .env run-plausibility-check --config examples/medication/request.toml
 uv run --no-sync --env-file .env run-plausibility-check --config examples/medication/administration.toml
+uv run --no-sync --env-file .env run-plausibility-check --config examples/medication/statement.toml
+uv run --no-sync --env-file .env run-plausibility-check --config examples/medication/product.toml
 ```
 
 Equivalent container calls (same files and output):
@@ -18,7 +20,7 @@ docker compose run --rm run-plausibility-check check --config /app/examples/medi
 podman-compose run --rm run-plausibility-check check --config /app/examples/medication/administration.toml
 ```
 
-Open `output/medication-request.html` or `output/medication-administration.html`, with the matching CSV. Each set shows source data → terminology check/name → findings → conditional calculations, with source references. Repeat with a new `--out ../../output/medication-request-2.csv`; paths resolve relative to the selected TOML. Python can also call `semantic_plausibility.run_plausibility_check(config_path)` or the repository's `run-plausibility-check.py` wrapper.
+Open `output/medication-request.html`, `medication-administration.html`, `medication-statement.html` or `medication-product.html`, with the matching CSV. Each set shows source data → terminology check/name → findings → conditional calculations, with source references. Repeat with a new `--out ../../output/medication-request-2.csv`; paths resolve relative to the selected TOML. Python can also call `semantic_plausibility.run_plausibility_check(config_path)` or the repository's `run-plausibility-check.py` wrapper.
 
 These checks do **not** need Ollama. AI/evidence research and clinician-registry reuse currently support laboratory Observations only; medication research is rejected explicitly. Patient-specific dose safety, interactions, renal/weight adjustments and evidence-based dose limits are not implemented.
 
@@ -43,8 +45,8 @@ One TOML selects one resource type. `[input.columns]` maps the following logical
 | `product_code`, `product_system`, `product_version`, `product_name` | Source coding/edition/label. Minimum flat product fields: code and system. All alternate codings use `medication_json`. |
 | `form_text`, `ingredient_text`, `strength_numerator_value/code/system`, `strength_denominator_value/code/system` | Convenience map for **one** source-declared ingredient/strength. Does not create catalogue evidence. |
 | `medication_json` | Alternative to all flat product fields: complete FHIR Medication including all ingredients, codings, form, strength, amount and extensions. Nested ingredient references require further review. |
-| `status`, `intent` | Resource status; intent additionally required for requests. These are not the report status. |
-| `dosage_instructions_json` | Request: full array of R4 `dosageInstruction` objects, including all doseAndRate entries, timing, PRN and maximum-dose constraints. |
+| `status`, `intent` | Resource status (optional for standalone Medication); intent additionally required for requests. These are not the report status. |
+| `dosage_instructions_json` | Request: full array of R4 `dosageInstruction`; Statement: full array of R4 `dosage` objects, including all doseAndRate entries, timing, PRN and maximum-dose constraints. |
 | `dosage_json` | Administration: R4 dosage object with dose, rate, route/site/method. |
 | `duration_value`, `duration_code`, `duration_system`, `constant_rate` | Administration: actual elapsed duration and explicit constant/uninterrupted assertion, if known. No invented duration. |
 | `do_not_perform` | Request: optional true/false prohibition flag. Prohibited/inactive records do not get strength transformations. |
@@ -56,7 +58,7 @@ The grouping key retains **product/ingredients/strength + all dosages/routes/tim
 
 ### FHIR or database input
 
-- Use `request-fhir.toml` / `administration-fhir.toml` for the supplied complete synthetic Bundles. They enable local full FHIR validation, followed by the medication semantic checks. These minimal examples can have MII findings; they are not asserted to conform.
+- Use `request-fhir.toml` / `administration-fhir.toml` / `statement-fhir.toml` / `product-fhir.toml` for the supplied complete synthetic Bundles. They enable local full FHIR validation, followed by the medication semantic checks. These minimal examples can have MII findings; they are not asserted to conform.
 - A resource, resource array, Bundle or NDJSON export is accepted. Linked `Medication` must be contained or included in the export. References are resolved locally; missing references are flagged, never fetched from a public server. Conflicting versions and duplicate IDs fail.
 - For full FHIR JSON in a CSV: `type="csv"`, `granularity="individual"`, and **only** `[input.columns] resource_json="resource_json"`.
 - PostgreSQL/SQLite use the same medication mappings and [database connection settings](../../docs/configuration.md#postgresql-and-sqlite). Select a site-provided view; include all required dosing fields as JSON columns. A database `resource_json` cell must be a self-contained resource/Bundle/array with its linked Medication. Direct DB JSON receives semantic checks; export it first for formal validation.
@@ -84,4 +86,8 @@ Podman: replace `docker compose` with `podman-compose`. `validator-init` generat
 - PRN schedules, titration, rate ranges/ratios and max-dose constraints are preserved and marked for review; no daily total or patient-specific limit is invented. Only rateQuantity × elapsed duration is integrated.
 - Product/form/route **compatibility** is not established merely by valid individual codes. No comprehensive product catalogue, dose appropriateness model, medication AI research or automatic FHIR rewrite is claimed.
 
-Normative sources: [MII Medication 2026.0.1](https://www.medizininformatik-initiative.de/Kerndatensatz/KDS_Medikation_2026/MIIIGModulMedikation.html), [R4 MedicationRequest](https://hl7.org/fhir/R4/medicationrequest.html), [R4 MedicationAdministration](https://hl7.org/fhir/R4/medicationadministration.html), [R4 Dosage](https://hl7.org/fhir/R4/dosage.html), [WHO ATC N02BE01](https://atcddd.fhi.no/atc_ddd_index/?code=N02BE01).
+A standalone Medication has no dose requirement (`dose_check=not_applicable`). A Statement describes reported medication use; it is not evidence of an administration. `not-taken`, inactive/prohibited states and modifiers suppress dose transformations. Missing structured dosage remains a review task. The two new CSVs contain two distinct source rows each.
+
+The product/statement examples use **German ATC 2026**. Install `bfarm.terminologien.atcgm#2026.0.0`, then enable their `lookups.downloads` pointing at `local/terminologies/atc-2026` (the supplied nested TOMLs use `../../local/…`). Until then code membership remains unknown. Their `ddd_references_json` contains exact published DDD text, edition and source where available; it is never a patient dose limit or a product strength. [Local ATC/DDD setup](../../docs/lookups.md#local-atcddd).
+
+Normative sources: [MII Medication 2026.0.1](https://www.medizininformatik-initiative.de/Kerndatensatz/KDS_Medikation_2026/MIIIGModulMedikation.html), [R4 MedicationRequest](https://hl7.org/fhir/R4/medicationrequest.html), [R4 MedicationAdministration](https://hl7.org/fhir/R4/medicationadministration.html), [R4 MedicationStatement](https://hl7.org/fhir/R4/medicationstatement.html), [R4 Medication](https://hl7.org/fhir/R4/medication.html), [R4 Dosage](https://hl7.org/fhir/R4/dosage.html), [WHO ATC N02BE01](https://atcddd.fhi.no/atc_ddd_index/?code=N02BE01).

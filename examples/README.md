@@ -10,6 +10,8 @@ Measurements, bounds and dosage records are synthetic examples, not clinical rec
 | [laboratory-fhir-invalid.csv](laboratory-fhir-invalid.csv) | Same Bundle with its required MII identifier removed | Negative full-validation example; numeric set unchanged |
 | [laboratory-research.csv](laboratory-research.csv) | 6 local/name/unit cases | Map `analyte_name="analyte_name"`, then check before AI research |
 | [medication-request.csv](medication-request.csv) | 3 distinct product/strength/dose/timing sets | Executable terminology/dose check; see [recipes](medication/README.md) |
+| [medication-statement.csv](medication-statement.csv) | 2 distinct reported-use sets, including not-taken | German ATC catalogue required for membership; not an administration |
+| [medication-product.csv](medication-product.csv) | 2 product/strength sets | No dosage requirement; optional published ATC/DDD context |
 | [medication-administration.csv](medication-administration.csv) | 2 distinct dose/rate/duration sets | Executable terminology/dose check; see [recipes](medication/README.md) |
 
 The scalar laboratory cases show: documented same-unit fit; an out-of-reference value; `140 g/L → 14 g/dL` if a factor of 0.1 is verified; leukocyte `10*3/uL`; ambiguous bare `10*6`; a non-number; absent reference bounds; and a local LIS code needing source catalogue verification and a target coding proposal. The supplied reference intervals illustrate behavior only. AI findings depend on actual retrieved evidence and model responses.

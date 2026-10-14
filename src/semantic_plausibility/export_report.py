@@ -162,6 +162,8 @@ class AuditLog:
         self.previous, self.sequence, self.run_id = "", 0, run_id
 
     def event(self, phase, **details):
+        from .progress import phase_event
+        phase_event(phase, details)
         self.sequence += 1
         record = {
             "sequence": self.sequence,

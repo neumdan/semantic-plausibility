@@ -8,7 +8,29 @@ from .audit import encoded
 
 
 SET_FIELDS = ["source_data_json", "linked_data_json", "recommendation_set_json",
-              "matched_analyte", "suggested_analyte", "suggested_code_version"]
+              "matched_analyte", "suggested_analyte", "suggested_code_version", "lookup_attempts_json"]
+
+
+def lookup_attempts(item):
+    """Compact trace retaining every attempted source without repeating whole concepts."""
+    rows = []
+    checks = list(item.get('source_code_checks', [])) + [item.get('unit_check', {})]
+    checks += [check.get('terminology', {}) for check in item.get('code_checks', [])]
+    seen = set()
+    for check in checks:
+        for attempt in check.get('attempts', []) or [check]:
+            if not attempt:
+                continue
+            metadata = attempt.get('metadata') or {}
+            row = {key: attempt[key] for key in ('alias', 'type', 'role', 'state', 'source', 'source_sha256', 'error_type', 'reason') if key in attempt}
+            row.update(system=check.get('system', ''), code=check.get('code', ''),
+                       version=metadata.get('version', check.get('version', '')),
+                       artifact=metadata.get('artifact', {}))
+            identity = encoded(row)
+            if identity not in seen:
+                rows.append(row)
+                seen.add(identity)
+    return rows
 
 
 def review_set_fields(row, evidence):
@@ -69,6 +91,7 @@ def review_set_fields(row, evidence):
               "source_code_checks": item.get("source_code_checks", []),
               "source_code_unit_fit": item.get("source_code_unit_fit", []),
               "coding_candidates": suggestions.get("coding_candidates", [])}
+    linked['lookup_attempts'] = lookup_attempts(item)
     linked["code"]["ambiguous_identity"] = bool(ambiguous)
     proposal = {"kind": "complete_set_review_proposal", "target_profile": row.get("ig_canonical") or row.get("profile"),
                 "code": {"code": target_code, "system": target_system, "version": edition,
@@ -92,6 +115,7 @@ def review_set_fields(row, evidence):
                                      "reason": "Published intervals are review evidence. Retain source ranges and their population/method context until adjudication."},
                 "context": source["context"], "review_required": True, "automatic_changes": False}
     return {"source_data_json": encoded(source), "linked_data_json": encoded(linked),
+            "lookup_attempts_json": encoded(linked['lookup_attempts']),
             "recommendation_set_json": encoded(proposal), "matched_analyte": matched_analyte,
             "suggested_analyte": proposed_analyte, "suggested_code_version": edition or "",
             "canonical_name": canonical,
@@ -166,6 +190,8 @@ def linked_data_html(row):
     definitions = [check for check in data.get("source_code_checks", []) if check.get("metadata")]
     if definitions:
         rendered += '<details><summary>Source catalogue definitions</summary><pre>' + escape(json.dumps(definitions, ensure_ascii=False, indent=2)) + '</pre></details>'
+    if data.get('lookup_attempts'):
+        rendered += '<details><summary>Lookup attempts, editions and unavailable sources</summary><pre>' + escape(json.dumps(data['lookup_attempts'], ensure_ascii=False, indent=2)) + '</pre></details>'
     for check in data.get("source_code_checks", []):
         if check.get("source"):
             sources.append({"source": check["source"], "version": check.get("version", ""), **(check.get("metadata") or {}).get("artifact", {})})

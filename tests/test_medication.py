@@ -56,8 +56,8 @@ def details(result):
 
 
 class MedicationTests(unittest.TestCase):
-    def test_both_recipes_run_offline_unknown_is_not_success(self):
-        for stem, expected in [("request", 3), ("administration", 2)]:
+    def test_all_recipes_run_offline_unknown_is_not_success(self):
+        for stem, expected in [("request", 3), ("administration", 2), ("statement", 2), ("product", 2)]:
             with self.subTest(stem=stem), tempfile.TemporaryDirectory() as name:
                 config = configuration(Path(name), stem)
                 self.assertTrue(check_configuration(config)["passed"])
@@ -164,7 +164,7 @@ class MedicationTests(unittest.TestCase):
             self.assertEqual(result.statuses, {"error": 1, "needs_review": 1})
 
     def test_native_reference_resolution_item_ids_and_no_patient_identifiers(self):
-        for stem in ("request", "administration"):
+        for stem in ("request", "administration", "statement", "product"):
             with self.subTest(stem=stem), tempfile.TemporaryDirectory() as name:
                 path = configuration(Path(name), stem, native=True)
                 path.write_text(path.read_text().replace('mode = "distinct"', 'mode = "items"'))
@@ -176,6 +176,32 @@ class MedicationTests(unittest.TestCase):
                 self.assertNotIn("example-patient", result.csv.read_text())
                 if stem == "administration":
                     self.assertEqual(data["duration"]["value"], 1800)
+                if stem == "statement":
+                    self.assertTrue(data['dosages'])
+                    self.assertFalse(data['duration'])
+
+    def test_statement_not_taken_and_optional_product_status_dose(self):
+        with tempfile.TemporaryDirectory() as name:
+            path = configuration(Path(name), 'statement')
+            result = run_plausibility_check(path)
+            entry = next(d for d in details(result) if d['source_set']['status'] == 'not-taken')
+            self.assertTrue(any('not-taken' in f['message'] for f in entry['findings']))
+            self.assertFalse(any(p['type'] == 'strength_conversion' for p in entry['recommendations']))
+            c = BatchConfiguration(path)
+            with self.assertRaisesRegex(ValueError, 'array'):
+                normalize({'resourceType': 'MedicationStatement', 'dosage': {}}, {}, c)
+            path = configuration(Path(name), 'product')
+            c = BatchConfiguration(path)
+            row = input_rows('product')[0]
+            row['status'] = ''
+            data, _, _ = from_row(row, c)
+            with c.deployment.prepare() as prepared:
+                checker = MedicationChecker(c, prepared)
+                try:
+                    assessed = checker.assess(data)
+                    self.assertFalse(any(f['path'] in {'status', 'dosage'} for f in assessed['findings']))
+                finally:
+                    checker.close()
 
     def test_native_duplicate_ids_and_unknown_references_fail_or_flag(self):
         with tempfile.TemporaryDirectory() as name:

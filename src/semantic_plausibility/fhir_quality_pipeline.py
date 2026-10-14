@@ -202,7 +202,7 @@ class FhirQualityPipeline:
         for coding in codings:
             system, code, version = str(coding.get("system") or ""), str(coding.get("code") or ""), str(coding.get("version") or "")
             if system == LOINC and term and term.code == code:
-                validation = {"state": "valid", "source": term.source, "version": term.version}
+                validation = {"state": "valid", "source": term.source, "version": term.version, "attempts": term.lookup_attempts}
             elif self.terminology:
                 validation = self.terminology.check(system, code, version, research=False)
             else:
@@ -246,6 +246,7 @@ class FhirQualityPipeline:
                         "metadata": {"display": term.display},
                         "candidates": [],
                         "errors": [],
+                        "attempts": term.lookup_attempts,
                     }
                 elif self.terminology:
                     check["terminology"] = self.terminology.check(

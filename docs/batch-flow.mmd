@@ -2,9 +2,9 @@
 flowchart TD
     CSV["CSV / LIS / CDS Hub DB<br/>Individual or distinct source rows<br/>Column map + actual source counts<br/>Read-only site-specific view"]
     FHIR["Complete FHIR documents<br/>Bundle / array / NDJSON / JSON<br/>or resource_json in a CSV cell<br/>Resolve exported Medication locally"]
-    CONFIG["Explicit domain selection<br/>Observation / MedicationRequest<br/>or MedicationAdministration<br/>TOML profile, lookups and secrets"]
+    CONFIG["Explicit domain selection<br/>Observation / MedicationRequest<br/>or Medication / Admin / Statement<br/>TOML profile, lookups and secrets"]
     LAB["Laboratory semantic set<br/>code + system/edition + analyte/name<br/>value or observed bounds + unit/system<br/>Every reference range and its qualifiers<br/>Specimen, method, comparator and modifiers"]
-    MED["Medication semantic set<br/>Product + system/edition + form/ingredients<br/>Strength + all dose/unit, route and timing data<br/>Status/intent + actual duration + modifiers<br/>No averaging different doses or regimens"]
+    MED["Medication semantic set<br/>Product + system/edition + form/ingredients; DDD context<br/>Strength + all dose/unit, route and timing data<br/>Status/intent + actual duration + modifiers<br/>No averaging different doses or regimens"]
     GROUP["Choose output representation<br/>distinct: complete guarded sets + known counts; laboratory numeric distributions<br/>items: individual inputs with original resource/database ID and source locator<br/>Missing counts and unresolved references remain explicit; no missing context is invented"]
     CHECK["Domain checks → CSV + HTML with sources<br/>Lab: lookups, code–unit–range fit; optional local AI and literature evidence<br/>Medication: terminology + numeric/dimensional dose checks and conditional calculations"]
     REVIEW["Clinician review of the complete set<br/>Each source set → linked definitions → explanations, transformations and sources<br/>FHIR validation is separate and applies only to full resources; input stays unchanged<br/>Clinical dose safety and medication AI/evidence research are not implemented"]

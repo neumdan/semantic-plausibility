@@ -451,7 +451,7 @@ def reference_artifacts(config):
         {
             "lookup:" + name: entry.get("path")
             for name, entry in config.data.get("lookups", {}).items()
-            if entry.get("enabled") and entry.get("type") in {"csv", "sqlite", "fhir_artifacts"}
+            if entry.get("enabled") and entry.get("type") in {"csv", "sqlite", "fhir_artifacts", "loinc_csv"}
         }
     )
     paths.update({"value_set:" + str(index): name for index, name in enumerate(config.data.get("specification", {}).get("VALUE_SETS", []))})
@@ -571,6 +571,17 @@ def configured_checker(config, prepared, *, profile=None, research=None, options
             checker.spelling.ucum = checker.ucum
     if profile is not None:
         checker.custom = profile
+    # Use one traced route for LOINC membership and its unit/axis metadata.
+    from .local_terminology import LoincApiSource, RoutedLoinc
+    checker.terminology = checker.terminology or TerminologyRouter([])
+    checker.terminology.strategy = config.lookup_strategy
+    if config.network_mode != "offline":
+        for alias, entry in config.data.get("lookups", {}).items():
+            if entry.get("enabled") and entry.get("type") == "loinc":
+                checker.terminology.sources.append(({"http://loinc.org"}, LoincApiSource(checker.loinc, alias), False))
+    # A saved offline reference pack is already versioned lookup evidence.
+    if not prepared.audit.snapshot:
+        checker.loinc = ReliableLookup(RoutedLoinc(checker.terminology), circuit_breaker=False)
     checker.review_catalogue_fingerprint = [row for row in reference_artifacts(config)
         if row["role"].startswith(("lookup:", "value_set:")) or row["role"] == "reference_pack"]
     return checker
@@ -1008,7 +1019,10 @@ def _review_export(config):
                         term.version for (operation, _, _), term in checker.loinc.cache.items()
                         if operation == "lookup" and isinstance(term, LoincTerm) and term.version
                     }),
-                    "lookup_errors": checker.ucum.errors + checker.loinc.errors,
+                    "lookup_errors": checker.ucum.errors + checker.loinc.errors + [
+                        {k: attempt[k] for k in ('alias', 'type', 'error_type', 'reason') if k in attempt}
+                        for result in checker.terminology.cache.values() for attempt in result.get('attempts', [])
+                        if attempt.get('error_type') or attempt.get('reason') == 'source_circuit_open'],
                     "research": {
                         "enabled": enabled, "scope": prepared.scope,
                         "sources": list(getattr(checker.evidence, "source_records", {}).values()),

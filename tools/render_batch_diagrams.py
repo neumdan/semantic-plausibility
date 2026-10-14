@@ -50,7 +50,7 @@ write('architecture', 'Laboratory and medication review architecture', 1250, [
  ('CONFIG',750,20,330,132,['One TOML + secrets','Input, profile, real lookups, output','Local model and research budgets','Credentials in .env / secret files'],'normal'),
  ('VALIDATE',385,220,330,132,['2 · Optional FHIR validation','Full resources → local Matchbox','HL7 validator + pinned MII guide','Outcome stays separate from fit'],'teal'),
  ('NORMAL',385,420,330,132,['Standardise and group','Lab set or complete medication dose','DuckDB distinct groups; lab statistics','or items with original ID / locator'],'normal'),
- ('SOURCES',20,620,330,157,['Real terminology evidence','Local BfArM / site catalogues','UCUM / LOINC / medication APIs','Primary / source / optional roles','Retain editions, hashes, failures'],'normal'),
+ ('SOURCES',20,620,330,157,['Real terminology evidence','Local LOINC / BfArM / ATC + DDD','UCUM / LOINC / medication APIs','Local first; fallback or all sources','Retain editions, hashes, failures'],'normal'),
  ('CHECK',385,620,330,157,['1 · Deterministic check','Source identity + target profile rules','Code / name / unit fit and numbers','Lab ranges / medication dose checks','Supported unit transformations'],'teal'),
  ('MODEL',750,420,330,132,['Optional local model','Ollama: ministral-3:3b starter','or local compatible endpoint','Guarded JSON; sources required'],'normal'),
  ('AI',750,620,330,157,['3 · Laboratory terminology AI','Checked report → candidates','Real names, codes and unit lists','LOINC pages; no study queries','Exact rechecks; may abstain'],'teal'),
@@ -77,9 +77,9 @@ write('architecture', 'Laboratory and medication review architecture', 1250, [
  ('REGISTRY','CHECK','M185 1080 V1030 H370 V750 H382','scoped reuse',True)], [])
 
 write('decision-flow', 'Check the source set, select evidence scope, review the proposal', 1680, [
- ('CONTRACT',130,20,840,106,['1. Check input contract','Observation / MedicationRequest / MedicationAdministration; explicit source mapping','Malformed input fails; preserve every reference interval or dosage instruction'],'normal'),
+ ('CONTRACT',130,20,840,106,['1. Check input contract','Observation / Medication / MedicationRequest / Administration / Statement','Malformed input fails; preserve every reference interval or dosage instruction'],'normal'),
  ('VALIDATION',130,185,840,106,['2. Formal validation requested?','Full FHIR file or CSV resource_json → local Matchbox/HL7 + pinned guide','Scalar sets → not_applicable; unavailable/invalid validation remains explicit'],'normal'),
- ('LOOKUP',130,350,840,106,['3. Verify the declared code/system and unit/system using configured sources','Local real catalogue and/or enabled API; preserve edition and source','Lab: selected profile rules + LOINC axes; medication: supplied coding and dose context'],'normal'),
+ ('LOOKUP',130,350,840,106,['3. Verify the declared code/system and unit/system using configured sources','Local first → enabled APIs for the exact system; retain every attempt and edition','Lab: selected profile rules + LOINC axes; medication: supplied coding and dose context'],'normal'),
  ('INVALID',20,515,330,106,['Confirmed invalid','Record deterministic error','Continue other independent checks'],'error'),
  ('VERIFIED',385,515,330,106,['Verified identity / syntax','Check code-unit-context fit','Membership alone is insufficient'],'teal'),
  ('UNKNOWN',750,515,330,106,['Unverified / unavailable','Keep evidence gap visible','Do not call absence invalid'],'normal'),
@@ -101,9 +101,9 @@ write('decision-flow', 'Check the source set, select evidence scope, review the 
 write('batch-flow', 'Input representations and domain data models', 1080, [
  ('CSV',20,20,330,132,['CSV / LIS / CDS Hub DB','Individual or distinct source rows','Column map + actual source counts','Read-only site-specific view'],'normal'),
  ('FHIR',385,20,330,132,['Complete FHIR documents','Bundle / array / NDJSON / JSON','or resource_json in a CSV cell','Resolve exported Medication locally'],'normal'),
- ('CONFIG',750,20,330,132,['Explicit domain selection','Observation / MedicationRequest','or MedicationAdministration','TOML profile, lookups and secrets'],'normal'),
+ ('CONFIG',750,20,330,132,['Explicit domain selection','Observation / MedicationRequest','or Medication / Admin / Statement','TOML profile, lookups and secrets'],'normal'),
  ('LAB',20,245,515,182,['Laboratory semantic set','code + system/edition + analyte/name','value or observed bounds + unit/system','Every reference range and its qualifiers','Specimen, method, comparator and modifiers'],'normal'),
- ('MED',565,245,515,182,['Medication semantic set','Product + system/edition + form/ingredients','Strength + all dose/unit, route and timing data','Status/intent + actual duration + modifiers','No averaging different doses or regimens'],'normal'),
+ ('MED',565,245,515,182,['Medication semantic set','Product + system/edition + form/ingredients; DDD context','Strength + all dose/unit, route and timing data','Status/intent + actual duration + modifiers','No averaging different doses or regimens'],'normal'),
  ('GROUP',130,515,840,132,['Choose output representation','distinct: complete guarded sets + known counts; laboratory numeric distributions','items: individual inputs with original resource/database ID and source locator','Missing counts and unresolved references remain explicit; no missing context is invented'],'normal'),
  ('CHECK',130,710,840,106,['Domain checks → CSV + HTML with sources','Lab: lookups, code–unit–range fit; optional local AI and literature evidence','Medication: terminology + numeric/dimensional dose checks and conditional calculations'],'teal'),
  ('REVIEW',130,885,840,132,['Clinician review of the complete set','Each source set → linked definitions → explanations, transformations and sources','FHIR validation is separate and applies only to full resources; input stays unchanged','Clinical dose safety and medication AI/evidence research are not implemented'],'normal')], [

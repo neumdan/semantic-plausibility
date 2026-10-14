@@ -1,0 +1,75 @@
+# Run in place: run-plausibility-check --config examples/medication/product.toml
+# Synthetic source inputs; all lookup responses come from actual configured services.
+config_version = 3
+[general]
+PROJECT_NAME = "medication-product-review"
+RESOURCE_TYPE = "Medication"
+[input]
+type = "csv"
+origin = "lis"
+path = "../medication-product.csv"
+granularity = "distinct"
+[input.columns]
+resource_type = "resource_type"
+count = "count"
+product_code = "product_code"
+product_system = "product_system"
+product_version = "product_version"
+product_name = "product_name"
+form_text = "form_text"
+ingredient_text = "ingredient_text"
+strength_numerator_value = "strength_numerator_value"
+strength_numerator_code = "strength_numerator_code"
+strength_numerator_system = "strength_numerator_system"
+strength_denominator_value = "strength_denominator_value"
+strength_denominator_code = "strength_denominator_code"
+strength_denominator_system = "strength_denominator_system"
+status = "status"
+[specification]
+FHIR_VERSION = "4.0.1"
+IG_PACKAGE = "de.medizininformatikinitiative.kerndatensatz.medikation"
+IG_VERSION = "2026.0.1"
+IG_CANONICAL = "https://www.medizininformatik-initiative.de/fhir/core/modul-medikation/StructureDefinition/Medication"
+[specification.links]
+resource = "https://hl7.org/fhir/R4/medication.html"
+guide = "https://www.medizininformatik-initiative.de/Kerndatensatz/KDS_Medikation_2026/MIIIGModulMedikation.html"
+source = "https://github.com/medizininformatik-initiative/kerndatensatzmodul-medikation"
+[network]
+mode = "lookups" # Use "offline" with installed real catalogues; missing evidence remains unknown.
+[lookups.ucum]
+enabled = true
+type = "ucum"
+role = "primary"
+endpoint = "https://ucum.nlm.nih.gov/ucum-service/v1"
+[lookups.medication_codes]
+enabled = true
+type = "fhir"
+role = "primary"
+endpoint = "https://tx.fhir.org/r4" # Public test service; coverage/availability are recorded, never presumed.
+systems = ["http://www.whocc.no/atc", "http://snomed.info/sct", "http://www.nlm.nih.gov/research/umls/rxnorm", "http://fhir.de/CodeSystem/ifa/pzn"]
+# For your authenticated server, change endpoint and uncomment:
+# token_env = "MEDICATION_TX_TOKEN" # Put the value in .env, never in TOML/Git.
+[lookups.downloads]
+enabled = false
+type = "fhir_artifacts"
+role = "source"
+path = "../../local/terminologies/atc-2026" # Install the real BfArM ATC package first; then enable this lookup.
+systems = ["http://fhir.de/CodeSystem/bfarm/atc"]
+[output]
+mode = "distinct" # Use "items" only with individual input; IDs are then retained.
+path = "../../output/medication-product.csv"
+[validation]
+setup_directory = "../../local/validation" # Generated Compose validator files, relative to this TOML.
+enabled = false # Scalar rows cannot prove full FHIR conformance. Use the *-fhir.toml recipe.
+backend = "matchbox"
+endpoint = "http://127.0.0.1:8081/matchboxv3/fhir"
+container_endpoint = "http://matchbox:8080/matchboxv3/fhir"
+terminology_server = "http://blaze:8080/fhir"
+terminology_endpoint = "http://127.0.0.1:8082/fhir"
+fail_on_error = true
+
+[terminology]
+strategy = "fallback" # Local first, then enabled APIs for the exact system.
+
+[logging]
+level = "INFO"

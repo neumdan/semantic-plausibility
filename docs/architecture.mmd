@@ -5,7 +5,7 @@ flowchart TD
     CONFIG["One TOML + secrets<br/>Input, profile, real lookups, output<br/>Local model and research budgets<br/>Credentials in .env / secret files"]
     VALIDATE["2 · Optional FHIR validation<br/>Full resources → local Matchbox<br/>HL7 validator + pinned MII guide<br/>Outcome stays separate from fit"]
     NORMAL["Standardise and group<br/>Lab set or complete medication dose<br/>DuckDB distinct groups; lab statistics<br/>or items with original ID / locator"]
-    SOURCES["Real terminology evidence<br/>Local BfArM / site catalogues<br/>UCUM / LOINC / medication APIs<br/>Primary / source / optional roles<br/>Retain editions, hashes, failures"]
+    SOURCES["Real terminology evidence<br/>Local LOINC / BfArM / ATC + DDD<br/>UCUM / LOINC / medication APIs<br/>Local first; fallback or all sources<br/>Retain editions, hashes, failures"]
     CHECK["1 · Deterministic check<br/>Source identity + target profile rules<br/>Code / name / unit fit and numbers<br/>Lab ranges / medication dose checks<br/>Supported unit transformations"]
     MODEL["Optional local model<br/>Ollama: ministral-3:3b starter<br/>or local compatible endpoint<br/>Guarded JSON; sources required"]
     AI["3 · Laboratory terminology AI<br/>Checked report → candidates<br/>Real names, codes and unit lists<br/>LOINC pages; no study queries<br/>Exact rechecks; may abstain"]

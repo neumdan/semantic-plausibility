@@ -1,10 +1,10 @@
-# Laboratory input and output contract (0.11.3)
+# Laboratory input and output contract
 
 ## Minimum export
 
 Select the hospital cohort/time window upstream. Prefer one row per distinct **code + code system + value + unit code/display + unit system + complete reference set + semantic qualifiers**, with its real `count`. Preserve comparators (`<`, `<=`, `>=`, `>`), versions, status, method, specimen and population/age/type qualifiers. Do not retain a random first code/range or discard outliers before review.
 
-Supported inputs: scalar CSV, complete FHIR JSON in a CSV cell, FHIR R4 Bundle/JSON/array/NDJSON, mapped PostgreSQL view, read-only SQLite extract. MedicationRequest/Administration use their separate [product/dose input contract](../examples/medication/README.md); diagnosis is not implemented. LIS vendor APIs and TORCH/CQL run upstream and produce these formats.
+Supported inputs: scalar CSV, complete FHIR JSON in a CSV cell, FHIR R4 Bundle/JSON/array/NDJSON, mapped PostgreSQL view, read-only SQLite extract. Medication, MedicationRequest, MedicationAdministration and MedicationStatement use their separate [product/dose input contract](../examples/medication/README.md); diagnosis is not implemented. LIS vendor APIs and TORCH/CQL run upstream and produce these formats.
 
 | TOML role | Source meaning |
 | --- | --- |
@@ -95,3 +95,5 @@ Every checked/researched row now contains:
 | `suggested_code_version` | Edition associated with the proposed target code |
 
 A proposal never rewrites input. Exact membership, definition/name, dimensional fit, numeric completeness and evidence applicability remain separate. The HTML presents these structured fields as source → linked data → proposal, with checks in the final column.
+
+Lookup provenance is available in `lookup_attempts_json` and the HTML lookup trace: attempted alias/type, state, source, edition, available artifact hash and redacted failure type. Conflicting sources remain unresolved. Medication uses `sources_json` for the same purpose and `ddd_references_json` for exact publisher DDD text; see its domain contract.

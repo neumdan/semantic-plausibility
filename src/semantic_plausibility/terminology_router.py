@@ -26,14 +26,22 @@ class CsvCodeSource:
     def __init__(self, path: Path, *, complete: bool = False):
         self.path, self.complete = path, complete
         self.codes: dict[tuple[str, str, str], dict[str, str]] = {}
-        with path.open(newline="", encoding="utf-8") as handle:
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 512 * 1024**2:
+            raise ValueError("Terminology CSV must be a regular local file smaller than 512 MiB")
+        with path.open('rb') as handle:
+            self.sha256 = hashlib.file_digest(handle, 'sha256').hexdigest()
+        with path.open(newline="", encoding="utf-8-sig") as handle:
             reader = csv.DictReader(handle)
             if not {"system", "code"}.issubset(reader.fieldnames or []):
                 raise ValueError("Terminology CSV needs system and code columns")
             for row in reader:
                 system, code = (row.get("system") or "").strip(), (row.get("code") or "").strip()
-                if system and code:
-                    self.codes[system, code, (row.get("version") or "").strip()] = row
+                key = system, code, (row.get("version") or "").strip()
+                if not system or not code or None in row or key in self.codes:
+                    raise ValueError("Terminology CSV has a missing/duplicate identity or malformed row")
+                self.codes[key] = row
+        if not self.codes:
+            raise ValueError("Terminology CSV contains no codes")
 
     def check(self, system: str, code: str, version: str = "") -> dict[str, Any]:
         row = self.codes.get((system, code, version))
@@ -52,8 +60,9 @@ class CsvCodeSource:
         return {
             "state": state,
             "source": str(self.path),
+            "source_sha256": self.sha256,
             "metadata": {key: row.get(key, "") for key in ("display", "version", "definition",
-                "expected_unit_code", "expected_unit_system", "specimen", "method")}
+                "expected_unit_code", "expected_unit_system", "specimen", "method", "ddd")}
             if row
             else None,
         }
@@ -350,7 +359,10 @@ class WebsiteCandidateSource:
 
 
 class TerminologyRouter:
-    def __init__(self, sources: list[dict[str, Any]], *, llm: Any = None):
+    def __init__(self, sources: list[dict[str, Any]], *, llm: Any = None, strategy="fallback"):
+        if strategy not in {"fallback", "all"}:
+            raise ValueError("Unknown terminology routing strategy")
+        self.strategy, self.cache = strategy, {}
         self.sources: list[tuple[set[str], Any, bool]] = []
         for entry in sources:
             systems = entry.get("systems")
@@ -359,6 +371,9 @@ class TerminologyRouter:
             kind = entry.get("kind")
             source = make_source(entry, llm=llm)
             source.role = entry.get("role", "primary" if kind == "fhir" else "optional" if kind in {"ols", "website"} else "source")
+            source.alias = entry.get("alias", kind)
+            source.source_type = kind
+            source.remote = kind not in {"csv", "sqlite", "fhir_artifacts", "loinc_csv"}
             self.sources.append((set(systems), source, kind == "website"))
 
     def close(self) -> None:
@@ -371,13 +386,18 @@ class TerminologyRouter:
         return cls(load_sources(path), llm=llm)
 
     def check(self, system: str, code: str, version: str = "", *, research: bool = False) -> dict[str, Any]:
+        key = (system, code, version, research)
+        if key not in self.cache:
+            self.cache[key] = self._check(system, code, version, research=research)
+        return self.cache[key]
+
+    def _check(self, system, code, version, *, research):
         if not system or not code:
-            return {"state": "unknown", "source": None, "metadata": None, "candidates": [], "errors": []}
+            return {"state": "unknown", "source": None, "metadata": None, "candidates": [], "errors": [], "attempts": [], "reason": "missing_code_or_system"}
         candidates: list[dict[str, Any]] = []
         errors: list[str] = []
-        negative = None
-        unknown = None
-        for systems, source, website in sorted(self.sources, key=lambda item: {"primary": 0, "source": 1, "optional": 2}.get(getattr(item[1], "role", "source"), 1)):
+        attempts, results = [], []
+        for systems, source, website in sorted(self.sources, key=lambda item: (getattr(item[1], "remote", False), {"primary": 0, "source": 1, "optional": 2}.get(getattr(item[1], "role", "source"), 1))):
             if system not in systems:
                 continue
             try:
@@ -387,20 +407,27 @@ class TerminologyRouter:
                     continue
                 result = source.check(system, code, version)
             except Exception as exc:
-                errors.append(f"{type(source).__name__}: {exc}")
+                errors.append(f"{type(source).__name__}: {type(exc).__name__}")
+                attempts.append({"alias": getattr(source, "alias", type(source).__name__), "state": "unavailable", "error_type": type(exc).__name__})
                 continue
-            if getattr(source, "role", "source") == "primary" and result["state"] in {"valid", "invalid"}:
-                return {**result, "candidates": candidates, "errors": errors, "authority_role": "primary"}
-            if result["state"] == "valid":
-                return {**result, "candidates": candidates, "errors": errors}
-            if result["state"] == "invalid" and negative is None:
-                negative = result
-            if result["state"] == "unknown" and unknown is None:
-                unknown = result
+            attempts.append({"alias": getattr(source, "alias", type(source).__name__),
+                "type": getattr(source, "source_type", type(source).__name__),
+                "role": getattr(source, "role", "source"), **result})
+            results.append(result)
+            from .progress import LOGGER
+            LOGGER.debug("Terminology source %s: %s", getattr(source, "alias", type(source).__name__), result["state"])
+            if result["state"] == "valid" and self.strategy == "fallback":
+                break
+        positive = next((r for r in results if r["state"] == "valid"), None)
+        negative = next((r for r in results if r["state"] == "invalid"), None)
+        selected = positive or negative or next(iter(results), {"state": "unknown", "source": None, "metadata": None})
+        conflict = positive is not None and negative is not None
         return {
-            **(negative or unknown or {"state": "unknown", "source": None, "metadata": None}),
+            **selected, "state": "unknown" if conflict else selected["state"],
             "candidates": candidates,
             "errors": errors,
+            "attempts": attempts, "conflict": conflict,
+            "reason": "sources_disagree" if conflict else "no_enabled_source_for_system" if not attempts else "",
         }
 
     def check_binding(
@@ -420,12 +447,14 @@ class TerminologyRouter:
                 if result["state"] == "unknown" and unknown is None:
                     unknown = result
             except Exception as exc:
-                errors.append(str(exc))
+                errors.append(type(exc).__name__)
         return {**(negative or unknown or {"state": "unknown", "source": None}), "errors": errors}
 
     def labels(self, system, code, version=""):
         labels, errors = [], []
-        for systems, source, _ in self.sources:
+        for systems, source, _ in sorted(self.sources, key=lambda item: getattr(item[1], 'remote', False)):
+            if labels and self.strategy == 'fallback' and getattr(source, 'remote', False):
+                continue
             if system in systems and hasattr(source, "labels"):
                 try:
                     labels.extend(source.labels(system, code, version))
@@ -435,7 +464,9 @@ class TerminologyRouter:
 
     def search_names(self, system, name):
         candidates, errors = [], []
-        for systems, source, _ in self.sources:
+        for systems, source, _ in sorted(self.sources, key=lambda item: getattr(item[1], 'remote', False)):
+            if candidates and self.strategy == 'fallback' and getattr(source, 'remote', False):
+                continue
             if system in systems and hasattr(source, "search_names"):
                 try:
                     candidates.extend(source.search_names(name))
@@ -455,6 +486,9 @@ def make_source(entry, *, llm=None):
         return SqliteCodeSource(Path(entry["path"]), complete=bool(entry.get("complete", False)))
     if kind == "fhir_artifacts":
         return FhirArtifactSource(Path(entry["path"]))
+    if kind == "loinc_csv":
+        from .local_terminology import LoincCsvSource
+        return LoincCsvSource(Path(entry["path"]), version=entry["version"], complete=entry.get("complete", False))
     if kind == "website":
         return WebsiteCandidateSource(entry["url_template"], entry.get("keywords", []), llm=llm)
     from .terminology_apis import OlsNameSource, WhoIcdSource
@@ -475,7 +509,7 @@ def load_sources(path: Path) -> list[dict[str, Any]]:
         raise ValueError("Terminology source config needs a JSON source array")
     data = [dict(row) for row in data]
     for row in data:
-        if row.get("kind") in {"csv", "sqlite", "fhir_artifacts"} and row.get("path"):
+        if row.get("kind") in {"csv", "sqlite", "fhir_artifacts", "loinc_csv"} and row.get("path"):
             value = Path(row["path"])
             if not value.is_absolute():
                 row["path"] = str(path.resolve().parent / value)

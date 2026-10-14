@@ -13,6 +13,7 @@ from .model_config import select_model
 from .db_source import load_mapping
 from .profile_config import load_profile
 from .observation_services import NlmUcumClient, LoincFhirClient, _NoModelRedirects
+from .deployment import environment
 from urllib.request import build_opener
 
 
@@ -63,7 +64,15 @@ def check_configuration(path, *, source_alias=None, connections=False, research=
         "scope": "Configuration and connection readiness, not a clinical audit",
         "connections_probed": connections,
         "selected_input": {"type": raw_config.get("input", {}).get("type"),
-                           "path": raw_config.get("input", {}).get("path")},
+                           "path": raw_config.get("input", {}).get("path"),
+                           "resource": configuration.kind,
+                           "granularity": configuration.input.get('granularity', 'individual'),
+                           "columns": configuration.input.get('columns', {}),
+                           "table": configuration.database.get('DB_TABLE'),
+                           "schema": configuration.database.get('DB_SCHEMA')},
+        "target_specification": raw_config.get('specification', {}),
+        "output": configuration.output,
+        "terminology_strategy": configuration.lookup_strategy,
         "selected_lookups": [{"alias": alias, "type": row.get("type"),
                               "location": row.get("path") or row.get("endpoint") or "configured endpoint reference"}
                              for alias, row in raw_config.get("lookups", {}).items() if row.get("enabled")],
@@ -73,7 +82,8 @@ def check_configuration(path, *, source_alias=None, connections=False, research=
                             "backend": configuration.validation.get("backend", "matchbox"),
                             "applies_to": "Actual FHIR input documents, before aggregation"},
     }
-    with deployment.prepare(
+    updates = {"SQC_BATCH_CDS_DSN": configuration.toolchain_database()} if connections and configuration.input_type == 'postgres' and configuration.database.get('PATH_TO_DB_CONFIG_TOML') else {}
+    with environment(updates), deployment.prepare(
         source_alias=source_alias,
         research=research,
         model_alias=model_alias,
@@ -105,6 +115,15 @@ def check_configuration(path, *, source_alias=None, connections=False, research=
                 probe("csv_columns", csv_preflight)
         if source["kind"] == "postgres":
             probe("database_mapping", lambda: bool(source.get("mapping") and load_mapping(source["mapping"])))
+        if configuration.input_type == 'sqlite':
+            def sqlite_columns():
+                from contextlib import closing
+                import sqlite3
+                from urllib.parse import quote
+                from .db_source import sqlite_columns_present
+                with closing(sqlite3.connect('file:' + quote(str(source['path']), safe='/') + '?mode=ro', uri=True)) as connection:
+                    return sqlite_columns_present(connection, configuration.mapping)
+            probe('sqlite_table_and_columns', sqlite_columns)
         if configuration.kind == "Observation" and (prepared.audit.profile != "auto" or prepared.audit.profile_config):
             probe(
                 "audit_policy",
@@ -112,13 +131,17 @@ def check_configuration(path, *, source_alias=None, connections=False, research=
             )
         if prepared.audit.unit_catalog:
             probe("unit_catalog", lambda: Path(prepared.audit.unit_catalog).is_file())
-        from .terminology_router import FhirArtifactSource
-        for alias, entry in raw_config.get("lookups", {}).items():
-            if entry.get("enabled") and entry.get("type") == "fhir_artifacts":
+        from .terminology_router import make_source, load_sources
+        for entry in load_sources(prepared.audit.terminology_sources) if prepared.audit.terminology_sources else []:
+            if entry['kind'] in {'csv', 'sqlite', 'fhir_artifacts', 'loinc_csv'}:
                 def local_artifacts(entry=entry):
-                    source = FhirArtifactSource(configuration.path_value(entry["path"]))
-                    return bool(source.systems or source.supplements or source.value_sets)
-                probe("local_terminology:" + alias, local_artifacts)
+                    local = make_source(entry)
+                    try:
+                        return bool(local.systems or local.supplements or local.value_sets) if entry['kind'] == 'fhir_artifacts' else True
+                    finally:
+                        if hasattr(local, 'close'):
+                            local.close()
+                probe('local_terminology:' + entry.get('alias', entry['kind']), local_artifacts)
         if configuration.validation.get("enabled"):
             from .fhir_validation import target_profile
             probe("fhir_validation_profile", lambda: bool(target_profile(configuration)))
@@ -133,11 +156,16 @@ def check_configuration(path, *, source_alias=None, connections=False, research=
                         connect_timeout=5,
                         options="-c default_transaction_read_only=on -c statement_timeout=5000",
                     ) as connection:
-                        return connection.execute(
+                        read_only = connection.execute(
                             "SELECT current_setting('transaction_read_only'), 1"
                         ).fetchone() == ("on", 1)
+                        from psycopg import sql
+                        from .db_source import build_query
+                        query, params = build_query(configuration.mapping)
+                        connection.execute(sql.SQL('SELECT * FROM ({}) AS selected_input LIMIT 0').format(query), params)
+                        return read_only
 
-                probe("postgres_read_only", db_probe)
+                probe("postgres_read_only_table_and_columns", db_probe)
             if not offline and not prepared.audit.snapshot:
                 if "ucum" in active_lookups:
                     probe(
@@ -169,6 +197,12 @@ def check_configuration(path, *, source_alias=None, connections=False, research=
                             == "CapabilityStatement"
                         ),
                     )
+                for alias, entry in raw_config.get('lookups', {}).items():
+                    if entry.get('enabled') and entry.get('type') == 'fhir':
+                        def fhir_probe(entry=entry):
+                            token = deployment.secret(entry, 'token')
+                            return http_json(entry['endpoint'].rstrip('/') + '/metadata', token=token).get('resourceType') == 'CapabilityStatement'
+                        probe('terminology_fhir_metadata:' + alias, fhir_probe)
             if prepared.models_file and not offline:
                 endpoint, key = select_model(prepared.model_alias, prepared.models_file)
 

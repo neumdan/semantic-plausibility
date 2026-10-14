@@ -31,7 +31,7 @@ class DownloadedTerminologyTests(unittest.TestCase):
 @unittest.skipUnless(os.getenv("SQC_LIVE_TESTS") == "1", "Set SQC_LIVE_TESTS=1 for real public services")
 class PublicTerminologyTests(unittest.TestCase):
     def test_bfarm_metadata_and_explicit_download_conditions(self):
-        for name, version in [("bfarm.terminologien.loinc", "2.82.0"), ("bfarm.terminologien.ucum", "1.5.0")]:
+        for name, version in [("bfarm.terminologien.loinc", "2.82.0"), ("bfarm.terminologien.ucum", "1.5.0"), ("bfarm.terminologien.atcgm", "2026.0.0")]:
             metadata = package_metadata(name, version)
             self.assertEqual(metadata["version"], version)
             self.assertTrue(metadata["protected"])
@@ -64,6 +64,17 @@ class PublicTerminologyTests(unittest.TestCase):
                 check_name("Personal Best", system, "personal-best", "1.0.2", router=router)["state"],
                 "exact_alias",
             )
+            entries = [{'kind': 'fhir_artifacts', 'path': str(target), 'systems': [system], 'alias': alias}
+                       for alias in ('first', 'second')]
+            for strategy, expected in [('fallback', 1), ('all', 2)]:
+                routed = TerminologyRouter(entries, strategy=strategy)
+                try:
+                    result = routed.check(system, 'personal-best', '1.0.2')
+                    self.assertEqual(len(result['attempts']), expected)
+                    self.assertTrue(all(a['metadata']['artifact']['source_sha256'] for a in result['attempts']))
+                    self.assertEqual(routed.check('http://loinc.org', '718-7')['reason'], 'no_enabled_source_for_system')
+                finally:
+                    routed.close()
             repeated = install_package("de.gematik.hddt.terminology", "1.0.0", target)
             self.assertFalse(repeated["downloaded"])
             artifact = Path(result["source"])

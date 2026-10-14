@@ -13,7 +13,7 @@ Choose **per lookup**; a run can combine local labels with API validation. Labor
 
 | Route | One-time setup | Reference in TOML | During a batch |
 | --- | --- | --- | --- |
-| **A — downloaded/local data** | Download a pinned FHIR package with `package-init`, install real FHIR JSON yourself, or provide an actual CSV/SQLite catalogue | `type="fhir_artifacts"`, `"csv"` or `"sqlite"`; `path`, `systems`, `enabled=true` | Read the selected local files; no download occurs |
+| **A — downloaded/local data** | Download a pinned FHIR package with `package-init`, install real FHIR JSON yourself, or provide an actual CSV/SQLite catalogue | `type="fhir_artifacts"`, `"loinc_csv"`, `"csv"` or `"sqlite"`; `path`, `systems`, `enabled=true` | Read the selected local files; no download occurs |
 | **B — API** | Choose the appropriate adapter/endpoint; obtain credentials when required | `type`, `endpoint`, `enabled=true`; `systems` for generic sources; credential environment/file references | Request and cache results from the explicitly enabled service |
 
 For A, keep installed terminology under `local/terminologies/`. A package's `[packages.NAME].path` and its `[lookups.NAME].path` must refer to the same installation. Existing FHIR artifacts need only the lookup table. CSV catalogues require `system,code`; optional `version,display` are supported. SQLite requires `codes(system,code,version,display)`.
@@ -81,7 +81,7 @@ BfArM/gematik publishes versioned FHIR R4 **packages** through an [NPM-compatibl
 
 Austria's ELGA TerminoloGit offers public terminology artifacts and versioned releases. Import the exact relevant edition; the old `termpub` service is not the current publication channel. [ELGA documentation](https://www.elga.gv.at/technischer-hintergrund/technische-elga-leitfaeden/).
 
-WHO ATC offers a free searchable index, while complete downloads use registered access and its ordering portal. It is a medication reference and outside the current laboratory workflow. [WHO Centre access](https://atcddd.fhi.no/atc_ddd_index_and_guidelines/atc_ddd_index/).
+WHO ATC offers a free searchable index, while complete downloads use registered access and its ordering portal. Its codes can be checked by the medication adapter using a configured FHIR service or a properly licensed local catalogue. [WHO Centre access](https://atcddd.fhi.no/atc_ddd_index_and_guidelines/atc_ddd_index/).
 
 EMA SPOR has read-only browser access and version-specific account/role requirements for its APIs. Its dedicated API is listed as **known, not implemented**; it is not a FHIR terminology endpoint. [EMA SPOR](https://spor.ema.europa.eu/).
 
@@ -108,7 +108,7 @@ podman-compose --profile terminology run --rm package-init
 docker compose --profile terminology run --rm package-init
 ```
 
-Ordinary `batch` runs never download packages. `package-init` checks the publisher SHA-1, records SHA-256, preserves the original archive/licence files and installs atomically. Repeated installation verifies the existing files. Dependencies are recorded, not automatically downloaded. Package version and CodeSystem version can differ; code checks use the CodeSystem edition. Installed contents stay under ignored `local/`; transfer this folder to a disconnected review machine. For offline LOINC axes/units and UCUM syntax/factors, also supply a pack captured from real APIs; a translation package alone is insufficient.
+Ordinary `batch` runs never download packages. `package-init` checks the publisher SHA-1, records SHA-256, preserves the original archive/licence files and installs atomically. Repeated installation verifies the existing files. Dependencies are recorded, not automatically downloaded. Package version and CodeSystem version can differ; code checks use the CodeSystem edition. Installed contents stay under ignored `local/`; transfer this folder to a disconnected review machine. For offline LOINC axes/example units use the full official `loinc_csv` below or a real captured API pack. For UCUM syntax/factors supply the captured pack. A translation package alone is insufficient.
 
 **Supplements supply labels, not independent code membership.** A base `CodeSystem.content="complete"` can establish membership/absence for its edition; a fragment cannot disprove an absent code. Only explicit ValueSet expansions are evaluated locally; unevaluated `compose` filters stay unverified. UCUM has a generative grammar: Common UCUM Units is a useful finite subset, not a complete list of every valid expression.
 
@@ -220,4 +220,52 @@ path = "../input/terminologies/bfarm-lab"
 systems = ["http://loinc.org", "http://unitsofmeasure.org"]
 ```
 
-Python resolves the sibling path against the TOML directory; Compose mounts it read-only at `/input`. Keep primary LOINC/UCUM APIs configured. Translation supplements enrich matching editions only. Local-file SHA-256, supplement/base editions and the publisher's canonical resource URL accompany label evidence. A raw `Loinc.csv` with official LOINC column names is not the generic `system/code/display/version` lookup CSV; it needs an adapter/conversion, and must not be passed as that catalogue unchanged.
+Python resolves the sibling path against the TOML directory; Compose mounts it read-only at `/input`. Keep primary LOINC/UCUM APIs configured. Translation supplements enrich matching editions only. Local-file SHA-256, supplement/base editions and the publisher's canonical resource URL accompany label evidence. Use `type="loinc_csv"` for the unchanged official `Loinc.csv`; use `type="csv"` only for the generic `system,code,version,display` catalogue.
+
+## Full local LOINC table
+
+Download a release from [LOINC downloads](https://loinc.org/downloads/) under its account/licence conditions. Unpack the full **Loinc.csv**, preserve its headers, and record the actual release. The adapter reads identity, canonical name, all six axes, status, synonyms and example units using the [official table structure](https://loinc.org/kb/users-guide/loinc-database-structure/loinc-table-structure/).
+
+```toml
+[lookups.loinc_local]
+enabled = true
+role = "primary"
+type = "loinc_csv"
+systems = ["http://loinc.org"]
+path = "../input/terminologies/loinc/Loinc.csv"
+version = "2.83" # Replace with the downloaded release; not a row's VersionLastChanged.
+complete = true # Only the full edition; false for a subset.
+```
+
+A full table establishes code membership and provides example-unit context locally; example units are not exhaustive clinical rules. Disable the remote LOINC lookup for a strictly local code check, or keep it as an explicit fallback. `network.mode="offline"` disables all remote lookups; absent UCUM syntax/conversion evidence then remains unknown. Optional BfArM translations must match the base edition. The file hash and release are retained. Missing or duplicate codes and malformed files fail visibly.
+
+```sh
+uv run --no-sync --env-file .env run-plausibility-check lookup --config pipeline.toml --lookup loinc_local --code 718-7
+```
+
+## Local ATC/DDD
+
+BfArM publishes the German ATC/DDD package **`bfarm.terminologien.atcgm`**; package **2026.0.0** contains CodeSystem edition **2026**, canonical **`http://fhir.de/CodeSystem/bfarm/atc`**. Its `ddd` concept property is a publisher-provided string. See the [package catalogue](https://terminologien.bfarm.de/fhirpackages.html) and [official ATC resource description](https://terminologien.bfarm.de/CodeSystem-atcgm-2026.html).
+
+1. Copy `terminology.example.toml` to ignored `terminology.toml`.
+2. Enable `[packages.atc_de]`. Read the [ATC download conditions](https://terminologien.bfarm.de/bfarm.terminologien.atcgm-conditions.html); set `accept_download_conditions=true` only if you accept them.
+3. Install that selected package:
+
+```sh
+uv run --no-sync --env-file .env run-plausibility-check package-init --config terminology.toml --package atc_de
+```
+
+For containers, select `SQC_CONFIG_FILE=terminology.toml` in `.env`, then use `podman-compose --profile terminology run --rm package-init` (or `docker compose …`). Restore `SQC_CONFIG_FILE=pipeline.toml` afterwards. Only enabled packages are installed. If you already downloaded/extracted the package, step 3 is unnecessary.
+
+4. Add this lookup to the **medication check's TOML**, then run its `config-check` and `check`:
+
+```toml
+[lookups.atc_de]
+enabled = true
+role = "primary"
+type = "fhir_artifacts"
+systems = ["http://fhir.de/CodeSystem/bfarm/atc"]
+path = "local/terminologies/atc-2026" # Nested example TOMLs use ../../local/…
+```
+
+This exact CodeSystem is different from WHO ATC's `http://www.whocc.no/atc`. Preserve the source's actual system/edition; don't relabel it merely to obtain a match. A local read needs no API credentials. The report retains canonical names and available DDD strings in `ddd_references_json`, alongside code, edition, source and artifact hash. A missing DDD is a missing catalogue value. DDD is a drug-utilization reference, not an individual prescribed dose, a safety threshold or product concentration; no automatic dose correction uses it.
