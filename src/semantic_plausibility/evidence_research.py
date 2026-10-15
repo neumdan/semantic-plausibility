@@ -20,6 +20,7 @@ from . import research_prompts as prompts
 from .model_schemas import response_schema
 from .observation_services import PublicEvidenceClient
 from .report_sources import review_set_fields
+from .report_context import run_context, item_context, execution_position, execution_since
 
 
 def research_plan(config_path, report=None, *, scope=None):
@@ -83,7 +84,8 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
     protected += [row.get("path") for row in config.data.get("lookups", {}).values()]
     if any(config.path_value(name) in paths.values() for name in protected if name):
         raise ValueError("Research output must not replace source data, lookups or clinician decisions")
-    profile = verify_report_profile(config, json.loads(source.with_suffix(".summary.json").read_text()))
+    source_summary = json.loads(source.with_suffix(".summary.json").read_text())
+    profile = verify_report_profile(config, source_summary)
     for detail in details.values():
         checked = detail["report"]["profile"]
         if checked["canonical"] != (profile.canonical or None) or checked["guide_version"] != (profile.guide_version or "4.0.1"):
@@ -105,10 +107,12 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
                     configuration_sha256=config.deployment.sha256, research_scope=scope, output_path=str(target), software=versions())
                 reviewed = []
                 with config.deployment.prepare(research=True, source_access=False) as prepared:
+                    assessment_run = run_context(config, prepared, output_path=target, source_report=source, source_summary=source_summary)
                     checker = configured_checker(config, prepared, profile=profile, research=True)
                     try:
                         with (folder / paths["evidence"].name).open("w") as evidence_file:
                             for original_row in original:
+                                execution_start = execution_position(checker)
                                 detail = details[original_row["tuple_id"]]
                                 payload = detail["metadata"]
                                 raw, assessment = checker.assess(payload, detail["observed_values"])
@@ -174,6 +178,9 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
                                 assessment.update(metadata=payload, observed_values=detail["observed_values"])
                                 row["evidence_json"] = encoded(assessment)
                                 row.update(review_set_fields(row, assessment))
+                                assessment["assessment_context"] = item_context(assessment_run, row, assessment)
+                                assessment["assessment_context"]["execution"] = execution_since(checker, execution_start)
+                                row["assessment_context_json"] = encoded(assessment["assessment_context"])
                                 reviewed.append(row)
                                 if progress:
                                     progress(f"Completed {len(reviewed)}/{len(original)} groups; {len(item['study_candidates'])} study evidence records for this set.")
@@ -186,6 +193,7 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
                         (folder / paths["trace"].name).write_text("".join(encoded(row) + "\n" for row in trace))
                         summary = json.loads(source.with_suffix(".summary.json").read_text())
                         summary.update(run_id=run_id, operation="research-evidence", software=versions(),
+                            run_context=assessment_run,
                             output_path=str(target),
                             source_report_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
                             configuration_sha256=config.deployment.sha256, evidence_kind="retrieved_evidence_candidates",

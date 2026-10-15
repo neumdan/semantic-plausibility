@@ -27,8 +27,8 @@ class PodmanExampleTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(sorted(p.relative_to(root) for p in root.rglob("*")), before)
             commands = [line for line in result.stdout.splitlines() if " --out " in line]
-            self.assertEqual(len(commands), 6)
-            self.assertEqual(len({line.split(" --out ")[1].strip() for line in commands}), 6)
+            self.assertEqual(len(commands), 9)
+            self.assertEqual(len({line.split(" --out ")[1].strip() for line in commands}), 9)
             for line in commands[2:4]:
                 self.assertIn("/01-lab-lookup/report.csv", line)
             self.assertIn("--scope lookup", commands[2])
@@ -39,6 +39,20 @@ class PodmanExampleTests(unittest.TestCase):
             self.assertLess(result.stdout.index("pc stop matchbox blaze"), result.stdout.index("pc up -d ollama"))
             self.assertIn("Compose project: semantic-plausibility-examples", result.stdout)
             self.assertNotIn("--build matchbox", result.stdout)
+
+    def test_lookup_only_plan_covers_every_domain_without_model_or_validator(self):
+        result = subprocess.run(
+            [shutil.which("bash"), str(SCRIPT), "--lookup-only", "--dry-run"],
+            cwd=ROOT, capture_output=True, text=True, timeout=15,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        commands = [line for line in result.stdout.splitlines() if " --out " in line]
+        self.assertEqual(len(commands), 6)
+        self.assertEqual(len({line.split(" --out ")[1].strip() for line in commands}), 6)
+        for name in ("request", "administration", "product", "statement", "terminology"):
+            self.assertTrue(any(f"/examples/medication/{name}.toml" in line for line in commands))
+        for forbidden in ("pc up -d ollama", "validator-init", "--scope studies", "--scope lookup"):
+            self.assertNotIn(forbidden, result.stdout)
 
     def test_bad_arguments_fail_before_changing_a_checkout(self):
         with tempfile.TemporaryDirectory() as name:

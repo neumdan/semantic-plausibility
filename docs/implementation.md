@@ -10,6 +10,7 @@ The named check reads an export, writes local artifacts and exits. Evidence rese
 | Real UCUM syntax/factors and LOINC metadata | `observation_services.py`; `local_terminology.py` reads official LOINC CSV and preserves published ATC/DDD text |
 | Local full FHIR/IG validation | `fhir_validation.py`, pinned Matchbox/HL7 or MII service |
 | Source → linked terminology → complete proposal and citations | `report_sources.py`, provider-origin metadata in `observation_services.py` |
+| Run configuration, item methods, assumptions and next steps | `report_context.py`; shared CSV/HTML records, secret-free settings projection |
 | Additional configured CodeSystems/ValueSets | `terminology_router.py`, `terminology_validation.py` |
 | Pinned package setup / aliases / optional OLS and WHO APIs | `terminology_packages.py`, `name_checks.py`, `terminology_apis.py`; `lookup` inspects one source |
 | Code–unit fit, references and recommendations | `fhir_quality_pipeline.py`, `recommendations.py` |
@@ -50,6 +51,15 @@ Matchbox 4.1.21 and MII validator 0.0.1-alpha.8 are pinned; the latter uses the 
 Live FHIR tests require a running local Matchbox with the real MII guide: `SQC_LIVE_FHIR_VALIDATION_TESTS=1 uv run --no-sync python -m unittest discover -s tests -p test_fhir_validation.py -v`. The valid/invalid source inputs are illustrative; every validation response comes from the actual service.
 
 ## Current verification
+
+15 October 2026 report update: run settings and per-item assessment records now accompany the source sets and proposals. The suite ran **100 tests: 68 passed, 32 optional integrations skipped**. A live research test retrieved actual literature while recording model unavailability; a live label/report test checks code and source attribution. All six Podman lookup scenarios completed. Secret exclusion, HTML escaping and report audit integrity passed. The full nine-scenario plan was checked; Ollama inference and full FHIR validation were not rerun for this report update.
+
+15 October 2026 domain update: README/manual now separate A check level, B input, C sources and D clinical domain. All five resource types have executable recipes; the Podman launcher adds a six-report `--lookup-only` route and nine-report full route. Generic FHIR mTLS certificate paths now work through batch preparation, standalone lookup and connection checks. Certificate-protected live access remains unverified without credentials.
+
+Verification: **96 tests: 64 passed, 32 optional integrations skipped** without service opt-ins; **five live laboratory tests passed**, plus **six new live medication terminology/report tests passed** (WHO ATC, SNOMED, RxNorm, UNII, EDQM and the complete two-product example). Two domain-configuration tests passed; the national/MII test was explicitly skipped. All **six actual Podman lookup-only scenarios** completed, with each audit verified. Ruff, example TOML loading, manual links and diagram XML checks passed. The container includes both public terminology configurations. No hospital database, licensed national content or medication full-profile conformance is claimed from this run. [Observed codes, editions and unresolved cases](../examples/medication/README.md#recorded-example-run--15-october-2026).
+
+The full nine-report workflow was plan-tested; its model/validator stages were not rerun for this domain update. The existing earlier laboratory research results below are separate, versioned runs.
+
 
 Version **0.13.0**, 14 October 2026: adds MedicationStatement/Medication adapters, local official LOINC CSV support, published ATC/DDD context, local-first/all-source routing with visible attempts, configuration summaries and log levels. SQLite rejects missing mapped columns before querying (quoted unknown names must never become literal values).
 

@@ -1,20 +1,23 @@
 #!/usr/bin/env bash
-# Six real-service example runs. Requires Bash, Podman and podman-compose.
+# Real-service laboratory and medication example runs. Requires Bash, Podman and podman-compose.
 set -Eeuo pipefail
 umask 077
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 DRY_RUN=false
 REBUILD=false
+LOOKUP_ONLY=false
 for argument in "$@"; do
 case "$argument" in
   --dry-run) DRY_RUN=true ;;
   --rebuild) REBUILD=true ;;
+  --lookup-only) LOOKUP_ONLY=true ;;
   -h|--help)
-    printf '%s\n' 'Usage: bash tools/run-podman-examples.sh [--dry-run] [--rebuild]' \
-      'Runs four laboratory modes and two medication checks using the supplied TOMLs.' \
+    printf '%s\n' 'Usage: bash tools/run-podman-examples.sh [--lookup-only] [--dry-run] [--rebuild]' \
+      'Runs four laboratory modes, four medication types and a medication terminology example.' \
       'Uses real APIs, local Matchbox/Blaze and Ollama; first use downloads images/model.' \
       'Writes separate reports under output/podman-examples-<timestamp>-<unique suffix>/.' \
+      '--lookup-only runs six lookup/check reports without starting Ollama or the FHIR validator.' \
       '--dry-run prints the plan without creating files, downloading or running containers.' \
       '--rebuild explicitly rebuilds the runner and validator, retaining cached layers/volumes.'
     exit 0 ;;
@@ -55,7 +58,7 @@ cleanup() {
   local status=$?
   trap - EXIT
   # Stop only this script's project; keep model/terminology volumes and reports.
-  if ! pc stop ollama matchbox blaze; then
+  if ! "$LOOKUP_ONLY" && ! pc stop ollama matchbox blaze; then
     printf 'Could not stop test services. Project: %s\n' "$PROJECT" >&2
     status=1
   fi
@@ -140,11 +143,11 @@ report() {
 }
 
 printf '%s\n' 'Example inputs; real terminology APIs; local validation and inference.' \
-  'Configuration: pipeline.example.toml; examples/lab/fhir-csv.toml; examples/medication/{request,administration}.toml.' \
+  'Configuration: pipeline.example.toml; examples/lab/fhir-csv.toml; examples/medication/{request,administration,product,statement,terminology}.toml.' \
   "Private test caches: $STATE" "Compose project: $PROJECT" \
   'Host ports are assigned dynamically on localhost; services communicate inside the stack.'
 if ! "$DRY_RUN"; then
-  RUNNER_SHA="$(sqc_fingerprint "$ROOT" compose.yaml .dockerignore deploy/Dockerfile pyproject.toml uv.lock README.md LICENSE NOTICE src examples)"
+  RUNNER_SHA="$(sqc_fingerprint "$ROOT" compose.yaml .dockerignore deploy/Dockerfile pyproject.toml uv.lock README.md LICENSE NOTICE src examples terminology.example.toml)"
 fi
 sqc_ensure_image run-plausibility-check semantic-plausibility-stack:local "$RUNNER_SHA"
 
@@ -159,6 +162,7 @@ prepare_matchbox() {
 lookup_ready=false
 if report 01-lab-lookup run-plausibility-check check --config /app/pipeline.toml; then lookup_ready=true; fi
 
+if ! "$LOOKUP_ONLY"; then
 if step 'Prepare pinned MII laboratory validator' pc run --rm validator-init validator-init \
      --config /app/examples/lab/fhir-csv.toml --overwrite \
    && step 'Start local terminology service' pc up -d blaze && wait_healthy blaze \
@@ -184,8 +188,14 @@ else
   record 04-lab-ai-evidence - dependency_failed
 fi
 
+fi # Full lab workflow; --lookup-only skips validator and model services.
+
 report 05-medication-request run-plausibility-check check --config /app/examples/medication/request.toml || true
 report 06-medication-administration run-plausibility-check check --config /app/examples/medication/administration.toml || true
+
+report 07-medication-product run-plausibility-check check --config /app/examples/medication/product.toml || true
+report 08-medication-statement run-plausibility-check check --config /app/examples/medication/statement.toml || true
+report 09-medication-terminology run-plausibility-check check --config /app/examples/medication/terminology.toml || true
 
 if ! "$DRY_RUN"; then
   printf '%s\n' '</ul><p><a href="summary.tsv">Exit summary</a> · <a href="run.log">Run log</a></p></html>' >> "$RUN_DIR/index.html"

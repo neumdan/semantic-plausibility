@@ -36,6 +36,60 @@ These checks do **not** need Ollama. AI/evidence research and clinician-registry
 
 `constant_rate=true` is a **source assertion**, not inferred from FHIR `effectivePeriod` or from `status="completed"`. Without it, the comparison is conditional and requires review. Interrupted or variable-rate infusions must not set it. UCUM conversion precision is preserved; arithmetic comparison uses relative tolerance `0.000001`, not a clinical tolerance. A mismatch does not propose a replacement dose.
 
+## Terminology walkthrough
+
+Pick **D** independently of **A** (check level), **B** (input) and **C** (sources). These resource adapters support A1. MII Medication 2026.0.1 defines the target profile; the configured API or installed catalogue supplies the actual terminology content. Choose source systems explicitly, without relabelling a WHO ATC code as German ATC.
+
+| Semantic role | Source systems | How to verify |
+| --- | --- | --- |
+| Lab test and quantities | LOINC; UCUM | Laboratory recipes, LOINC metadata + unit grammar/conversion |
+| Medication classification | WHO ATC; German ATC/DDD | Separate systems and editions; DDD is context, not a dosing limit |
+| German product/pack | PZN | Authorised catalogue or server with actual coverage |
+| Ingredient | ASK, SNOMED substance, UNII, CAS; optional RxNorm ingredient concept | Exact code lookup; equivalence between codings still needs product/clinical evidence |
+| Pharmaceutical form and route | EDQM Standard Terms | Form/route code identity, separately from product/dose compatibility |
+| Dose, strength, rate | UCUM | Unit identity/dimension and conditional arithmetic using source-declared strength |
+
+**Run:** `podman-compose run --rm run-plausibility-check check --config /app/examples/medication/terminology.toml`. Open `output/medication-terminology.html`. Docker uses `docker compose`; Python uses `uv run --no-sync --env-file .env run-plausibility-check --config examples/medication/terminology.toml`.
+
+This reads `terminology-bundle.json` (two synthetic source formulations) and performs real lookups:
+
+1. Paracetamol: WHO ATC `N02BE01`; ingredient SNOMED `387517004`, RxNorm `161`, UNII `362O9ITL9D`; EDQM `10219000` (tablet); source strength `500 mg / 1`. The public trial server covers these codes, subject to availability and its returned editions.
+2. Aspirin: PZN `06312077`, German ATC `B01AC06` **2023**, SNOMED `387458008`, EDQM tablet; source strength `100 mg / 1`, adapted from the [published MII example](https://www.medizininformatik-initiative.de/Kerndatensatz/KDS_Medikation_2026/MIIIGModulMedikation-TechnischeImplementierung-FHIR-Profile-Medication.html). No licensed product table ships here. Missing PZN/German ATC coverage remains unknown. A downloaded 2026 ATC catalogue cannot verify a requested 2023 edition.
+
+Code identities do not verify formulation, strength, cross-coding equivalence or clinical appropriateness. RxNorm is an optional international terminology, not an additional MII requirement. These resources do not claim full MII conformance; enable formal validation only after setting up its guide.
+
+### Recorded example run — 15 October 2026
+
+The six Podman A1 scenarios completed with separate CSV/HTML reports and verified audit hashes. Live laboratory tests also verified NLM UCUM and LOINC. The medication example returned:
+
+| Lookup | Observed result / edition |
+| --- | --- |
+| WHO ATC `N02BE01` | valid / 2025 |
+| SNOMED `387517004` | valid / international edition 20250201 |
+| RxNorm `161` | valid / server version `03022026` |
+| UNII `362O9ITL9D` | valid / 2024-06-22 |
+| EDQM `10219000` | valid / 5 February 2025 |
+| UCUM `mg`, `1` | valid syntax |
+| PZN `06312077`, German ATC `B01AC06` version 2023 | unknown: public server lacks the requested system/coverage |
+
+Both medication formulations remained `needs_review`: source strength is not verified product evidence. Request calculations were conditional; the inconsistent Administration produced an `error`. Product/Statement CSVs retained missing German ATC 2026 coverage as unknown. These are observed service editions, not a claim of current national coverage. ASK, CAS and the certificate-protected MII server were configured/documented but **not verified** in this run. Real BfArM ATC/DDD, ASK/PZN catalogues and a MII client certificate still need to be supplied.
+
+### Probe one service at a time
+
+The separate root `terminology.example.toml` enables public trial aliases. These commands never start a batch or model:
+
+```sh
+podman-compose run --rm run-plausibility-check lookup --config /app/terminology.example.toml --lookup ucum --code mg
+podman-compose run --rm run-plausibility-check lookup --config /app/terminology.example.toml --lookup loinc --code 718-7
+podman-compose run --rm run-plausibility-check lookup --config /app/terminology.example.toml --lookup atc_who --code N02BE01
+podman-compose run --rm run-plausibility-check lookup --config /app/terminology.example.toml --lookup snomed --code 387517004
+podman-compose run --rm run-plausibility-check lookup --config /app/terminology.example.toml --lookup rxnorm --code 161
+podman-compose run --rm run-plausibility-check lookup --config /app/terminology.example.toml --lookup unii --code 362O9ITL9D
+podman-compose run --rm run-plausibility-check lookup --config /app/terminology.example.toml --lookup edqm --code 10219000
+```
+
+JSON includes state, source, canonical display and returned edition where available. API coverage and licensing differ. [National downloads, ASK/PZN and MII mTLS](../../docs/lookups.md#medication-terminology-sources) explain the additional setup. Supply licensed RF2 data to a suitable terminology server first; this runner does not ingest RF2 itself.
+
 ## Input contract
 
 One TOML selects one resource type. `[input.columns]` maps the following logical roles to actual CSV or database columns. Unknown roles fail before scanning. Do not relabel an ATC code as a PZN or assume that an ATC class proves a product's strength.

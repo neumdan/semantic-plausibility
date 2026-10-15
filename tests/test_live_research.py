@@ -74,6 +74,12 @@ class ResearchRetrievalTests(unittest.TestCase):
             self.assertEqual(dossier["groups_with_study_evidence"], 1)
             with Path(dossier["csv"]).open(encoding="utf-8-sig", newline="") as handle:
                 result = next(csv.DictReader(handle))
+            assessment = json.loads(result["assessment_context_json"])
+            self.assertEqual(assessment["check_result_basis"], "original_A1_report")
+            self.assertGreater(assessment["execution"]["new_model_calls"], 0)
+            context = json.loads(Path(dossier["csv"]).with_suffix(".summary.json").read_text())["run_context"]
+            self.assertEqual(context["level"], "A3")
+            self.assertFalse(context["input"]["hospital_data_requeried"])
             self.assertTrue(result["canonical_name"])
             self.assertTrue(result["suggested_name"])
             full = json.loads(result["recommendation_set_json"])

@@ -39,6 +39,7 @@ from .observation_quality import LoincTerm
 from .terminology_router import TerminologyRouter, artifact_files, load_sources
 from .review_feedback import REVIEW_FIELDS, ReviewRegistry
 from .report_sources import SET_FIELDS, review_set_fields
+from .report_context import run_context, item_context, execution_position, execution_since
 
 _CSV_LOCK = RLock()
 
@@ -794,6 +795,7 @@ def _review_export(config):
                         raise ValueError("Export manifest frequency does not match known source occurrences")
                 log.event("grouped", **accounting, skipped_resources=skipped)
                 phase = "semantic_checks"
+                assessment_run = run_context(config, prepared, output_path=target)
                 all_fields = FIELDS + [
                     key
                     for key in EXTRA_FIELDS
@@ -827,6 +829,7 @@ def _review_export(config):
                     writer = csv.DictWriter(output, fieldnames=all_fields)
                     writer.writeheader()
                     for key, payload, stats, metadata in groups.groups():
+                        execution_start = execution_position(checker)
                         raw_row, detail = checker.assess(payload, stats)
                         detail = {
                             "run_id": run_id,
@@ -952,6 +955,9 @@ def _review_export(config):
                                         review_required=approval["review_required"], approval_id=approval["decision_id"])
                             row["fhir_mapping_proposal_json"] = encoded(plan)
                         row.update(review_set_fields(row, detail))
+                        detail["assessment_context"] = item_context(assessment_run, row, detail)
+                        detail["assessment_context"]["execution"] = execution_since(checker, execution_start)
+                        row["assessment_context_json"] = encoded(detail["assessment_context"])
                         selected = {
                             field: _csv_text(str(row[field]))
                             if isinstance(row.get(field), str)
@@ -986,6 +992,7 @@ def _review_export(config):
                     "mode": mode,
                     "software": versions(),
                     "configuration_sha256": config.deployment.sha256,
+                    "run_context": assessment_run,
                     "input_sha256": input_hash,
                     "reference_pack_sha256": _input_hash(snapshot) if snapshot else None,
                     "reference_artifacts": artifacts,

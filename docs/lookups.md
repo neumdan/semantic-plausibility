@@ -37,7 +37,7 @@ username_env = "LOINC_FHIR_USERNAME"
 password_env = "LOINC_FHIR_PASSWORD"
 ```
 
-For B, put actual credential values in ignored `.env` using those names, or use `username_file` / `password_file`. Generic FHIR sources use `token_env` / `token_file`; WHO uses client ID/secret references. Public NLM, the public FHIR test service and SemLookP need no credentials. Keep only one dedicated `type="loinc"` and one `type="ucum"` service active.
+For B, put actual credential values in ignored `.env` using those names, or use `username_file` / `password_file`. Generic FHIR sources use `token_env` / `token_file` or `client_cert` / `client_key` paths for mTLS; WHO uses client ID/secret references. Public NLM, the public FHIR test service and SemLookP need no credentials. Keep only one dedicated `type="loinc"` and one `type="ucum"` service active.
 
 **Offline or combined:** `network.mode="lookups"` permits selected APIs alongside local files. `network.mode="offline"` disables remote adapters; set `input.snapshot="local/reference-pack.json"` to reuse actual UCUM/LOINC responses, examples and verified factors. Capture this pack in a connected run with `output.lookup_pack="output/reference-pack.json"`, then transfer it with your export and any local artifacts. It covers only queries from that run; absent evidence stays unverified. A BfArM label supplement alone cannot validate arbitrary UCUM expressions or establish conversions. There is no fallback to an unconfigured API.
 
@@ -74,6 +74,50 @@ Already downloaded files need no download credentials. A raw official `Loinc.csv
 NLM exposes unit validation and conversion services. A mathematically supported factor is required before proposing a value/reference transformation. [NLM documentation](https://ucum.nlm.nih.gov/ucum-service.html).
 
 LOINC's API requires a registered account and Basic Authentication. Public lookup pages can provide candidate evidence but cannot substitute for a successful exact code validation. [LOINC authentication](https://loinc.org/kb/api/auth).
+
+## Medication terminology sources
+
+The [MII Medication terminology guide](https://www.medizininformatik-initiative.de/Kerndatensatz/KDS_Medikation_2026/MIIIGModulMedikation-TechnischeImplementierung-Terminologien.html) distinguishes classification, product, ingredient, form/route and quantities. Configure the **actual canonical system**, edition and source. An IG's ValueSet binding is not a server address or a list of installed/licensed content. Server coverage must be tested separately.
+
+| Source | Supported route | Setup / limit |
+| --- | --- | --- |
+| WHO ATC | Generic FHIR; real local export | Public trial alias `atc_who`; independent from German ATC |
+| German ATC/DDD | BfArM FHIR package; own/MII FHIR server | [Pinned download setup](#local-atcddd); DDD text is not a dose limit |
+| SNOMED CT | Generic FHIR; authorised FHIR/CSV/SQLite export | Public trial covers an international edition. German edition/licensing must be supplied explicitly; raw RF2 is not read by this runner |
+| RxNorm | Generic FHIR; real local export | Alias `rxnorm`; specify ingredient/product concepts correctly. The dedicated RxNav API is a known alternative, not a separate implemented adapter |
+| UNII | Generic FHIR; real local export | Alias `unii`; [FDA downloads](https://precision.fda.gov/uniisearch). Raw FDA files require a documented map to `system,code,version,display`; no automatic FDA importer |
+| EDQM Standard Terms | Generic FHIR; authorised FHIR/CSV/SQLite | Alias `edqm`; production catalogue access/terms apply. Check form and route independently |
+| ASK / PZN / CAS | Own or MII FHIR server where covered; authorised exports | Enable `german_medication_files` or your server. No licensed product/substance catalogue ships with the code |
+| UCUM | NLM API; captured real responses | Dose/strength/rate expressions and supported conversions, not a medication catalogue |
+
+`terminology.example.toml` provides single-source aliases and disabled national/local routes. [Probe commands and synthetic source example](../examples/medication/README.md#terminology-walkthrough). The public server is for trial interoperability; returned versions are preserved and never called the latest national edition. If you change sources, configure the **same tables in the domain recipe you run**.
+
+Downloaded FHIR packages/resources can be used unchanged with `type="fhir_artifacts"`. For another publisher format, perform an explicit, documented conversion into the catalogue schema or import it into your terminology server. Preserve the code system and release; set `complete=false` for a subset. A generic unit label, ATC class or ingredient lookup cannot prove a product's actual strength.
+
+### MII client certificates
+
+The [SU-TermServ access page](https://www.ontoserver.mii-termserv.de/) requires an authorised client certificate for read access; a bearer token alone does not provide it. Obtain the certificate through your institution or SU-TermServ. Put the PEM certificate chain and matching unencrypted private key in ignored `local/secrets/`, restrict the key to its owner, and mount this directory read-only (the standard Compose runner already does so). Pass file paths, never key contents, in your selected TOML:
+
+```toml
+[lookups.mii_termserv]
+enabled = true
+type = "fhir"
+role = "primary"
+endpoint = "https://ontoserver.mii-termserv.de/fhir"
+client_cert = "local/secrets/mii-client.crt"
+client_key = "local/secrets/mii-client.key"
+systems = ["http://fhir.de/CodeSystem/bfarm/atc", "http://fhir.de/CodeSystem/ask", "http://fhir.de/CodeSystem/ifa/pzn", "http://snomed.info/sct", "http://standardterms.edqm.eu"]
+```
+
+Paths above assume root `pipeline.toml`; use `../../local/secrets/…` in a nested `examples/medication/` TOML. Only declare systems your deployment covers. Then:
+
+```sh
+chmod 600 local/secrets/mii-client.key
+podman-compose run --rm run-plausibility-check config-check --connections
+podman-compose run --rm run-plausibility-check lookup --lookup mii_termserv --system http://fhir.de/CodeSystem/ask --code 00002
+```
+
+`config-check` loads the certificate/key pair locally; `--connections` also probes access. An exact lookup is still needed to check code/edition coverage. Use the same `--config` argument on both commands when selecting another mounted TOML. No certificate was available in the public example test; that integration remains unverified until configured locally. Full FHIR validation uses its own local validator configuration.
 
 ## Germany and Europe
 

@@ -57,6 +57,7 @@ FIELDS = [
     "ig_version",
     "ig_canonical",
     "configuration_sha256",
+    "assessment_context_json",
     "review_status",
     "review_complete",
     "review_correct",
@@ -256,6 +257,7 @@ def ratio(numerator, denominator):
 
 def write_html(path, rows, summary, csv_name, log_name):
     from .report_sources import recommendation_html, source_set_html, linked_data_html, source_html
+    from .report_context import run_context_html, item_context_html
     title = "Laboratory evidence research" if summary.get("operation") == "research-evidence" else "Laboratory export review"
     if summary.get("operation") == "research-evidence" and summary.get("research", {}).get("scope") == "lookup":
         title = "Laboratory terminology recommendations"
@@ -266,6 +268,7 @@ def write_html(path, rows, summary, csv_name, log_name):
         checks = {key: row.get(key, "") for key in ("status", "reason", "code_check", "unit_check", "code_unit_fit", "reference_check", "value_reference_check", "lookup_credibility", "mii_numeric_set_ready")}
         checked = "".join(f'<p><strong>{escape(key.replace("_", " "))}</strong>: {escape(str(value))}</p>' for key, value in checks.items())
         body += '<tr><td class="set">' + source_set_html(row) + '</td><td class="set">' + linked_data_html(row) + '</td><td class="recommendations">' + recommendation_html(row) + '</td><td class="set">' + checked + '</td></tr>'
+        body += '<tr><td colspan="4" class="assessment-cell">' + item_context_html(row) + '</td></tr>'
     spec = summary.get("specification", {})
     links = {"FHIR R4 Observation": "https://hl7.org/fhir/R4/observation.html", **spec.get("links", {})}
     profile_html = '<section><h2>Target profile and resources</h2><p>Package: <code>' + escape(str(spec.get("IG_PACKAGE", "hl7.fhir.r4.core"))) + ' | ' + escape(str(spec.get("IG_VERSION", "4.0.1"))) + '</code></p>'
@@ -297,8 +300,9 @@ def write_html(path, rows, summary, csv_name, log_name):
     html = f'''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">
 <title>{title}</title><style>body{{font:16px/1.6 system-ui;background:#f4f7f9;color:#142d42;margin:0}}main{{max-width:1150px;margin:auto;padding:30px}}
-section{{background:white;padding:24px;margin:18px 0;border:1px solid #d5e1e8;border-radius:8px}}h1,h2{{line-height:1.2}}a{{color:#176c63}}table{{border-collapse:collapse;font-size:13px;white-space:nowrap}}th,td{{padding:9px;text-align:left;vertical-align:top;border-bottom:1px solid #d5e1e8}}th{{background:#edf5f3}}.scroll{{overflow:auto}}.note{{border-left:3px solid #176c63;padding:14px;background:#eef7f4}}code{{font-family:monospace}}.recommendations{{white-space:normal;min-width:360px;max-width:520px}}.set{{white-space:normal;min-width:240px;max-width:360px;overflow-wrap:anywhere}}pre{{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}}.recommendation{{padding:12px 0;border-bottom:1px solid #d5e1e8}}.recommendation p{{margin:4px 0}}.recommendation ul{{padding-left:18px}}.source-meta{{display:block;color:#526978;font-size:12px;overflow-wrap:anywhere}}blockquote{{margin:8px 0;padding-left:12px;border-left:2px solid #176c63}}.recommendations code,.recommendations a{{overflow-wrap:anywhere}}</style>
+section{{background:white;padding:24px;margin:18px 0;border:1px solid #d5e1e8;border-radius:8px}}h1,h2{{line-height:1.2}}a{{color:#176c63}}table{{border-collapse:collapse;font-size:13px;white-space:nowrap}}th,td{{padding:9px;text-align:left;vertical-align:top;border-bottom:1px solid #d5e1e8}}th{{background:#edf5f3}}.scroll{{overflow:auto}}.note{{border-left:3px solid #176c63;padding:14px;background:#eef7f4}}code{{font-family:monospace}}.recommendations{{white-space:normal;min-width:360px;max-width:520px}}.set{{white-space:normal;min-width:240px;max-width:360px;overflow-wrap:anywhere}}pre{{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}}.recommendation{{padding:12px 0;border-bottom:1px solid #d5e1e8}}.recommendation p{{margin:4px 0}}.recommendation ul{{padding-left:18px}}.source-meta{{display:block;color:#526978;font-size:12px;overflow-wrap:anywhere}}blockquote{{margin:8px 0;padding-left:12px;border-left:2px solid #176c63}}.recommendations code,.recommendations a{{overflow-wrap:anywhere}}.assessment-cell{{white-space:normal;max-width:1000px}}.assessment table{{white-space:normal}}summary{{cursor:pointer;font-weight:600}}</style>
 <main><h1>{title}</h1><p>Local batch · {escape(summary["mode"])} · {escape(summary["run_id"])}</p>
+{run_context_html(summary, csv_name)}
 <section><h2>{percent} numerically ready laboratory sets</h2><p>{readiness["numerator"]} / {readiness["denominator"]} selected groups. {counts}</p>
 <p class="note">{escape(READINESS_DEFINITION)}</p><p>Evidence mode: <strong>{escape(summary["evidence_kind"])}</strong>. Research evidence is reported separately from numerical completeness.</p><ul>{definitions}</ul>
 <p>Observation-weighted readiness: {escape(str(summary.get("weighted_readiness")))}. Unknown source frequencies stay unknown.</p></section>

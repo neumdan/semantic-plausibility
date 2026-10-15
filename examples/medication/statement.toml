@@ -47,9 +47,10 @@ enabled = true
 type = "fhir"
 role = "primary"
 endpoint = "https://tx.fhir.org/r4" # Public test service; coverage/availability are recorded, never presumed.
-systems = ["http://www.whocc.no/atc", "http://snomed.info/sct", "http://www.nlm.nih.gov/research/umls/rxnorm", "http://fhir.de/CodeSystem/ifa/pzn"]
+systems = ["http://www.whocc.no/atc", "http://snomed.info/sct", "http://www.nlm.nih.gov/research/umls/rxnorm", "http://fdasis.nlm.nih.gov", "http://standardterms.edqm.eu", "http://fhir.de/CodeSystem/bfarm/atc", "http://fhir.de/CodeSystem/ifa/pzn", "http://fhir.de/CodeSystem/ask", "http://terminology.hl7.org/CodeSystem/CAS"]
 # For your authenticated server, change endpoint and uncomment:
 # token_env = "MEDICATION_TX_TOKEN" # Put the value in .env, never in TOML/Git.
+# For MII SU-TermServ instead: see ../../docs/lookups.md#mii-client-certificates.
 [lookups.downloads]
 enabled = false
 type = "fhir_artifacts"

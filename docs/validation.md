@@ -36,7 +36,7 @@ podman-compose --profile validation ps
 
 For Docker replace `podman-compose` with `docker compose`. Matchbox depends on local Blaze for terminology checks. Allow the first build/start to finish; inspect `podman-compose --profile validation logs --tail=30 matchbox` if it is not healthy. Access the local Matchbox interface at `http://127.0.0.1:8081/matchboxv3/`.
 
-For later runs with the same guide, use `podman-compose --profile validation up -d blaze matchbox` and then the check command. This reuses the image and Blaze volume. The [six-example launcher](../README.md#run-all-six-examples-with-podman) handles these reuse/build decisions automatically.
+For later runs with the same guide, use `podman-compose --profile validation up -d blaze matchbox` and then the check command. This reuses the image and Blaze volume. The [example launcher](../README.md#architecture-and-decision-flow) handles these reuse/build decisions automatically.
 
 Allocate **16 GiB** to the Docker/Podman VM when running the 3B Ollama model and validation together; Matchbox is limited to 4 GiB and Blaze to 2 GiB. On macOS, a stopped Podman machine can be resized:
 

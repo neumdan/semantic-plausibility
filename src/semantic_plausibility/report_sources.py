@@ -11,11 +11,13 @@ SET_FIELDS = ["source_data_json", "linked_data_json", "recommendation_set_json",
               "matched_analyte", "suggested_analyte", "suggested_code_version", "lookup_attempts_json"]
 
 
-def lookup_attempts(item):
+def lookup_attempts(item, unit=None):
     """Compact trace retaining every attempted source without repeating whole concepts."""
     rows = []
-    checks = list(item.get('source_code_checks', [])) + [item.get('unit_check', {})]
-    checks += [check.get('terminology', {}) for check in item.get('code_checks', [])]
+    checks = list(item.get('source_code_checks', [])) + [{**item.get('unit_check', {}), **(unit or {})}]
+    checks += [{**check.get('terminology', {}),
+                **{key: check[key] for key in ('system', 'code', 'version') if key in check}}
+               for check in item.get('code_checks', [])]
     seen = set()
     for check in checks:
         for attempt in check.get('attempts', []) or [check]:
@@ -91,7 +93,7 @@ def review_set_fields(row, evidence):
               "source_code_checks": item.get("source_code_checks", []),
               "source_code_unit_fit": item.get("source_code_unit_fit", []),
               "coding_candidates": suggestions.get("coding_candidates", [])}
-    linked['lookup_attempts'] = lookup_attempts(item)
+    linked['lookup_attempts'] = lookup_attempts(item, unit={"system": row.get("unit_system", ""), "code": row.get("unit_code", "")})
     linked["code"]["ambiguous_identity"] = bool(ambiguous)
     proposal = {"kind": "complete_set_review_proposal", "target_profile": row.get("ig_canonical") or row.get("profile"),
                 "code": {"code": target_code, "system": target_system, "version": edition,

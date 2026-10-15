@@ -1,16 +1,16 @@
 %% Same node/edge contract as decision-flow.svg.
 flowchart TD
-    CONTRACT["1. Check input contract<br/>Observation / Medication / MedicationRequest / Administration / Statement<br/>Malformed input fails; preserve every reference interval or dosage instruction"]
+    CONTRACT["1. Select D (domain/profile) and check the B (input) contract<br/>Lab Observation / Medication / MedicationRequest / Administration / Statement<br/>Malformed input fails; preserve every reference interval or dosage instruction"]
     VALIDATION["2. Formal validation requested?<br/>Full FHIR file or CSV resource_json → local Matchbox/HL7 + pinned guide<br/>Scalar sets → not_applicable; unavailable/invalid validation remains explicit"]
-    LOOKUP["3. Verify the declared code/system and unit/system using configured sources<br/>Local first → enabled APIs for the exact system; retain every attempt and edition<br/>Lab: selected profile rules + LOINC axes; medication: supplied coding and dose context"]
+    LOOKUP["3. Verify the declared code/system and unit/system using configured sources<br/>Local first → enabled APIs for the exact system; retain every attempt and edition<br/>Lab: LOINC axes; medication: product / ingredient / form / route / quantity roles"]
     INVALID["Confirmed invalid<br/>Record deterministic error<br/>Continue other independent checks"]
     VERIFIED["Verified identity / syntax<br/>Check code-unit-context fit<br/>Membership alone is insufficient"]
     UNKNOWN["Unverified / unavailable<br/>Keep evidence gap visible<br/>Do not call absence invalid"]
     FIT["4. Assess unit fit and transformation<br/>Lab: documented code–unit fit; verified conversion → factor for value and bounds<br/>Medication: dose × source strength → conditional conversion with sources and factor<br/>Missing evidence / ambiguous strength or count units → expert review, no forced map"]
     NUMERIC["5. Check quantities and context; write the checked CSV<br/>Lab: numeric values and reference bounds; medication: dose, timing, range and units<br/>Infusion rate × duration is conditional unless constant uninterrupted delivery is asserted"]
-    NO_AI["Modes 1 / 2: lab or medication<br/>Deterministic findings + sources<br/>Optional full FHIR outcome<br/>No model calls"]
-    AI["Lab mode 3: scope=lookup<br/>Local AI suggests code/name/unit<br/>Real candidate retrieval + recheck<br/>No literature retrieval"]
-    EVIDENCE["Lab mode 4: scope=studies<br/>Same AI + configured study APIs<br/>Quote values / units / intervals<br/>Keep gaps and failures visible"]
+    NO_AI["A1: lab or medication<br/>Deterministic findings + sources<br/>Optional full FHIR outcome<br/>No model calls"]
+    AI["A2: lab · scope=lookup<br/>Local AI suggests code/name/unit<br/>Real candidate retrieval + recheck<br/>No literature retrieval"]
+    EVIDENCE["A3: lab · scope=studies<br/>Same AI + configured study APIs<br/>Quote values / units / intervals<br/>Keep gaps and failures visible"]
     REVIEW["6. Review the whole proposal with its evidence<br/>Original set → linked code/analyte/name/units → proposal with transformations<br/>Physician records decision, reviewer, time and rationale; source remains unchanged<br/>Numeric readiness, FHIR conformance and clinical correctness stay distinct"]
     REUSE["7. Optional laboratory mapping reuse<br/>Import clinician decisions; recheck target code, unit, factor and reference bounds<br/>Source, catalogue, profile or context changes require renewed review<br/>Apply approved transformations in institutional ETL and validate the resulting FHIR<br/>No automated resource rewrite or model retraining"]
     CONTRACT --> VALIDATION

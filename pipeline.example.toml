@@ -69,7 +69,7 @@ base_url = "http://127.0.0.1:11434/v1" # Native Ollama; container_base_url is us
 model = "ministral-3:3b"
 temperature = 0
 max_tokens = 2048
-timeout_seconds = 180
+timeout_seconds = 600 # Allow for CPU inference in a Podman VM.
 response_mode = "json_schema"
 
 [research]

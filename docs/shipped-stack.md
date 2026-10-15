@@ -56,9 +56,9 @@ Both engines use the same image and Compose file. The host TOML is mounted read-
 
 All runner commands share **`semantic-plausibility-stack:local`**. Build once with the selected engine; ordinary `run --rm` commands reuse it and remove only their temporary job container. Source updates reuse the dependency layer when `pyproject.toml` and `uv.lock` are unchanged. The runtime image contains no uv download cache.
 
-For all six examples, use `bash tools/run-podman-examples.sh`. It compares build-input fingerprints with image labels, logs image IDs, and builds the runner/Matchbox only when missing or changed. `--rebuild` forces this step. Its fixed project name is `semantic-plausibility-examples`; run from one checkout at a time. Moving that checkout reuses the same named volumes. Model files persist in `semantic-plausibility-examples_ollama_models`; Blaze data persists in `semantic-plausibility-examples_validation_blaze`. Reports remain under the checkout's `output/`, separate for every run.
+For all nine examples, use `bash tools/run-podman-examples.sh`. `--lookup-only` selects six reports across the five clinical resource types and the terminology walkthrough, without starting model/validator services. It compares build-input fingerprints with image labels, logs image IDs, and builds the runner/Matchbox only when missing or changed. `--rebuild` forces this step. Its fixed project name is `semantic-plausibility-examples`; run from one checkout at a time. Moving that checkout reuses the same named volumes. Models use the shared `SQC_OLLAMA_VOLUME` (default `semantic-plausibility-ollama`); Blaze data persists in `semantic-plausibility-examples_validation_blaze`. Reports remain under the checkout's `output/`, separate for every run.
 
-Manual Compose uses project `semantic-plausibility-stack` and its own volumes. Prefer one workflow/model server: running both stacks downloads models into separate stores. Python/uv with existing native Ollama avoids container and duplicate model storage; [native setup](#native-python-with-ollama). Full FHIR validation still needs a validator.
+Manual Compose uses project `semantic-plausibility-stack`. Its Ollama service and the example script now share the same named model store. Run one Ollama service at a time against that volume; stop the manual service before running all examples. To reuse weights from an older project, find its model volume with `podman volume ls` and set `SQC_OLLAMA_VOLUME=the-existing-volume-name` in `.env` before starting. Existing volumes are never migrated or deleted automatically; without this selector, an older store is left untouched and the new default starts empty. Python/uv with existing native Ollama avoids container and duplicate model storage; [native setup](#native-python-with-ollama). Full FHIR validation still needs a validator.
 
 Inspect with `podman system df`; optional `podman image prune` removes only dangling unused images/build layers. It may affect unused build caches in other projects, which can be rebuilt. Avoid `--all`, `--volumes` and `down --volumes` when retaining images, databases and models. Stop supporting services with `podman-compose --profile research --profile validation stop` (Docker: replace `podman-compose` with `docker compose`); the example script stops its own services automatically. Stops preserve volumes. Existing tagged releases are not automatically deleted. On macOS, reclaimed space inside the Podman VM may not immediately shrink the host disk image.
 
@@ -76,7 +76,7 @@ docker compose run --rm run-plausibility-check config-check --config /app/pipeli
 podman-compose run --rm run-plausibility-check config-check --config /app/pipeline.toml
 ```
 
-Add `--connections` to probe the selected database/terminology connections. Setup readiness is not a semantic data result. The actual check reads and assesses the input.
+Add `--connections` to probe the selected database/terminology connections. The model is probed only when research is enabled Setup readiness is not a semantic data result. The actual check reads and assesses the input.
 
 Open `output/laboratory-review.html` and CSV. The example gives **8 rows → 7 review groups / 84 source occurrences**. Verify artifact hashes with one of:
 
@@ -87,6 +87,8 @@ podman-compose run --rm run-plausibility-check verify /app/output/laboratory-rev
 ```
 
 ## Four run modes
+
+These are four **test scenarios**, mapped to the manual’s three levels: A1, A1 + optional FHIR validation, A2, A3. Choose input/profile and terminology independently. [Start with the three-category manual](index.html).
 
 Use `pipeline.toml` with `examples/laboratory.csv` for modes 1, 3 and 4. Mode 2 uses the supplied `examples/lab/fhir-csv.toml` recipe with a complete Bundle in a CSV cell. First [start Matchbox/Blaze](validation.md#docker-or-podman-setup) for mode 2; first [prepare Ollama and the catalogue](#ollama) for modes 3–4. Neither service is started by the check command.
 
@@ -160,7 +162,7 @@ container_base_url = "http://ollama:11434/v1" # Compose address, used automatica
 model = "ministral-3:3b"
 temperature = 0
 max_tokens = 2048
-timeout_seconds = 180
+timeout_seconds = 600 # Allow for CPU inference in a Podman VM.
 response_mode = "json_schema"
 
 [research]
@@ -207,7 +209,7 @@ The setup actions download the configured model and real UCUM catalogue. Skip `m
 
 ### Native Python with Ollama
 
-Start native Ollama (`ollama serve` if it is not already running). Set `LOCAL_MODEL_BASE_URL=http://127.0.0.1:11434/v1` in `.env`. In another terminal:
+Start native Ollama (`ollama serve` if it is not already running). Set `models.local.base_url="http://127.0.0.1:11434/v1"` in TOML. A `LOCAL_MODEL_BASE_URL` environment override is used only if you explicitly select it through `base_url_env`. In another terminal:
 
 ```sh
 uv sync --locked --no-editable

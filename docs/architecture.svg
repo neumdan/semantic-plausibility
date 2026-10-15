@@ -1,30 +1,36 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1250" viewBox="0 0 1100 1250" role="img" aria-labelledby="title desc">
-<title id="title">Laboratory and medication review architecture</title><desc id="desc">Scalar exports; Complete FHIR exports; One TOML + secrets; 2 · Optional FHIR validation; Standardise and group; Real terminology evidence; 1 · Deterministic check; Optional local model; 3 · Laboratory terminology AI; CSV + HTML review report; 4 · Laboratory AI + studies; Laboratory review registry; Clinician review; Complementary MII checks</desc>
+<title id="title">Laboratory and medication review architecture</title><desc id="desc">B · Scalar exports; B · Complete FHIR exports; Four choices in one TOML; Independent: FHIR validation; D · Domain and target guide; Standardise and group; C · Real terminology evidence; A1 · Lookup-only check; Optional local model; A2 · AI-supported lookup; CSV + HTML review report; A3 · AI-supported evidence; Laboratory review registry; Clinician review; Complementary MII checks</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#537487"/></marker></defs>
 <style>text{font-family:Arial,sans-serif;fill:#142d42}.heading{font-size:19px;font-weight:700}.body{font-size:17px}.label{font-size:14px;fill:#526978}</style><rect width="1100" height="100%" fill="white"/>
 <g data-node="SCALAR"><rect x="20" y="20" width="330" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="36" y="49" class="heading">Scalar exports</text>
+<text x="36" y="49" class="heading">B · Scalar exports</text>
 <text x="36" y="77" class="body" style="font-size:16px">LIS / CDS Hub CSV or DB view</text>
 <text x="36" y="102" class="body" style="font-size:16px">Individual rows or distinct sets</text>
 <text x="36" y="127" class="body" style="font-size:16px">Explicit columns and real counts</text>
 </g>
 <g data-node="FHIR"><rect x="385" y="20" width="330" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="401" y="49" class="heading">Complete FHIR exports</text>
+<text x="401" y="49" class="heading">B · Complete FHIR exports</text>
 <text x="401" y="77" class="body" style="font-size:16px">Bundle / resource array / NDJSON</text>
 <text x="401" y="102" class="body" style="font-size:16px">or CSV resource_json cells</text>
 <text x="401" y="127" class="body" style="font-size:16px">TORCH / CQL selection upstream</text>
 </g>
 <g data-node="CONFIG"><rect x="750" y="20" width="330" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="766" y="49" class="heading">One TOML + secrets</text>
-<text x="766" y="77" class="body" style="font-size:16px">Input, profile, real lookups, output</text>
-<text x="766" y="102" class="body" style="font-size:16px">Local model and research budgets</text>
+<text x="766" y="49" class="heading">Four choices in one TOML</text>
+<text x="766" y="77" class="body" style="font-size:16px">A: check level · B: input</text>
+<text x="766" y="102" class="body" style="font-size:16px">C: sources · D: domain + profile</text>
 <text x="766" y="127" class="body" style="font-size:16px">Credentials in .env / secret files</text>
 </g>
 <g data-node="VALIDATE"><rect x="385" y="220" width="330" height="132" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="401" y="249" class="heading">2 · Optional FHIR validation</text>
+<text x="401" y="249" class="heading">Independent: FHIR validation</text>
 <text x="401" y="277" class="body" style="font-size:16px">Full resources → local Matchbox</text>
 <text x="401" y="302" class="body" style="font-size:16px">HL7 validator + pinned MII guide</text>
 <text x="401" y="327" class="body" style="font-size:16px">Outcome stays separate from fit</text>
+</g>
+<g data-node="DOMAIN"><rect x="750" y="220" width="330" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="766" y="249" class="heading">D · Domain and target guide</text>
+<text x="766" y="277" class="body" style="font-size:16px">Lab Observation / Medication</text>
+<text x="766" y="302" class="body" style="font-size:16px">Request / Admin / Statement</text>
+<text x="766" y="327" class="body" style="font-size:16px">Pinned MII IG or base FHIR R4</text>
 </g>
 <g data-node="NORMAL"><rect x="385" y="420" width="330" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
 <text x="401" y="449" class="heading">Standardise and group</text>
@@ -33,14 +39,14 @@
 <text x="401" y="527" class="body" style="font-size:16px">or items with original ID / locator</text>
 </g>
 <g data-node="SOURCES"><rect x="20" y="620" width="330" height="157" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="36" y="649" class="heading">Real terminology evidence</text>
-<text x="36" y="677" class="body" style="font-size:16px">Local LOINC / BfArM / ATC + DDD</text>
-<text x="36" y="702" class="body" style="font-size:16px">UCUM / LOINC / medication APIs</text>
-<text x="36" y="727" class="body" style="font-size:16px">Local first; fallback or all sources</text>
+<text x="36" y="649" class="heading">C · Real terminology evidence</text>
+<text x="36" y="677" class="body" style="font-size:16px">LOINC / UCUM / ATC; SNOMED</text>
+<text x="36" y="702" class="body" style="font-size:16px">RxNorm / UNII / EDQM; ASK / PZN</text>
+<text x="36" y="727" class="body" style="font-size:16px">Local files → configured APIs</text>
 <text x="36" y="752" class="body" style="font-size:16px">Retain editions, hashes, failures</text>
 </g>
 <g data-node="CHECK"><rect x="385" y="620" width="330" height="157" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="401" y="649" class="heading">1 · Deterministic check</text>
+<text x="401" y="649" class="heading">A1 · Lookup-only check</text>
 <text x="401" y="677" class="body" style="font-size:16px">Source identity + target profile rules</text>
 <text x="401" y="702" class="body" style="font-size:16px">Code / name / unit fit and numbers</text>
 <text x="401" y="727" class="body" style="font-size:16px">Lab ranges / medication dose checks</text>
@@ -53,7 +59,7 @@
 <text x="766" y="527" class="body" style="font-size:16px">Guarded JSON; sources required</text>
 </g>
 <g data-node="AI"><rect x="750" y="620" width="330" height="157" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="766" y="649" class="heading">3 · Laboratory terminology AI</text>
+<text x="766" y="649" class="heading">A2 · AI-supported lookup</text>
 <text x="766" y="677" class="body" style="font-size:16px">Checked report → candidates</text>
 <text x="766" y="702" class="body" style="font-size:16px">Real names, codes and unit lists</text>
 <text x="766" y="727" class="body" style="font-size:16px">LOINC pages; no study queries</text>
@@ -67,7 +73,7 @@
 <text x="401" y="982" class="body" style="font-size:16px">Input remains unchanged</text>
 </g>
 <g data-node="STUDIES"><rect x="750" y="850" width="330" height="157" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="766" y="879" class="heading">4 · Laboratory AI + studies</text>
+<text x="766" y="879" class="heading">A3 · AI-supported evidence</text>
 <text x="766" y="907" class="body" style="font-size:16px">Original report → same AI pass</text>
 <text x="766" y="932" class="body" style="font-size:16px">Plus Europe PMC / PubMed</text>
 <text x="766" y="957" class="body" style="font-size:16px">Quoted reported values and bounds</text>
@@ -94,7 +100,9 @@
 <path data-edge="SCALAR-NORMAL" d="M185 152 V486 H382" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
 <path data-edge="FHIR-VALIDATE" d="M550 152 V217" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
 <path data-edge="FHIR-NORMAL" d="M715 125 H732 V486 H718" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
-<path data-edge="CONFIG-VALIDATE" d="M915 152 V285 H718" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="CONFIG-DOMAIN" d="M915 152 V217" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="DOMAIN-VALIDATE" d="M750 285 H718" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="DOMAIN-CHECK" d="M750 320 H735 V590 H650 V617" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
 <path data-edge="VALIDATE-NORMAL" d="M550 352 V417" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
 <path data-edge="NORMAL-CHECK" d="M550 552 V617" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
 <path data-edge="SOURCES-CHECK" d="M350 693 H382" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>

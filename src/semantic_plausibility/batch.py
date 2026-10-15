@@ -528,6 +528,8 @@ class BatchConfiguration:
                     "password_file",
                     "token_env",
                     "token_file",
+                    "client_cert",
+                    "client_key",
                     "path",
                     "complete",
                     "version",
@@ -553,6 +555,12 @@ class BatchConfiguration:
             if row.get("role", "primary") not in {"primary", "source", "optional"}:
                 raise ValueError("lookup.role must be primary, source or optional")
             kind = row.get("type")
+            if row.get("client_cert") or row.get("client_key"):
+                if kind != "fhir" or not all(
+                    isinstance(row.get(key), str) and row[key].strip()
+                    for key in ("client_cert", "client_key")
+                ):
+                    raise ValueError("mTLS requires both client_cert and client_key file paths on a generic FHIR lookup")
             if kind in {"ucum", "loinc"}:
                 if row.get("role", "primary") != "primary":
                     raise ValueError("Dedicated UCUM/LOINC services are primary; configure generic optional sources for cross-checks")
@@ -593,9 +601,9 @@ class BatchConfiguration:
                     raise ValueError(
                         "Generic FHIR lookup endpoints use endpoint; credentials remain environment/file references"
                     )
-                if row.get("username_env") or row.get("password_env"):
+                if any(row.get(key) for key in ("username_env", "password_env", "username_file", "password_file")):
                     raise ValueError(
-                        "Generic FHIR lookups support bearer tokens; use a gateway for other authentication. LOINC supports Basic Auth"
+                        "Generic FHIR lookups support bearer tokens or mTLS; LOINC supports Basic Auth"
                     )
                 result["sources"].append(
                     {
@@ -611,6 +619,8 @@ class BatchConfiguration:
                                 "endpoint",
                                 "token_env",
                                 "token_file",
+                                "client_cert",
+                                "client_key",
                                 "path",
                                 "complete",
                                 "version",

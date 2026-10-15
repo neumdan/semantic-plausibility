@@ -162,6 +162,9 @@ services:
 
 volumes:
   ollama_models:
+    # Share downloaded weights between manual runs and the example script.
+    # Set SQC_OLLAMA_VOLUME in .env to reuse an existing named model volume.
+    name: ${SQC_OLLAMA_VOLUME:-semantic-plausibility-ollama}
   validation_blaze:
 
 networks:

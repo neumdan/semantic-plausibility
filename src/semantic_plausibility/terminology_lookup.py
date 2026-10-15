@@ -74,8 +74,9 @@ def _configured_lookup(config, alias, *, system, code, version, name):
             "name_check": check_name(name, system, code, version, term=term) if name else None,
         }
     entry = config.lookup_settings({alias: row})["sources"][0]
-    if entry.get("path"):
-        entry["path"] = str(config.path_value(entry["path"]))
+    for key in ("path", "client_cert", "client_key"):
+        if entry.get(key):
+            entry[key] = str(config.path_value(entry[key]))
     updates = {}
     for key in ("token", "client_id", "client_secret"):
         if entry.get(key + "_file") or entry.get(key + "_env"):

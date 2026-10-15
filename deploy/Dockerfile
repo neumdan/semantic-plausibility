@@ -18,6 +18,7 @@ RUN if [ "$INSTALL_POSTGRES" = "1" ]; then \
       uv sync --locked --no-dev --no-editable; \
     fi
 COPY examples ./examples
+COPY terminology.example.toml ./
 ENV PATH="/app/.venv/bin:$PATH"
 ENTRYPOINT ["run-plausibility-check"]
 CMD ["--help"]

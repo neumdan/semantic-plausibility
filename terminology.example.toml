@@ -108,3 +108,58 @@ strategy = "fallback" # Local first; try enabled compatible APIs until verified.
 
 [logging]
 level = "INFO" # DEBUG, INFO, WARNING or ERROR. The audit is always retained.
+
+[lookups.atc_who]
+enabled = true # Public trial; inspect returned edition and coverage.
+role = "primary"
+type = "fhir"
+endpoint = "https://tx.fhir.org/r4"
+systems = ["http://www.whocc.no/atc"]
+
+[lookups.snomed]
+enabled = true # Public trial; inspect returned edition and coverage.
+role = "primary"
+type = "fhir"
+endpoint = "https://tx.fhir.org/r4"
+systems = ["http://snomed.info/sct"]
+
+[lookups.rxnorm]
+enabled = true # Public trial; inspect returned edition and coverage.
+role = "primary"
+type = "fhir"
+endpoint = "https://tx.fhir.org/r4"
+systems = ["http://www.nlm.nih.gov/research/umls/rxnorm"]
+
+[lookups.unii]
+enabled = true # Public trial; inspect returned edition and coverage.
+role = "primary"
+type = "fhir"
+endpoint = "https://tx.fhir.org/r4"
+systems = ["http://fdasis.nlm.nih.gov"]
+
+[lookups.edqm]
+enabled = true # Public trial; inspect returned edition and coverage.
+role = "primary"
+type = "fhir"
+endpoint = "https://tx.fhir.org/r4"
+systems = ["http://standardterms.edqm.eu"]
+
+# Licensed/national catalogues: use actual FHIR JSON or package.tgz files.
+# SNOMED RF2 needs import into a terminology server or a licensed CSV/SQLite export.
+[lookups.german_medication_files]
+enabled = false
+role = "primary"
+type = "fhir_artifacts"
+path = "../input/terminologies/medication"
+systems = ["http://fhir.de/CodeSystem/ask", "http://fhir.de/CodeSystem/ifa/pzn", "http://snomed.info/sct", "http://standardterms.edqm.eu", "http://terminology.hl7.org/CodeSystem/CAS"]
+
+# MII SU-TermServ reads require an authorised GEANT client certificate (mTLS).
+# These are PEM FILE PATHS, not secret contents or environment variable names.
+[lookups.mii_termserv]
+enabled = false
+role = "primary"
+type = "fhir"
+endpoint = "https://ontoserver.mii-termserv.de/fhir"
+client_cert = "local/secrets/mii-client.crt"
+client_key = "local/secrets/mii-client.key"
+systems = ["http://loinc.org", "http://snomed.info/sct", "http://fhir.de/CodeSystem/bfarm/atc", "http://fhir.de/CodeSystem/ask", "http://fhir.de/CodeSystem/ifa/pzn", "http://standardterms.edqm.eu"]

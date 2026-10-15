@@ -1,20 +1,19 @@
 # Configure a laboratory or medication review
 
-## Setup in six decisions
+## Configure in four categories
 
-1. **Select a resource and representation.** Lab Observation; or Medication, MedicationRequest, MedicationAdministration, MedicationStatement. CSV / PostgreSQL / SQLite use mapped columns. Native FHIR JSON, Bundle or NDJSON uses built-in resource fields. Select/export FHIR server resources with TORCH/CQL upstream.
-2. **Map the actual source.** For example `code="lab_test_id"` means the column `lab_test_id` contains the source code. Set its real `code_system`; do not label unmapped LIS identifiers as LOINC. Use a database view when joins or conversions are needed, under a read-only account.
-3. **Choose target rules.** The shipped recipes pin MII Laboratory 2026.0.3 or Medication 2026.0.1 on FHIR R4. Without a custom profile, the matching international R4 resource is the formal-validation fallback. An IG cannot determine the meanings of site column names. `specification.links` are documentation; installed snapshots/packages perform checks.
-4. **Install/enable terminology.** Select local catalogues or named APIs in `[lookups]`. For offline LOINC use `loinc_csv`; for BfArM ATC/DDD use `fhir_artifacts`; use real captured UCUM responses or an enabled UCUM API. Add your LIS catalogue for unmapped local codes. [Exact recipes](lookups.md).
-5. **Choose reports.** `output.mode="distinct"` groups guarded sets; `items` retains identifiers. Set `output.path` to a new CSV filename. The runner always adds HTML/evidence/summary/audit. It does not produce an OMOP database or write FHIR back to a server. CDS Hub/OMOP can be mapped input views; semantic roles and target rules remain explicit.
-6. **Check then execute.** Run `config-check`, optionally `--connections`, then `check` using the same TOML. Review gaps as well as suggestions. Add validation or laboratory AI only after this basic run works.
+Start with the [step-by-step manual](index.html). This page is the field reference; choose one entry in each category:
 
-The source column map, target clinical specification and report representation are three independent choices. All paths are relative to the selected TOML. `../input/` and `local/` are the standard private-data locations; credentials live in `.env` or referenced secret files.
+| Category | Select | Settings / command |
+| --- | --- | --- |
+| **A. Plausibility level** | A1 lookup-only; A2 AI-supported lookup; A3 AI-supported evidence | `check`; optionally `research-evidence --scope lookup` or `--scope studies` on the original checked report |
+| **B. Input** | CSV, PostgreSQL/SQLite, native FHIR or server export | `[input]`, `[input.columns]`, `[database]`, `[output]` |
+| **C. Lookup / terminology sources** | Downloaded catalogues, enabled APIs, or a combination | `[lookups]`, `[terminology]`, `[network]`; credential references only |
+| **D. Clinical domain** | Laboratory Observation or Medication / Request / Administration / Statement | `general.RESOURCE_TYPE`, `[specification]`, optional `[validation]` |
 
+FHIR validation is independent: `[validation]` applies to complete resources, not scalar aggregates. A2/A3 currently support laboratory Observations only. Model settings belong in `[models]`; study APIs/budgets in `[research]`. **Use one TOML for all three levels**, and keep `.env`/secret files for credentials. No shell exports are needed.
 
-Start by copying `pipeline.example.toml` to **`pipeline.toml`**. For the first check, leave the example unchanged. For your data, edit its existing `[input]`, `[input.columns]` and `[output]` tables. Enable other features only when you need them. [First setup and run commands](shipped-stack.md#first-setup).
-
-TOML carries the pipeline settings. `.env` or secret files carry credentials; no shell exports are required. The runner supports laboratory **Observation in FHIR R4 (4.0.1)**. **MedicationRequest and MedicationAdministration** also have executable [medication recipes and their full column map](../examples/medication/README.md). Condition and Procedure remain later adapters. The lab settings below do not automatically apply to medication.
+Map actual source facts: a local LIS test identifier stays local until reviewed. Profiles supply target rules, not a guess about source column meanings. Reports are CSV/HTML; automatic FHIR/OMOP/database output writers are not implemented. All relative paths resolve from the selected TOML. [Every supplied profile recipe](index.html#profiles) · [Input walkthroughs](index.html#input) · [Download/API walkthroughs](index.html#terminology).
 
 ## Select the configuration
 
@@ -35,7 +34,7 @@ These sections cover the supported workflow. Unknown settings are rejected. Use 
 | Section | Main settings | Purpose |
 | --- | --- | --- |
 | Root | `config_version=3` | Current configuration schema, separate from the software version |
-| `general` | `PROJECT_NAME`, `RESOURCE_TYPE` (Observation / MedicationRequest / MedicationAdministration), `MODEL_ALIAS` | Run label, supported resource type, selected named model (default alias `local`) |
+| `general` | `PROJECT_NAME`, `RESOURCE_TYPE` (Observation / Medication / MedicationRequest / MedicationAdministration / MedicationStatement), `MODEL_ALIAS` | Run label, supported resource type, selected named model (default alias `local`) |
 | `input` | `type`, `origin`, `source_namespace`, `path`, `granularity`, `delimiter` | Location, source/site identity and input representation |
 | `input.columns` / `input.defaults` | Semantic role → column / known constant | CSV/database field mapping; defaults only for documented source facts |
 | `input.elements` | Semantic role → `Observation.*` path | Optional scalar FHIR selection; the native adapter normally needs no mapping |
@@ -175,7 +174,9 @@ For a PostgreSQL JSON/JSONB Observation column, map `resource_json="resource"` a
 
 For SQLite, use `input.type="sqlite"`, `input.path="local/lab.sqlite"`, the column mapping and `database.DB_TABLE="lab"`; omit PostgreSQL connection fields. It opens read-only. DuckDB is the aggregation engine for every input type, not an additional database server.
 
-## Profiles and terminology roles
+## D. Clinical domain, profiles and terminology roles
+
+Choose the clinical domain with `general.RESOURCE_TYPE`; this is independent of CSV/DB/FHIR input. Lab uses the quantitative Observation adapter. Medication uses the selected resource-specific adapter and its full dosage context. The [profile recipes](index.html#profiles) supply MII Medication 2026.0.1 targets for all four medication resources. Diagnosis/procedure and other Observation domains remain future work.
 
 The starter explicitly pins FHIR R4 and MII Laboratory 2026.0.3. `STRUCTURE_DEFINITION` must be an installed resolved R4 Observation snapshot; `IG_PACKAGE`, `IG_VERSION` and `IG_CANONICAL` record its identity. Alternatively use `PROFILE_FILE` for a reviewed selected-element policy; never configure both. `VALUE_SETS` lists real versioned ValueSet JSON used to derive bound systems. [Pinned profile example](../examples/lab/mii-lis.toml).
 
@@ -217,11 +218,14 @@ The starter uses `network.mode="lookups"` for enabled real sources. For `"offlin
 | --- | --- |
 | Official LOINC Basic Auth | `username_env` / `username_file`, `password_env` / `password_file` |
 | Generic FHIR / website bearer token | `token_env` / `token_file` |
+| Generic FHIR mTLS (including MII SU-TermServ) | Both `client_cert` and `client_key`: PEM file paths relative to TOML, under ignored `local/secrets/` |
 | WHO ICD OAuth | `client_id_env` / `client_id_file`, `client_secret_env` / `client_secret_file` |
 | PostgreSQL | `DB_DSN_ENV` / `DB_DSN_FILE`, or user/password references above |
 | Local model requiring a key | `api_key_env` / `api_key_file` |
 | PubMed optional key | `research.pubmed.API_KEY_ENV` / `API_KEY_FILE` |
 | Protected package setup | `packages.NAME.token_env` / `token_file`, with explicit conditions acceptance |
+
+Client certificate/key paths are passed to TLS without copying key contents into reports or logs. `config-check` loads the pair locally; `--connections` tests server access with it. [MII certificate setup](lookups.md#mii-client-certificates).
 
 Environment references name a variable whose value lives in `.env` or the runtime. File references point to a secret file containing only the value; mount it under `local/secrets/` for Compose. Plain Python can use file references without loading `.env`. The default user TOMLs and files under `local/`/`output/` are excluded from Git, as are `.env` credentials. Keep other site configurations under ignored `local/` or add them to your ignore rules.
 
@@ -343,3 +347,9 @@ The inventory never enables a service automatically. Missing code/system, uncove
 `--log-level DEBUG` overrides TOML for one command and adds source-attempt states. INFO shows phases/counts; WARNING/ERROR reduce console output. No credentials or clinical values are printed by the progress logger. Reports/trace files do contain source-derived data and must remain private. Audit recording is independent of console verbosity.
 
 `config-check` lists mappings, target rules, active sources, strategy and output. It verifies local catalogue readability and CSV/SQLite columns. `--connections` adds read-only PostgreSQL table/column checks and supported service readiness probes. A successful readiness probe does not promise that every code, edition or clinical assertion in your dataset can be verified.
+
+## What the report records
+
+`run_context` in the summary is a whitelist of effective settings: A–D choices, input column/element/table selection, defaults/context, profile, grouping, source aliases, credential mechanism (not its values), model/scope and output. URL credentials/query strings are omitted from this projection. It is not a copy of TOML or the process environment.
+
+Each CSV row's `assessment_context_json` references the configuration hash and records input accounting, method results, assumptions, actual lookup evidence, validation scope and the next improvement step. Individual mode retains IDs; distinct mode does not. Defaults are disclosed as configured source assertions; the adapter does not track which individual fields originally used each default. Research reads the audited A1 report, records its original input/configuration, and keeps its verdict separate from new candidates. New model/retrieval events are counted per item; cached results may be reused without a new call. Existing reports without these fields are never retroactively assigned today's settings.

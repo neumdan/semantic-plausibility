@@ -1,23 +1,26 @@
 %% Same node/edge contract as architecture.svg.
 flowchart TD
-    SCALAR["Scalar exports<br/>LIS / CDS Hub CSV or DB view<br/>Individual rows or distinct sets<br/>Explicit columns and real counts"]
-    FHIR["Complete FHIR exports<br/>Bundle / resource array / NDJSON<br/>or CSV resource_json cells<br/>TORCH / CQL selection upstream"]
-    CONFIG["One TOML + secrets<br/>Input, profile, real lookups, output<br/>Local model and research budgets<br/>Credentials in .env / secret files"]
-    VALIDATE["2 · Optional FHIR validation<br/>Full resources → local Matchbox<br/>HL7 validator + pinned MII guide<br/>Outcome stays separate from fit"]
+    SCALAR["B · Scalar exports<br/>LIS / CDS Hub CSV or DB view<br/>Individual rows or distinct sets<br/>Explicit columns and real counts"]
+    FHIR["B · Complete FHIR exports<br/>Bundle / resource array / NDJSON<br/>or CSV resource_json cells<br/>TORCH / CQL selection upstream"]
+    CONFIG["Four choices in one TOML<br/>A: check level · B: input<br/>C: sources · D: domain + profile<br/>Credentials in .env / secret files"]
+    VALIDATE["Independent: FHIR validation<br/>Full resources → local Matchbox<br/>HL7 validator + pinned MII guide<br/>Outcome stays separate from fit"]
+    DOMAIN["D · Domain and target guide<br/>Lab Observation / Medication<br/>Request / Admin / Statement<br/>Pinned MII IG or base FHIR R4"]
     NORMAL["Standardise and group<br/>Lab set or complete medication dose<br/>DuckDB distinct groups; lab statistics<br/>or items with original ID / locator"]
-    SOURCES["Real terminology evidence<br/>Local LOINC / BfArM / ATC + DDD<br/>UCUM / LOINC / medication APIs<br/>Local first; fallback or all sources<br/>Retain editions, hashes, failures"]
-    CHECK["1 · Deterministic check<br/>Source identity + target profile rules<br/>Code / name / unit fit and numbers<br/>Lab ranges / medication dose checks<br/>Supported unit transformations"]
+    SOURCES["C · Real terminology evidence<br/>LOINC / UCUM / ATC; SNOMED<br/>RxNorm / UNII / EDQM; ASK / PZN<br/>Local files → configured APIs<br/>Retain editions, hashes, failures"]
+    CHECK["A1 · Lookup-only check<br/>Source identity + target profile rules<br/>Code / name / unit fit and numbers<br/>Lab ranges / medication dose checks<br/>Supported unit transformations"]
     MODEL["Optional local model<br/>Ollama: ministral-3:3b starter<br/>or local compatible endpoint<br/>Guarded JSON; sources required"]
-    AI["3 · Laboratory terminology AI<br/>Checked report → candidates<br/>Real names, codes and unit lists<br/>LOINC pages; no study queries<br/>Exact rechecks; may abstain"]
+    AI["A2 · AI-supported lookup<br/>Checked report → candidates<br/>Real names, codes and unit lists<br/>LOINC pages; no study queries<br/>Exact rechecks; may abstain"]
     OUTPUT["CSV + HTML review report<br/>Source → linked data → proposal<br/>Checks and citations beside each set<br/>Summary + evidence + audit hashes<br/>Input remains unchanged"]
-    STUDIES["4 · Laboratory AI + studies<br/>Original report → same AI pass<br/>Plus Europe PMC / PubMed<br/>Quoted reported values and bounds<br/>Independent sourced dossier"]
+    STUDIES["A3 · AI-supported evidence<br/>Original report → same AI pass<br/>Plus Europe PMC / PubMed<br/>Quoted reported values and bounds<br/>Independent sourced dossier"]
     REGISTRY["Laboratory review registry<br/>Approved / rejected / revoked<br/>Source + profile + context scope<br/>Reverify target and factor on reuse"]
     EXPERT["Clinician review<br/>Decide semantic correctness<br/>Apply approved mappings in ETL<br/>Validate resulting FHIR resources"]
     MII["Complementary MII checks<br/>FHIR conformance: validator<br/>Availability / completeness: FDE<br/>This tool: semantic-set review"]
     SCALAR --> |"scalar path"| NORMAL
     FHIR --> |"if enabled"| VALIDATE
     FHIR -.-> |"otherwise"| NORMAL
-    CONFIG -.-> |"profile + settings"| VALIDATE
+    CONFIG -.-> DOMAIN
+    DOMAIN -.-> |"profile"| VALIDATE
+    DOMAIN -.-> |"domain rules"| CHECK
     VALIDATE --> |"outcomes retained"| NORMAL
     NORMAL --> CHECK
     SOURCES --> |"lookups"| CHECK
@@ -31,7 +34,7 @@ flowchart TD
     EXPERT --> |"review-import"| REGISTRY
     REGISTRY -.-> |"scoped reuse"| CHECK
     classDef normal fill:#f3f7fa,stroke:#c4d5df,color:#142d42
-    class SCALAR,FHIR,CONFIG,NORMAL,SOURCES,MODEL,REGISTRY,MII normal
+    class SCALAR,FHIR,CONFIG,DOMAIN,NORMAL,SOURCES,MODEL,REGISTRY,MII normal
     classDef teal fill:#eef7f4,stroke:#a8cfc6,color:#142d42
     class VALIDATE,CHECK,AI,OUTPUT,STUDIES,EXPERT teal
     classDef error fill:#fcf1f3,stroke:#ecc7cf,color:#142d42

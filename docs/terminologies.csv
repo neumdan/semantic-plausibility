@@ -195,3 +195,4 @@ urn:iso:std:iso:11073:10101,,coded_element,kds_inventory
 urn:iso:std:iso:3166-2:de,,coded_element,kds_inventory
 urn:oid:2.16.840.1.113883.3.1937.777.24.5.2,,coded_element,kds_inventory
 urn:oid:2.16.840.1.113883.3.1937.777.24.5.3,,coded_element,kds_inventory
+http://www.nlm.nih.gov/research/umls/rxnorm,RxNorm,optional_medication_coding,services.json; optional_international_source

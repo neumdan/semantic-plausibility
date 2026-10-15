@@ -14,7 +14,7 @@ from .db_source import load_mapping
 from .profile_config import load_profile
 from .observation_services import NlmUcumClient, LoincFhirClient, _NoModelRedirects
 from .deployment import environment
-from urllib.request import build_opener
+from urllib.request import build_opener, HTTPSHandler
 
 
 def load_deployment(path):
@@ -26,7 +26,7 @@ def load_deployment(path):
     return config.deployment
 
 
-def http_json(url, *, data=None, token="", timeout=15):
+def http_json(url, *, data=None, token="", timeout=15, tls_context=None):
     headers = {"Accept": "application/json"}
     if token:
         headers["Authorization"] = "Bearer " + token
@@ -34,7 +34,10 @@ def http_json(url, *, data=None, token="", timeout=15):
     if body:
         headers["Content-Type"] = "application/json"
     request = Request(url, body, headers)
-    with build_opener(_NoModelRedirects()).open(request, timeout=timeout) as response:
+    handlers = [_NoModelRedirects()]
+    if tls_context:
+        handlers.append(HTTPSHandler(context=tls_context))
+    with build_opener(*handlers).open(request, timeout=timeout) as response:
         if response.status != 200:
             raise ValueError("Unexpected probe response")
         raw = response.read(2 * 1024 * 1024 + 1)
@@ -133,6 +136,9 @@ def check_configuration(path, *, source_alias=None, connections=False, research=
             probe("unit_catalog", lambda: Path(prepared.audit.unit_catalog).is_file())
         from .terminology_router import make_source, load_sources
         for entry in load_sources(prepared.audit.terminology_sources) if prepared.audit.terminology_sources else []:
+            if entry['kind'] == 'fhir' and entry.get('client_cert'):
+                probe('client_certificate:' + entry.get('alias', 'fhir'),
+                      lambda entry=entry: make_source(entry).client.tls_context is not None)
             if entry['kind'] in {'csv', 'sqlite', 'fhir_artifacts', 'loinc_csv'}:
                 def local_artifacts(entry=entry):
                     local = make_source(entry)
@@ -200,8 +206,13 @@ def check_configuration(path, *, source_alias=None, connections=False, research=
                 for alias, entry in raw_config.get('lookups', {}).items():
                     if entry.get('enabled') and entry.get('type') == 'fhir':
                         def fhir_probe(entry=entry):
+                            from .terminology_validation import FhirTerminologyClient
                             token = deployment.secret(entry, 'token')
-                            return http_json(entry['endpoint'].rstrip('/') + '/metadata', token=token).get('resourceType') == 'CapabilityStatement'
+                            client = FhirTerminologyClient(entry['endpoint'],
+                                client_cert=str(deployment.path_value(entry['client_cert'])) if entry.get('client_cert') else '',
+                                client_key=str(deployment.path_value(entry['client_key'])) if entry.get('client_key') else '')
+                            return http_json(client.base_url + '/metadata', token=token,
+                                             tls_context=client.tls_context).get('resourceType') == 'CapabilityStatement'
                         probe('terminology_fhir_metadata:' + alias, fhir_probe)
             if prepared.models_file and not offline:
                 endpoint, key = select_model(prepared.model_alias, prepared.models_file)

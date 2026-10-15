@@ -9,6 +9,7 @@ pipeline.toml
 pipeline.research.toml
 pipeline.fhir.toml
 terminology.toml
+!examples/medication/terminology.toml
 .env.*
 !.env.example
 deploy/.env

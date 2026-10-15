@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1680" viewBox="0 0 1100 1680" role="img" aria-labelledby="title desc">
-<title id="title">Check the source set, select evidence scope, review the proposal</title><desc id="desc">1. Check input contract; 2. Formal validation requested?; 3. Verify the declared code/system and unit/system using configured sources; Confirmed invalid; Verified identity / syntax; Unverified / unavailable; 4. Assess unit fit and transformation; 5. Check quantities and context; write the checked CSV; Modes 1 / 2: lab or medication; Lab mode 3: scope=lookup; Lab mode 4: scope=studies; 6. Review the whole proposal with its evidence; 7. Optional laboratory mapping reuse</desc>
+<title id="title">Check the source set, select evidence scope, review the proposal</title><desc id="desc">1. Select D (domain/profile) and check the B (input) contract; 2. Formal validation requested?; 3. Verify the declared code/system and unit/system using configured sources; Confirmed invalid; Verified identity / syntax; Unverified / unavailable; 4. Assess unit fit and transformation; 5. Check quantities and context; write the checked CSV; A1: lab or medication; A2: lab · scope=lookup; A3: lab · scope=studies; 6. Review the whole proposal with its evidence; 7. Optional laboratory mapping reuse</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#537487"/></marker></defs>
 <style>text{font-family:Arial,sans-serif;fill:#142d42}.heading{font-size:19px;font-weight:700}.body{font-size:17px}.label{font-size:14px;fill:#526978}</style><rect width="1100" height="100%" fill="white"/>
 <g data-node="CONTRACT"><rect x="130" y="20" width="840" height="106" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="146" y="49" class="heading">1. Check input contract</text>
-<text x="146" y="77" class="body">Observation / Medication / MedicationRequest / Administration / Statement</text>
+<text x="146" y="49" class="heading">1. Select D (domain/profile) and check the B (input) contract</text>
+<text x="146" y="77" class="body">Lab Observation / Medication / MedicationRequest / Administration / Statement</text>
 <text x="146" y="102" class="body">Malformed input fails; preserve every reference interval or dosage instruction</text>
 </g>
 <g data-node="VALIDATION"><rect x="130" y="185" width="840" height="106" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
@@ -15,7 +15,7 @@
 <g data-node="LOOKUP"><rect x="130" y="350" width="840" height="106" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
 <text x="146" y="379" class="heading">3. Verify the declared code/system and unit/system using configured sources</text>
 <text x="146" y="407" class="body">Local first → enabled APIs for the exact system; retain every attempt and edition</text>
-<text x="146" y="432" class="body">Lab: selected profile rules + LOINC axes; medication: supplied coding and dose context</text>
+<text x="146" y="432" class="body">Lab: LOINC axes; medication: product / ingredient / form / route / quantity roles</text>
 </g>
 <g data-node="INVALID"><rect x="20" y="515" width="330" height="106" rx="9" fill="#fcf1f3" stroke="#ecc7cf"/>
 <text x="36" y="544" class="heading">Confirmed invalid</text>
@@ -44,19 +44,19 @@
 <text x="146" y="962" class="body">Infusion rate × duration is conditional unless constant uninterrupted delivery is asserted</text>
 </g>
 <g data-node="NO_AI"><rect x="20" y="1050" width="330" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="36" y="1079" class="heading">Modes 1 / 2: lab or medication</text>
+<text x="36" y="1079" class="heading">A1: lab or medication</text>
 <text x="36" y="1107" class="body" style="font-size:16px">Deterministic findings + sources</text>
 <text x="36" y="1132" class="body" style="font-size:16px">Optional full FHIR outcome</text>
 <text x="36" y="1157" class="body" style="font-size:16px">No model calls</text>
 </g>
 <g data-node="AI"><rect x="385" y="1050" width="330" height="132" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="401" y="1079" class="heading">Lab mode 3: scope=lookup</text>
+<text x="401" y="1079" class="heading">A2: lab · scope=lookup</text>
 <text x="401" y="1107" class="body" style="font-size:16px">Local AI suggests code/name/unit</text>
 <text x="401" y="1132" class="body" style="font-size:16px">Real candidate retrieval + recheck</text>
 <text x="401" y="1157" class="body" style="font-size:16px">No literature retrieval</text>
 </g>
 <g data-node="EVIDENCE"><rect x="750" y="1050" width="330" height="132" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="766" y="1079" class="heading">Lab mode 4: scope=studies</text>
+<text x="766" y="1079" class="heading">A3: lab · scope=studies</text>
 <text x="766" y="1107" class="body" style="font-size:16px">Same AI + configured study APIs</text>
 <text x="766" y="1132" class="body" style="font-size:16px">Quote values / units / intervals</text>
 <text x="766" y="1157" class="body" style="font-size:16px">Keep gaps and failures visible</text>
