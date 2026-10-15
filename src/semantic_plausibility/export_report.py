@@ -335,6 +335,19 @@ def write_html(path, rows, summary, csv_name, log_name):
         downloads += ' · <a href="' + escape(Path(csv_name).with_suffix(".trace.jsonl").name, quote=True) + '">AI trace</a>'
     if has_studies:
         downloads += ' · <a href="' + escape(Path(csv_name).with_suffix(".studies.csv").name, quote=True) + '">Studies CSV</a>'
+    study_notice = ""
+    if has_studies:
+        study_counts = research.get("evidence_counts", {})
+        measurements = study_counts.get("extracted_measurements")
+        intervals = study_counts.get("extracted_intervals")
+        no_numbers = measurements == 0 and intervals == 0
+        study_notice = ('<p class="note"><strong>Study evidence:</strong> '
+            + escape(str(study_counts.get("articles_retrieved", "not recorded"))) + ' distinct articles; '
+            + escape(str(measurements if measurements is not None else "not recorded")) + ' quoted measurements; '
+            + escape(str(intervals if intervals is not None else "not recorded")) + ' quoted intervals; '
+            + escape(str(study_counts.get("articles_with_failed_extraction", "not recorded"))) + ' rejected/unavailable extractions. '
+            + ('<strong>No study-derived value or reference-range recommendation.</strong> ' if no_numbers else '')
+            + 'Green numeric fields describe format/bound checks only; clinical plausibility remains unestablished.</p>')
     html = f'''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">
 <title>{title}</title><style>
@@ -346,6 +359,7 @@ def write_html(path, rows, summary, csv_name, log_name):
 <p class="muted">One table per item. Read across each field: input → finding → recommendation. ≈ means rounded display; exact values remain in the CSV.</p>
 {legend_html()}
 <p class="muted">Methods: Lookup / deterministic checks · AI-supported lookup: {'enabled' if has_ai else 'Not run'} · Study evidence: {'enabled' if has_studies else 'Not run'}.</p>
+{study_notice}
 {body}
 <p class="muted">Showing {len(rows)} items/groups; the CSV contains every selected item/group. Proposal colours do not change the original source verdict.</p>
 <details class="run-details"><summary>Configuration, methods &amp; audit details</summary><p>Run: <code>{escape(summary["run_id"])}</code></p>

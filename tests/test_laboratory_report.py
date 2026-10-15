@@ -127,6 +127,14 @@ class RecordedRunTests(unittest.TestCase):
                             self.assertNotIn("100000000", field.recommendation)
                     decisions = set_decisions(row, summary)
                     fields = {f.name: f for f in laboratory_fields(row, summary)}
+                    if row.get("code") == "LIS-HB" and row.get("suggested_code") == "718-7":
+                        self.assertEqual(fields["Code"].proposal_state, "yellow")
+                        self.assertEqual(fields["Method"].proposal_state, "yellow")
+                        self.assertIn("no method-specific requirement", fields["Method"].recommendation)
+                    study_records = json.loads(row.get("study_evidence_json") or "[]")
+                    if any(r.get("status") == "extraction_unavailable" for r in study_records):
+                        for name in ("Value / statistics", "Reference ranges"):
+                            self.assertTrue(any("rejected/unavailable" in f for f in fields[name].findings))
                     if row.get("unit_code") == "g/L":
                         self.assertEqual(decisions["Unit code / display"][0], "Convert")
                         for key in ("Unit code / display", "Value / statistics", "Reference ranges"):
@@ -148,6 +156,10 @@ class RecordedRunTests(unittest.TestCase):
                 self.assertEqual(parser.open_set_details, 0)
                 self.assertIn('<th scope="col">→ Proposal</th>', html)
                 self.assertEqual(parser.item_tables, len(rows))
+                study_counts = summary.get("research", {}).get("evidence_counts", {})
+                if summary.get("research", {}).get("scope") == "studies" and study_counts.get("extracted_measurements") == 0 and study_counts.get("extracted_intervals") == 0:
+                    self.assertIn("No study-derived value or reference-range recommendation.", html)
+                    self.assertLess(html.index("No study-derived value"), html.index('class="item"'))
                 if folder.name in {"01-lab-lookup", "03-lab-ai-recommendations", "04-lab-ai-evidence"}:
                     self.assertIn("g/dL; value × 0.1", html)
                     self.assertIn("ucum.nlm.nih.gov", html)

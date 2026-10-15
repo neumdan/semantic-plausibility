@@ -119,6 +119,8 @@ Select a fresh `output.path`, then run another check. Approved decisions are reu
 
 All four laboratory reports prominently show **Approved mapping ready: approved / selected groups**. Without a review registry the numerator is zero. Research refreshes this decision state rather than inheriting an old approval. Numerical readiness, formal FHIR conformance and clinician approval remain separate measures. The expandable field table distinguishes deterministic lookup proposals from model-selected changes and supported study extractions; “not run” and “no supported extraction” never imply a successful check.
 
+Evidence reports show article, numerical-extraction and rejection counts above the item tables. An accepted model reply may contain an empty result: this is not evidence for a reference range. Rejected/unavailable extractions are also flagged in the affected value/reference fields. Exact-unit quoting stays mandatory; typographic normalization by the model is rejected unless it is literally supported by the supplied quotation. `elapsed_seconds` records the current research run; `source_check_elapsed_seconds` separately retains the original lookup duration.
+
 The registry retains history and explicit supersession. It changes mapping rules, not model weights. Hashes verify integrity; the institution remains responsible for who is authorised to approve decisions. Apply approved plans in ETL and run the full FHIR validator on actual individual resources.
 
 Imports require the same profile rules as the checked report. A later decision must have a later timestamp than the one it supersedes, so an old approval cannot undo a revocation. Reports made before this workflow need a new check before review import.

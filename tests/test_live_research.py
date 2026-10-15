@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import tempfile
+import time
 import unittest
 
 from semantic_plausibility.fhir_quality_pipeline import FhirQualityPipeline
@@ -101,7 +102,12 @@ class ResearchRetrievalTests(unittest.TestCase):
             config.write_text(text)
             check = run_plausibility_check(config)
             original_hash = hashlib.sha256(check.csv.read_bytes()).hexdigest()
+            started = time.monotonic()
             dossier = research_evidence(config)
+            elapsed = time.monotonic() - started
+            summary = json.loads(Path(dossier["csv"]).with_suffix(".summary.json").read_text())
+            self.assertAlmostEqual(summary["elapsed_seconds"], elapsed, delta=1)
+            self.assertEqual(summary["source_check_elapsed_seconds"], json.loads(check.summary.read_text())["elapsed_seconds"])
             self.assertEqual(dossier["model_state"], "no_accepted_response")
             self.assertEqual(dossier["groups_with_study_evidence"], 0)
             self.assertGreater(dossier["evidence_counts"]["articles_retrieved"], 0)

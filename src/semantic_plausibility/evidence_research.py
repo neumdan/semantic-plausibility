@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import time
 import uuid
 
 from .audit import encoded
@@ -99,6 +100,7 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
     os.close(descriptor)
     registry_path = config.data.get("quality", {}).get("review_registry")
     run_id = str(uuid.uuid4())
+    started = time.monotonic()
     log = None
     try:
         registry = ReviewRegistry(config.path_value(registry_path)) if registry_path else None
@@ -229,6 +231,8 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
                     writer = csv.DictWriter(handle, fieldnames=fields)
                     writer.writeheader()
                     writer.writerows({key: _csv_text(value) if isinstance(value, str) else value for key, value in row.items()} for row in reviewed)
+                summary["source_check_elapsed_seconds"] = source_summary.get("elapsed_seconds")
+                summary["elapsed_seconds"] = round(time.monotonic() - started, 4)
                 write_html(folder / paths["html"].name, reviewed[:2000], summary, paths["csv"].name, paths["audit"].name)
                 summary["output_hashes"] = {paths[key].name: hashlib.sha256((folder / paths[key].name).read_bytes()).hexdigest()
                                            for key in ("csv", "evidence", "trace", "studies", "html")}

@@ -240,7 +240,9 @@ def laboratory_fields(row, summary):
         fields["Code"].proposal_state = "yellow"
         fields["Code"].sources += candidate_sources
     elif research:
-        fields["Code"].findings.append("AI: no supported candidate selected.")
+        model_used = document(row.get("laboratory_suggestions_json")).get("model_used")
+        fields["Code"].findings.append("AI-assisted search: no code change selected." if model_used else
+            "AI code selection not needed; existing lookup retained." if code_valid else "AI: no code selection recorded.")
     policy_ok = is_true(item.get("code_policy_compatible"))
     invalid_policy = any(c.get("state") == "invalid" for c in item.get("code_checks", [])) or (code_valid and item.get("code_policy_compatible") is False)
     put("Code system", "red" if invalid_policy else "green" if code_valid and policy_ok else "yellow",
@@ -266,6 +268,11 @@ def laboratory_fields(row, summary):
             fields[name].source_state = fields[name].proposal_state = "grey"
             fields[name].action, fields[name].recommendation = "Not required", "No method specified by this code"
             fields[name].findings = ["Code context: no method-specific requirement."]
+        elif name == "Method" and selected and "method" in axes and not expected:
+            fields[name].proposal_state = "yellow"
+            fields[name].action = "Review candidate context"
+            fields[name].recommendation = "Candidate has no method-specific requirement; confirm the code mapping"
+            fields[name].findings = ["Candidate definition: no method-specific requirement. Source coding remains unresolved."]
         elif state != "green" or selected:
             fields[name].action = "Confirm source context"
             fields[name].recommendation = "Verify against " + str(expected) if expected else "Obtain source documentation"
@@ -320,6 +327,9 @@ def laboratory_fields(row, summary):
                             ("Reference ranges", {"reference_interval", "analytical_interval"})):
             extracted = [r for r in supported if r.get("evidence_type") in kinds]
             fields[name].findings.append(f"Studies: {len({r['source'] for r in records if r.get('source')})} articles; {len(extracted)} quoted numeric records.")
+            failed = len({r['source'] for r in records if r.get('source') and r.get('status') == 'extraction_unavailable'})
+            if failed:
+                fields[name].findings.append(f"{failed} article extraction(s) rejected/unavailable; no numerical proposal from those articles. See AI trace.")
             for record in extracted:
                 quantity = str(record["reported_value"]) if number(record.get("reported_value")) is not None else f"{record.get('low')} … {record.get('high')}"
                 fields[name].findings.append(str(record.get("value_kind") or record["evidence_type"]).replace("_", " ") + ": " + quantity + " " + str(record.get("unit") or "(unit missing)") + "; applicability unverified.")
