@@ -130,6 +130,10 @@ The active workflow is quantitative **laboratory Observation**, with MII KDS Lab
 
 The report records configuration, input mapping, assumptions, methods and actual sources per item. Review source → linked definition → proposed code/name/unit/transform → quoted evidence. Confirm specimen, method, population and every reference range before approving. Out-of-range results alone do not prove a semantic error. [Clinician feedback](docs/research.md#clinician-feedback) · [Position alongside MII quality checks](docs/mii-quality.md).
 
+**Reading the HTML:** One table per item: **Data field | Input value | Method + finding | Recommendation | Source → Proposal**. Source colours mean checked / unresolved / problem. Proposal colours mean **green: already correct within the stated check; yellow: review the proposal; red: no supported proposal found**. Grey means not applicable. Sources are numbered beside the findings; **Sources & details** expands the reasons, quotations and original fields. Laboratory and medication reports use the same layout. Green is a field result, not clinical approval; `Approved mapping ready` remains separate. [Examples and colour meanings](docs/data-contract.md#reading-the-recommendation).
+
+“Approved mapping ready: 0 / N” means no reusable clinician-approved laboratory mapping was established. Expand **Details & sources** for field comparisons, quotations and provenance; **Configuration, methods & audit details** contains setup and scope. A retrieved paper without supported numerical extraction cannot supply a replacement reference range.
+
 Medication A1 is available for technical terminology and quantity review; further medication development is deferred. [Choose a medication example, run it and interpret its open points](examples/medication/README.md).
 
 ## Run examples and inspect reports

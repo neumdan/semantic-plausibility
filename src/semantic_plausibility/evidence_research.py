@@ -12,10 +12,10 @@ import uuid
 
 from .audit import encoded
 from .batch import BatchConfiguration
-from .export_report import AuditLog, versions, write_html
+from .export_report import AuditLog, versions, write_html, ratio
 from .export_review import configured_checker, local_model_only
 from .profile_lookups import terminology_plan
-from .review_feedback import ReviewRegistry, report_details, verify_report_profile
+from .review_feedback import ReviewRegistry, report_details, verify_report_profile, approved_mapping_ready
 from . import research_prompts as prompts
 from .model_schemas import response_schema
 from .observation_services import PublicEvidenceClient
@@ -127,6 +127,8 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
                                 row = dict(original_row)
                                 proposals = item.get("laboratory_suggestions") or {}
                                 approval = registry.proposal(payload, row.get("source_namespace", ""), profile, checker) if registry else {"state": "not_configured"}
+                                row.update(mapping_review_state=approval["state"],
+                                    approved_mapping_ready=approved_mapping_ready(approval, payload, detail["observed_values"]))
                                 # Approved targets can add research without altering the source set.
                                 if approval["state"] == "reused_clinician_approval":
                                     target_code = approval["target"]
@@ -197,6 +199,9 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
                         trace += [{"kind": "model", **row} for row in getattr(llm, "trace", [])]
                         (folder / paths["trace"].name).write_text("".join(encoded(row) + "\n" for row in trace))
                         summary = json.loads(source.with_suffix(".summary.json").read_text())
+                        # Reused/withdrawn approvals are evaluated in this run, not inherited from A1.
+                        summary["metrics"]["approved_mapping_ready"] = ratio(
+                            sum(row["approved_mapping_ready"] for row in reviewed), len(reviewed))
                         summary.update(run_id=run_id, operation="research-evidence", software=versions(),
                             run_context=assessment_run,
                             output_path=str(target),

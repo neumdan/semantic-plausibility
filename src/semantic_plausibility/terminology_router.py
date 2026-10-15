@@ -358,6 +358,12 @@ class WebsiteCandidateSource:
         return list(result)
 
 
+def source_priority(item):
+    source = item[1]
+    return (getattr(source, "remote", False),
+        {"primary": 0, "source": 1, "optional": 2}.get(getattr(source, "role", "source"), 1))
+
+
 class TerminologyRouter:
     def __init__(self, sources: list[dict[str, Any]], *, llm: Any = None, strategy="fallback"):
         if strategy not in {"fallback", "all"}:
@@ -397,7 +403,7 @@ class TerminologyRouter:
         candidates: list[dict[str, Any]] = []
         errors: list[str] = []
         attempts, results = [], []
-        for systems, source, website in sorted(self.sources, key=lambda item: (getattr(item[1], "remote", False), {"primary": 0, "source": 1, "optional": 2}.get(getattr(item[1], "role", "source"), 1))):
+        for systems, source, website in sorted(self.sources, key=source_priority):
             if system not in systems:
                 continue
             try:
@@ -452,7 +458,7 @@ class TerminologyRouter:
 
     def labels(self, system, code, version=""):
         labels, errors = [], []
-        for systems, source, _ in sorted(self.sources, key=lambda item: getattr(item[1], 'remote', False)):
+        for systems, source, _ in sorted(self.sources, key=source_priority):
             if labels and self.strategy == 'fallback' and getattr(source, 'remote', False):
                 continue
             if system in systems and hasattr(source, "labels"):
@@ -464,7 +470,7 @@ class TerminologyRouter:
 
     def search_names(self, system, name):
         candidates, errors = [], []
-        for systems, source, _ in sorted(self.sources, key=lambda item: getattr(item[1], 'remote', False)):
+        for systems, source, _ in sorted(self.sources, key=source_priority):
             if candidates and self.strategy == 'fallback' and getattr(source, 'remote', False):
                 continue
             if system in systems and hasattr(source, "search_names"):

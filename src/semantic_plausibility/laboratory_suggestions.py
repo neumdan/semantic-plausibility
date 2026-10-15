@@ -11,6 +11,18 @@ from .name_checks import normalized_name
 from .observation_quality import LOINC_URI, UCUM_URI
 
 
+def existing_code_conflicts(existing_axes, candidate_axes):
+    """A unit mismatch cannot justify changing an existing code's known meaning.
+
+    Disagreements remain review candidates, including when the source code itself
+    might be wrong. A clinician must resolve that conflict before model selection.
+    """
+    existing_axes, candidate_axes = existing_axes or {}, candidate_axes or {}
+    return ["existing_code_" + axis for axis in ("component", "property", "time", "system", "scale", "method")
+            if existing_axes.get(axis) and candidate_axes.get(axis)
+            and existing_axes[axis].casefold() != candidate_axes[axis].casefold()]
+
+
 class LaboratorySuggestions:
     def __init__(self, llm):
         self.llm = llm
@@ -139,6 +151,10 @@ class LaboratorySuggestions:
                     "method": candidate.method, "unresolved_part_codes": candidate.part_codes}
             axes["axis_sources"] = candidate.axis_sources
             conflicts = []
+            if term and candidate.code != term.code:
+                existing_axes = {"component": term.component, "property": term.property,
+                    "time": term.time_aspect, "system": term.system, "scale": term.scale, "method": term.method}
+                conflicts += existing_code_conflicts(existing_axes, axes)
             conflicts += [name for name, value in source_axes.items() if value and axes.get(name)
                           and value.casefold() != axes[name].casefold()]
             for supplied, target, label in [(specimen, candidate.system, "specimen"), (method, candidate.method, "method")]:

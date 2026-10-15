@@ -38,4 +38,11 @@ def html(summary, csv_name):
     research = summary.get('research', {})
     data = research.get('evidence_counts', {})
     name = Path(csv_name).with_suffix('.studies.csv').name
-    return '<section><h2>Study evidence: retrieval versus extraction</h2><p>' + escape(data.get('scope', 'No study retrieval in lookup-only mode.')) + '</p><p><a href="'+escape(name, quote=True)+'">Open study evidence CSV: statistics, units, quotations and sources</a></p><pre>' + escape(json.dumps(data, ensure_ascii=False, indent=2)) + '</pre><p>Input means and SDs are descriptive summaries. Published intervals and study statistics remain context-dependent review evidence; no pooled population reference interval is inferred.</p></section>'
+    labels = {'articles_retrieved': 'Distinct articles retrieved', 'extracted_measurements': 'Quoted numerical measurements',
+        'extracted_intervals': 'Quoted intervals', 'extracted_unclassified_ranges': 'Unclassified ranges',
+        'unit_only_records': 'Unit-only evidence', 'articles_without_supported_extraction': 'Articles without supported extraction',
+        'articles_with_failed_extraction': 'Articles with failed/rejected extraction', 'records': 'Article/LOINC evidence records'}
+    table = '<table><thead><tr><th>Measure</th><th>Count</th></tr></thead><tbody>' + ''.join(
+        '<tr><th scope="row">' + label + '</th><td>' + escape(str(data.get(key, 'not recorded'))) + '</td></tr>'
+        for key, label in labels.items()) + '</tbody></table>'
+    return '<section><h2>Study evidence: retrieval versus extraction</h2><p>' + escape(data.get('scope', 'No study retrieval in lookup-only mode.')) + '</p><p><a href="'+escape(name, quote=True)+'">Open study evidence CSV: statistics, units, quotations and sources</a></p>' + table + '<p>Input means and SDs are descriptive summaries. Published intervals and study statistics remain context-dependent review evidence; no pooled population reference interval is inferred.</p></section>'

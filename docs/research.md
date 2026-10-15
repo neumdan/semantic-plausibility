@@ -85,6 +85,8 @@ The eight-row starter maps `analyte_name="source_test"`: this example's `source_
 
 A malformed `g/dll` can yield validated spelling candidates. A bare `10*6` cannot establish a cell-count denominator. A high value does not justify changing a unit or widening a reference interval. Age/sex, specimen, method, platform, calibration and preanalytical/population context govern clinical applicability.
 
+Candidate discovery uses the configured primary LOINC API as well as optional name services. Exact membership and numerical unit conversion are necessary but insufficient: a candidate conflicting with any known axis of an existing LOINC is excluded from model selection and retained for clinician review. For example, LOINC `6690-2` (leukocyte concentration) cannot be replaced by `26471-3` (other leukocytes/leukocytes, a fraction) to accommodate a bare `10*6`. Its UCUM syntax can be valid while the intended denominator remains unknown. This conservative guard does not certify the existing coding; correcting that coding requires resolving the contradiction with the clinician.
+
 ## Clinician feedback
 
 The check CSV contains empty review columns. Return either that copy with only review cells edited, or a small CSV containing `tuple_id` and review fields. The original report/audit stays intact; import verifies its artifact hashes and protects supplied source/check cells.
@@ -114,6 +116,8 @@ review_registry = "local/clinician-mappings.json"
 ```
 
 Select a fresh `output.path`, then run another check. Approved decisions are reused only for the same source/site, codes/names/units/editions, reference/context set, catalogue fingerprint and profile rules/edition. Measurement values may vary; mapping semantics may not. Every reuse rechecks target identity, unit, factor and reference transformations. A changed source/context/profile or revoked decision prevents reuse. `mapping_review_state`, `approved_mapping_ready` and `clinician_mapping_json` show the outcome. Original source checks remain visible.
+
+All four laboratory reports prominently show **Approved mapping ready: approved / selected groups**. Without a review registry the numerator is zero. Research refreshes this decision state rather than inheriting an old approval. Numerical readiness, formal FHIR conformance and clinician approval remain separate measures. The expandable field table distinguishes deterministic lookup proposals from model-selected changes and supported study extractions; “not run” and “no supported extraction” never imply a successful check.
 
 The registry retains history and explicit supersession. It changes mapping rules, not model weights. Hashes verify integrity; the institution remains responsible for who is authorised to approve decisions. Apply approved plans in ETL and run the full FHIR validator on actual individual resources.
 

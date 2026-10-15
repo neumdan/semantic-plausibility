@@ -27,6 +27,8 @@ LOINC_REVIEW = (
     "code whose selectable flag is true. A selected_name must be copied exactly from that code's names. "
     "The measured value cannot establish the correct analyte or unit. A compatible unit alone does not "
     "establish analyte identity. Consider component, property, time, specimen/system, scale and method; "
+    "Never reinterpret a concentration as a fraction to repair a missing unit denominator. "
+    "Candidates conflicting with the existing code definition require clinician resolution and are excluded. "
     "unresolved part codes are not resolved axis labels. Never invent missing specimen or method. "
     "Abstain with nulls if two candidates remain plausible, the name denotes a different analyte, or context "
     "conflicts. A selection is a review proposal, never proof that the original mapping is wrong."

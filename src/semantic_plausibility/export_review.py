@@ -949,9 +949,8 @@ def _review_export(config):
                             fhir_mapping_proposal_json=encoded(mapping_proposal(row, detail, proposals)),
                         )
                         approval = registry.proposal(payload, row["source_namespace"], selected_profile, checker) if registry else {"state": "not_configured", "review_required": True}
-                        ready_mapping = (approval["state"] == "reused_clinician_approval" and not approval["review_required"]
-                            and not stats.get("invalid") and (stats.get("minimum") is not None or stats.get("maximum") is not None)
-                            and not payload.get("modifier_extensions") and not payload["quantity"].get("comparator"))
+                        from .review_feedback import approved_mapping_ready
+                        ready_mapping = approved_mapping_ready(approval, payload, stats)
                         row.update(mapping_review_state=approval["state"], approved_mapping_ready=ready_mapping,
                                    clinician_mapping_json=encoded(approval))
                         approved_count += ready_mapping

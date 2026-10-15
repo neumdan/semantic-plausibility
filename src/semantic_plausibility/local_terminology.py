@@ -137,6 +137,10 @@ class LoincApiSource:
         self.source_type = "loinc"
         self.source = client.source
 
+    def search_names(self, name):
+        """Expose primary API discovery through the configured terminology router."""
+        return self.client.search_names(name)
+
     def check(self, system, code, version=""):
         before = len(self.client.errors)
         term = self.client.lookup(code, version=version)

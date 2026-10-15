@@ -21,6 +21,38 @@ from test_batch import configuration, ROOT
 
 @unittest.skipUnless(os.getenv("SQC_LIVE_TESTS") == "1", "Set SQC_LIVE_TESTS=1 for real terminology requests")
 class CandidateTests(unittest.TestCase):
+    def test_configured_loinc_api_name_search_and_existing_definition_guard(self):
+        from semantic_plausibility.export_review import ReliableLookup
+        from semantic_plausibility.local_terminology import LoincApiSource, RoutedLoinc
+        from semantic_plausibility.laboratory_suggestions import existing_code_conflicts
+        api = LoincApiSource(ReliableLookup(LoincFhirClient("https://tx.fhir.org/r4")), "loinc")
+        # Match configured_checker: optional services are inserted before the primary API.
+        router = TerminologyRouter([{"kind": "ols", "role": "optional", "systems": ["http://loinc.org"],
+            "base_url": "https://semanticlookup.zbmed.de/ols/api", "ontology": "loinc", "limit": 5}])
+        router.sources.append(({"http://loinc.org"}, api, False))
+        try:
+            # Exercise the configured routing layer, not only the direct API client.
+            found, errors = router.search_names("http://loinc.org", "Hemoglobin")
+            self.assertFalse(errors)
+            self.assertTrue(any(row["code"] == "718-7" for row in found))
+            self.assertTrue(all(row["method"] == "primary_fhir_name_expansion" for row in found))
+            pipeline = FhirQualityPipeline(NlmUcumClient(), RoutedLoinc(router), terminology=router)
+            existing = pipeline.loinc.lookup("6690-2")
+            result = LaboratorySuggestions(None).assess({"text": "Leukocytes"},
+                {"code": "10*6", "system": "http://unitsofmeasure.org"}, existing, pipeline,
+                specimen="Bld", context_conflict=True)
+            self.assertTrue(result["coding_candidates"])
+            for candidate in result["coding_candidates"]:
+                conflicts = existing_code_conflicts({"component": existing.component, "property": existing.property}, candidate["axes"])
+                if conflicts:
+                    self.assertFalse(candidate["selectable"])
+            fraction = pipeline.loinc.lookup("26471-3")
+            self.assertIn("existing_code_property", existing_code_conflicts(
+                {"property": existing.property}, {"property": fraction.property}))
+            self.assertIsNone(result["selected_code"])
+        finally:
+            router.close()
+
     def test_name_candidates_need_exact_identity_and_independent_unit_fit(self):
         router = TerminologyRouter([{"kind": "ols", "systems": ["http://loinc.org"],
             "base_url": "https://semanticlookup.zbmed.de/ols/api", "ontology": "loinc", "limit": 5}])

@@ -259,34 +259,58 @@ def write_html(path, rows, summary, csv_name, log_name):
     from .report_sources import recommendation_html, source_set_html, linked_data_html, source_html
     from .report_context import run_context_html, item_context_html
     from .research_summary import html as evidence_summary_html
+    from .laboratory_report_table import laboratory_fields, approval_html, blocked_selection
+    from .report_comparison import CSS as comparison_css, legend_html, field_table_html, field_details_html
     title = "Laboratory evidence research" if summary.get("operation") == "research-evidence" else "Laboratory export review"
     if summary.get("operation") == "research-evidence" and summary.get("research", {}).get("scope") == "lookup":
         title = "Laboratory terminology recommendations"
     metrics = summary["metrics"]
-    head = "<th>Source set</th><th>Linked terminology</th><th>Complete proposal and supporting sources</th><th>Checks</th>"
+    research = summary.get("research", {})
+    has_ai = summary.get("operation") == "research-evidence"
+    has_studies = has_ai and research.get("scope") == "studies"
     body = ""
-    for row in rows:
-        checks = {key: row.get(key, "") for key in ("status", "reason", "code_check", "unit_check", "code_unit_fit", "reference_check", "value_reference_check", "lookup_credibility", "mii_numeric_set_ready")}
-        checked = "".join(f'<p><strong>{escape(key.replace("_", " "))}</strong>: {escape(str(value))}</p>' for key, value in checks.items())
-        body += '<tr><td class="set">' + source_set_html(row) + '</td><td class="set">' + linked_data_html(row) + '</td><td class="recommendations">' + recommendation_html(row) + '</td><td class="set">' + checked + '</td></tr>'
-        body += '<tr><td colspan="4" class="assessment-cell">' + item_context_html(row) + '</td></tr>'
+    for index, row in enumerate(rows, 1):
+        fields = laboratory_fields(row, summary)
+        prefix = "item-" + str(row.get("tuple_id") or index)
+        blocked = blocked_selection(row)
+        raw_label = "Original recorded proposals (conflicting AI selection blocked)" if blocked else "Recorded proposals and study quotations"
+        label = str(row.get("code") or "Unspecified code") + " · " + str(row.get("analyte_name") or "Unnamed analyte")
+        body += ('<section class="item" data-tuple-id="' + escape(str(row.get("tuple_id", "")), quote=True) + '">'
+            + '<div class="item-heading"><h2>' + str(index) + '. ' + escape(label) + '</h2><p>'
+            + escape(str(row.get("occurrence_count") or "Unknown")) + ' occurrences · source verdict: '
+            + escape(str(row.get("status") or "unknown")) + '</p></div>'
+            + ('<p class="warning">Conflicting recorded AI proposal blocked. No code switch or unverified factor is applied.</p>' if blocked else '')
+            + field_table_html(fields, prefix=prefix)
+            + '<details class="set-details"><summary>Sources &amp; details</summary>'
+            + field_details_html(fields, prefix=prefix)
+            + '<p>Set <code>' + escape(str(row.get("tuple_id", ""))) + '</code> · Input rows: '
+            + escape(str(row.get("input_rows", "unknown"))) + '. Source verdict: ' + escape(str(row.get("reason", ""))) + '</p>'
+            + approval_html(row)
+            + '<details><summary>Original source fields and statistics</summary>' + source_set_html(row) + '</details>'
+            + '<details><summary>Linked terminology, axes and lookup attempts</summary>' + linked_data_html(row) + '</details>'
+            + '<details><summary>' + raw_label + '</summary>' + recommendation_html(row) + '</details>'
+            + item_context_html(row) + '</details></section>')
     spec = summary.get("specification", {})
     links = {"FHIR R4 Observation": "https://hl7.org/fhir/R4/observation.html", **spec.get("links", {})}
     profile_html = '<section><h2>Target profile and resources</h2><p>Package: <code>' + escape(str(spec.get("IG_PACKAGE", "hl7.fhir.r4.core"))) + ' | ' + escape(str(spec.get("IG_VERSION", "4.0.1"))) + '</code></p>'
     if spec.get("IG_CANONICAL"):
         profile_html += source_html(spec["IG_CANONICAL"], title="Profile canonical")
     profile_html += '<ul>' + ''.join('<li>' + source_html(url, title=label) + '</li>' for label, url in links.items()) + '</ul><p>These are documentation links. Validation uses the pinned installed StructureDefinition and guide package; a link is not a validation result.</p></section>'
-    research = summary.get("research", {})
     research_html = ""
     if summary.get("operation") == "research-evidence":
         research_html = '<section><h2>Research execution</h2><p>Scope: <strong>' + escape(str(research.get("scope", "not_recorded"))) + '</strong>. Local model: <strong>' + escape(str(research.get("model_state", "unknown"))) + '</strong>; accepted calls: ' + str(len(research.get("accepted_model_calls", []))) + '; retrieval requests: ' + str(research.get("retrieval_requests", "not_recorded")) + '; literature searches: ' + str(research.get("literature_searches", "not_recorded")) + '; extraction failures: ' + str(research.get("extraction_failures", "not_recorded")) + '.</p><p><a href="' + escape(Path(csv_name).with_suffix(".trace.jsonl").name, quote=True) + '">Executed searches, prompts and responses</a>. No accepted model response means extraction may be missing; inspect rejected/unavailable attempts before review.</p></section>'
     counts = " · ".join(f"{escape(key)}: {value}" for key, value in sorted(summary["statuses"].items()))
     readiness = metrics["mii_numeric_set_ready"]
+    weighted = summary.get("weighted_readiness") or {}
+    weighted_text = (f"{weighted['numerator']} / {weighted['denominator']} known source occurrences"
+        if "numerator" in weighted and "denominator" in weighted else "not recorded")
+    approval = metrics.get("approved_mapping_ready")
+    approval_count = (f"{approval['numerator']} / {approval['denominator']}" if approval else "not recorded")
     percent = f"{100 * readiness['ratio']:.1f}%" if readiness["ratio"] is not None else "unavailable"
     definitions = "".join(
         f"<li><strong>{escape(key.replace('_', ' '))}</strong>: {value['numerator']} / {value['denominator']}</li>"
         for key, value in metrics.items()
-        if isinstance(value, dict) and "numerator" in value
+        if isinstance(value, dict) and "numerator" in value and key != "approved_mapping_ready"
     )
     validation = summary.get("fhir_validation", {"state": "disabled"})
     validation_html = '<section><h2>FHIR resource validation</h2><p>State: <strong>' + escape(str(validation["state"])) + '</strong>.</p>'
@@ -296,23 +320,44 @@ def write_html(path, rows, summary, csv_name, log_name):
     if validation.get("profile"):
         validation_html += '<p>Requested profile: <code>' + escape(validation["profile"]) + '</code><br>Packages: ' + escape(", ".join(validation.get("packages", []))) + '</p>'
     if validation.get("issues"):
-        validation_html += '<p>Validator issues: ' + escape(json.dumps(validation["issues"])) + '</p>'
+        validation_html += '<p>Validator issues: ' + escape(" · ".join(f"{key}: {value}" for key, value in validation["issues"].items())) + '</p>'
     validation_html += '</section>'
+    def metric_text(key):
+        value = metrics.get(key, {})
+        return f"{value['numerator']} / {value['denominator']}" if "numerator" in value and "denominator" in value else "not recorded"
+    kpis = [("Approved mapping ready", approval_count), ("Code verified", metric_text("code_verified")),
+        ("Unit verified", metric_text("unit_verified")), ("Numerically ready", metric_text("mii_numeric_set_ready")),
+        ("FHIR validation", validation.get("state", "not recorded"))]
+    kpi_html = ''.join('<span><strong>' + escape(label) + ': ' + escape(str(value)) + '</strong></span>' for label, value in kpis)
+    mode_label = "AI-supported evidence" if has_studies else "AI-supported lookup" if has_ai else "Lookup and consistency checks"
+    downloads = f'<a href="{escape(csv_name, quote=True)}">CSV</a> · <a href="{escape(log_name, quote=True)}">Audit log</a>'
+    if has_ai:
+        downloads += ' · <a href="' + escape(Path(csv_name).with_suffix(".trace.jsonl").name, quote=True) + '">AI trace</a>'
+    if has_studies:
+        downloads += ' · <a href="' + escape(Path(csv_name).with_suffix(".studies.csv").name, quote=True) + '">Studies CSV</a>'
     html = f'''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">
-<title>{title}</title><style>body{{font:16px/1.6 system-ui;background:#f4f7f9;color:#142d42;margin:0}}main{{max-width:1150px;margin:auto;padding:30px}}
-section{{background:white;padding:24px;margin:18px 0;border:1px solid #d5e1e8;border-radius:8px}}h1,h2{{line-height:1.2}}a{{color:#176c63}}table{{border-collapse:collapse;font-size:13px;white-space:nowrap}}th,td{{padding:9px;text-align:left;vertical-align:top;border-bottom:1px solid #d5e1e8}}th{{background:#edf5f3}}.scroll{{overflow:auto}}.note{{border-left:3px solid #176c63;padding:14px;background:#eef7f4}}code{{font-family:monospace}}.recommendations{{white-space:normal;min-width:360px;max-width:520px}}.set{{white-space:normal;min-width:240px;max-width:360px;overflow-wrap:anywhere}}pre{{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}}.recommendation{{padding:12px 0;border-bottom:1px solid #d5e1e8}}.recommendation p{{margin:4px 0}}.recommendation ul{{padding-left:18px}}.source-meta{{display:block;color:#526978;font-size:12px;overflow-wrap:anywhere}}blockquote{{margin:8px 0;padding-left:12px;border-left:2px solid #176c63}}.recommendations code,.recommendations a{{overflow-wrap:anywhere}}.assessment-cell{{white-space:normal;max-width:1000px}}.assessment table{{white-space:normal}}summary{{cursor:pointer;font-weight:600}}</style>
-<main><h1>{title}</h1><p>Local batch · {escape(summary["mode"])} · {escape(summary["run_id"])}</p>
+<title>{title}</title><style>
+{comparison_css}
+</style><main><h1>{title}</h1><p>{mode_label} · {escape(summary["mode"])} · {downloads}</p>
+<div class="kpis" id="mapping-approval">{kpi_html}</div>
+<p class="muted">Counts describe the input set. Lookups, numerical readiness, FHIR conformance and clinician approval are separate results.</p>
+{('<p class="note">' + escape(str(summary['view_notice'])) + '</p>') if summary.get('view_notice') else ''}
+<p class="muted">One table per item. Read across each field: input → finding → recommendation. ≈ means rounded display; exact values remain in the CSV.</p>
+{legend_html()}
+<p class="muted">Methods: Lookup / deterministic checks · AI-supported lookup: {'enabled' if has_ai else 'Not run'} · Study evidence: {'enabled' if has_studies else 'Not run'}.</p>
+{body}
+<p class="muted">Showing {len(rows)} items/groups; the CSV contains every selected item/group. Proposal colours do not change the original source verdict.</p>
+<details class="run-details"><summary>Configuration, methods &amp; audit details</summary><p>Run: <code>{escape(summary["run_id"])}</code></p>
 {run_context_html(summary, csv_name)}
-{evidence_summary_html(summary, csv_name)}
-<section><h2>{percent} numerically ready laboratory sets</h2><p>{readiness["numerator"]} / {readiness["denominator"]} selected groups. {counts}</p>
+<section><h2>How to interpret the counts</h2><p>Numerically ready: {readiness["numerator"]} / {readiness["denominator"]} ({percent}). {counts}</p>
 <p class="note">{escape(READINESS_DEFINITION)}</p><p>Evidence mode: <strong>{escape(summary["evidence_kind"])}</strong>. Research evidence is reported separately from numerical completeness.</p><ul>{definitions}</ul>
-<p>Observation-weighted readiness: {escape(str(summary.get("weighted_readiness")))}. Unknown source frequencies stay unknown.</p></section>
+<p>Observation-weighted readiness: {escape(weighted_text)}. Unknown source frequencies stay unknown.</p>
+<p><strong>Approved mapping ready: {approval_count}</strong>. Only scoped clinician decisions reverified for the current input and target profile count. With no clinician review registry, this is 0 / selected groups. An accepted AI reply or cited article does not confer approval.</p></section>
+{evidence_summary_html(summary, csv_name) if has_studies else ''}
 {profile_html}
 {validation_html}
 {research_html}
-<section><h2>Review each set</h2><p><a href="{escape(csv_name, quote=True)}">Full review CSV</a> · <a href="{escape(log_name, quote=True)}">Auditable run log</a>. Read left to right: source data → linked terminology → complete proposed set and explanations. CSV retains the same structured data and expert review fields.</p>
-<div class="scroll"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div><p>Preview: {len(rows)} rows; the CSV contains every selected item/group.</p></section>
 <section><h2>Reproduce and review</h2><p>Run/configuration, input and reference-pack hashes are recorded in the summary. Physicians/laboratory physicians review suggestions before any mapping is applied. Source data is unchanged.</p>
-<pre>{escape(json.dumps(summary["software"], indent=2))}</pre><p>Full resource validation uses the configured local Matchbox/HL7 or MII validator. Its results remain separate from numeric semantic readiness and clinician approval. FDE availability/completeness remains a separate measure.</p></section></main></html>'''
+<details><summary>Software versions</summary><pre>{escape(json.dumps(summary["software"], indent=2))}</pre></details><p>Full resource validation uses the configured local Matchbox/HL7 or MII validator. FDE availability/completeness remains a separate measure. A cited article without a supported extraction proposes no numerical replacement.</p></section></details></main></html>'''
     path.write_text(html, encoding="utf-8")

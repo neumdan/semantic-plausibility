@@ -10,7 +10,6 @@ from pathlib import Path
 import tempfile
 import time
 import uuid
-from urllib.parse import urlsplit
 
 import duckdb
 
@@ -24,6 +23,8 @@ from .fhir_validation import fhir_json, validate_input
 from .medication_checks import MedicationChecker, SCOPE, terminology_plan
 from .medication_input import records
 from .report_context import run_context, item_context, run_context_html, item_context_html
+from .report_comparison import CSS as comparison_css, legend_html, field_table_html, field_details_html
+from .medication_report_table import medication_fields
 
 FIELDS = ["tuple_id", "resource_type", "source_rows", "occurrence_count", "frequency_known", "status",
           "medication_status", "intent", "product_name", "product_codings_json", "medication_json",
@@ -103,27 +104,33 @@ def item_summary(row, detail):
 def html_report(path, rows, summary, csv_name):
     def text(value):
         return escape(str(value))
-    def source(value):
-        if not isinstance(value, str):
-            return text(value)
-        try:
-            url = urlsplit(value)
-            if url.scheme in {"https", "http"} and url.hostname and not (url.username or url.password):
-                return f'<a href="{text(value)}" rel="noreferrer">{text(value)}</a>'
-        except ValueError:
-            pass
-        return text(value)
     blocks = []
-    for row, detail in rows:
-        label = row["product_name"] or "; ".join(c.get("code", "") for c in detail["source_set"]["medication"].get("code", {}).get("coding", [])) or row["tuple_id"]
-        recommendations = "".join("<li><b>" + text(p["type"]) + "</b>: <pre>" + text(json.dumps(p, indent=2, ensure_ascii=False)) + "</pre>Source: " + source(p.get("source", "Source export")) + "</li>" for p in detail["recommendations"])
-        findings = "".join(f'<li><b>{text(f["state"])} · {text(f["path"])}</b>: {text(f["message"])}<br>Source: {source(f["source"])}</li>' for f in detail["findings"])
-        checks = "".join(f'<tr><td>{text(r["path"])}</td><td>{text(r.get("system", ""))}<br>{text(r.get("code", ""))}</td><td>{text(r["state"])}</td><td>{source(r.get("source") or "No configured source established membership")}</td></tr>' for r in detail["terminology"])
+    for index, (row, detail) in enumerate(rows, 1):
+        label = row["product_name"] or "; ".join(c.get("code", "") for c in detail["source_set"]["medication"].get("code", {}).get("coding", [])) or "Unnamed product"
+        fields = medication_fields(row, detail)
+        prefix = "item-" + str(row["tuple_id"])
+        known = row["frequency_known"] is True or str(row["frequency_known"]).lower() == "true"
+        overview = '<h3>Item summary</h3><ul>' + ''.join('<li>' + text(line) + '</li>' for line in item_summary(row, detail)) + '</ul>'
         trace = '<details><summary>Lookup attempts and catalogue editions</summary><pre>' + text(json.dumps(detail['terminology'], ensure_ascii=False, indent=2)) + '</pre></details>'
-        overview = '<div class="item-summary"><h3>Item summary</h3><ul>' + ''.join('<li>' + text(line) + '</li>' for line in item_summary(row, detail)) + '</ul></div>'
-        ddd = '<h3>Published DDD context</h3><pre>' + text(json.dumps(detail['ddd_references'], ensure_ascii=False, indent=2)) + '</pre>' if detail['ddd_references'] else '<p>DDD: no published value retrieved from the configured catalogue. Clinical dose safety remains unassessed.</p>'
-        blocks.append(f'<section><h2>{text(label)} — {text(row["status"])}</h2><p>{text(row["resource_type"])} · {text(row["occurrence_count"] if row["frequency_known"] else "Unknown")} occurrences</p>{overview}{item_context_html(row)}<details><summary>Source set</summary><pre>{text(json.dumps(detail["source_set"], ensure_ascii=False, indent=2, default=str))}</pre></details><h3>Checks and explanations</h3><ul>{findings or "<li>No inconsistency found in the implemented checks.</li>"}</ul><table><thead><tr><th>Element</th><th>Code/system</th><th>Check</th><th>Source</th></tr></thead><tbody>{checks}</tbody></table>{trace}{ddd}<h3>Recommendations and calculations</h3><ul>{recommendations or "<li>No supported recommendation; review missing evidence.</li>"}</ul></section>')
-    path.write_text(f'''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';"><title>Medication plausibility review</title><style>body{{font:16px system-ui;margin:2rem auto;max-width:1100px;padding:0 1rem;color:#182e42;background:#f6f8fa}}section{{background:white;border:1px solid #cfd9df;padding:1rem;margin:1.5rem 0;border-radius:8px}}table{{border-collapse:collapse;width:100%;font-size:.9rem}}td,th{{padding:.6rem;border:1px solid #ddd;text-align:left;overflow-wrap:anywhere}}pre{{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f6f8;padding:.8rem}}li{{margin:.7rem 0}}.item-summary{{border-left:4px solid #176c63;background:#eef7f4;padding:.7rem 1rem}}a{{color:#006f82}}</style><h1>Medication plausibility review</h1><p>{text(SCOPE)}</p><p>{summary["input_records"]} source rows → {summary["distinct_tuples"]} report rows. <a href="{text(csv_name)}">Full CSV</a></p><p>FHIR validation: {text(summary["fhir_validation"]["state"])}. Counts: {text(summary["statuses"])}. This preview shows at most 2,000 rows; the CSV contains all results.</p><p><b>Reading statuses:</b> passed = no issue in implemented checks; needs_review = unresolved or conditional evidence; error = supported inconsistency. dose_check is an overall review flag, not the result of each calculation. Clinical dose safety is not assessed.</p><p>Strength is source-declared. Conversions are conditional review proposals, never dose replacements or automatic corrections.</p>{run_context_html(summary, csv_name)}{"".join(blocks)}</html>''', encoding="utf-8")
+        proposals = '<details><summary>Recorded proposals, calculations and DDD context</summary><pre>' + text(json.dumps({k: detail[k] for k in ('recommendations', 'ddd_references', 'findings')}, indent=2, ensure_ascii=False)) + '</pre><p>Published DDD is classification context, never a recommended dose.</p></details>'
+        source = '<details><summary>Original source fields</summary><pre>' + text(json.dumps(detail['source_set'], ensure_ascii=False, indent=2, default=str)) + '</pre></details>'
+        blocks.append('<section class="item" data-tuple-id="' + text(row['tuple_id']) + '"><div class="item-heading"><h2>'
+            + str(index) + '. ' + text(label) + '</h2><p>' + text(row['occurrence_count'] if known else 'Unknown') + ' occurrences</p></div>'
+            + '<p class="muted">' + text(row['resource_type']) + ' · status: ' + text(row.get('medication_status') or 'not supplied')
+            + ' · intent: ' + text(row.get('intent') or 'not supplied') + ' · source verdict: ' + text(row['status']) + '</p>'
+            + field_table_html(fields, prefix=prefix)
+            + '<details class="set-details"><summary>Sources &amp; details</summary>' + field_details_html(fields, prefix=prefix)
+            + '<p>Set <code>' + text(row['tuple_id']) + '</code></p>'
+            + '<details><summary>Complete item summary</summary>' + overview + '</details>' + item_context_html(row)
+            + source + trace + proposals + '</details></section>')
+    notice = '<p class="note">' + text(summary["view_notice"]) + '</p>' if summary.get("view_notice") else ''
+    path.write_text(f'''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';"><title>Medication plausibility review</title><style>{comparison_css}</style><main><h1>Medication plausibility review</h1><p>Lookup + deterministic consistency checks · <a href="{text(csv_name)}">CSV</a></p><p>{summary["input_records"]} source rows → {summary["distinct_tuples"]} report items · FHIR validation: {text(summary["fhir_validation"]["state"])} · Clinician mapping approval: not implemented.</p>{notice}
+<p class="muted">One table per item. Read across each field: input → finding → recommendation. Clinical dose safety is not assessed.</p>
+{legend_html()}
+<p class="muted">AI-supported lookup / study evidence: Not implemented for medication. Strength conversions use source-declared product strength; no dose replacement is proposed.</p>
+{"".join(blocks)}
+<p class="muted">This preview shows at most 2,000 items; the CSV contains all results.</p>
+<details class="run-details"><summary>Configuration, methods &amp; audit details</summary>{run_context_html(summary, csv_name)}<p>{text(SCOPE)}</p><p>Source statuses: passed = no issue in implemented checks; needs_review = unresolved or conditional evidence; error = supported inconsistency. dose_check is an overall review flag, not clinical dose approval. Colours apply only to the stated field check; new conversions always require review.</p><p>Counts: {text(summary["statuses"])}</p></details></main></html>''', encoding="utf-8")
 
 
 def ordered(value):

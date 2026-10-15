@@ -77,7 +77,36 @@ An existing prefix requires `overwrite=true` or a new filename. Concurrent runs 
 
 These describe findings inside a completed report. A setup/processing failure is different: the command fails and a completed report may be absent. Full-resource validation has its own outcome and can make the command return a nonzero exit code even when a semantic report was written.
 
-**Medication columns:** `code_check` and `unit_check` describe individual terminology checks. `dose_check=inconsistent` means an error was found in a dosage/duration/strength field; `review_required` means the dose still needs review, even if an individual calculation is consistent. `not_applicable` is for a standalone Medication. Inspect `findings_json` / `recommendations_json` for the individual arithmetic result and its assumptions. `clinical_dose_safety=not_assessed` applies throughout; source strength is not authoritative product evidence. The HTML presents this in a readable summary. No CSV status names have been renamed.
+**Medication columns:** `code_check` and `unit_check` describe individual terminology checks. `dose_check=inconsistent` means an error was found in a dosage/duration/strength field; `review_required` means the dose still needs review, even if an individual calculation is consistent. `not_applicable` is for a standalone Medication. Inspect `findings_json` / `recommendations_json` for the individual arithmetic result and its assumptions. `clinical_dose_safety=not_assessed` applies throughout; source strength is not authoritative product evidence. The HTML shows the complete source set, recorded findings and scoped actions. No CSV status names have been renamed.
+
+### Reading the recommendation
+
+The HTML shows **one table per item**, with one row per field: **Data field | Input value | Method + finding | Recommendation | Source → Proposal**. Laboratory fields include code/system, name, specimen, method, values/statistics, unit/system and reference ranges. Medication uses product coding, name, form, ingredients/strength and the supplied dosage/timing fields. Sources are numbered beside findings; expand **Sources & details** for quotations, reasons, original fields and lookup attempts.
+
+| Colour | Source | Proposal |
+| --- | --- | --- |
+| Green | This field passed the stated check | Already correct within that check; keep it |
+| Yellow | Incomplete or unresolved evidence | A candidate or conditional change needs review |
+| Red | A supported problem was found | No supported replacement is available; clarify the source |
+| Grey | Not applicable | No change required for this field |
+
+For example: `g/L → g/dL × 0.1` is **yellow** as a proposal, even when the factor is verified; values and compatible reference bounds must be scaled together. A nonnumeric value is **red → red** when no numerical replacement is supported. An unresolved lookup is **yellow → red**, unless a sourced candidate is available. `10*6` may have a unit candidate but no verified factor: that candidate stays **yellow**, never an executable conversion.
+
+Colours describe each field, not the semantic correctness of the complete set. Numeric format is not clinical plausibility. Lookups, FHIR conformance and clinician approval remain separate; **Approved mapping ready: 0 / N** is explicit when no approved mapping is reusable. This view neither repeats the lookup nor changes source data.
+
+| Action | Meaning / example |
+| --- | --- |
+| Keep | A particular check matched. Keeping a verified code does not approve its complete semantic set. |
+| Normalize label | Sourced canonical label for the chosen code; retain the local name and confirm analyte/product identity. |
+| Convert | A verified laboratory unit factor, e.g. `g/L → g/dL × 0.1`, with corresponding statistics and compatible reference-bound conversion. |
+| Complete | Obtain missing source context or reference interval; never fill it just from the code or a paper. |
+| Correct source | A supported inconsistency, e.g. a nonnumeric value. If no replacement is established, the report asks for source verification. |
+| Review / Review candidate | Ambiguity, conflicting evidence or an unapproved candidate. `10*6` does not establish the missing volume denominator. |
+| Not assessed / Not applicable | No conclusion was produced, or the field is outside scope. Not a successful check. |
+
+“Keep source values/ranges” means no supported numerical replacement is proposed. Clinical applicability can remain open. Study quantities are shown with type, unit, context and sources; article retrieval alone supplies no numerical limit.
+
+Medication additionally labels **conditional conversions** based on source-declared strength. A dose/rate/duration mismatch asks for verification of all three and interruptions; the calculated quantity is not a replacement dose. Medication AI, study research, dose safety and clinician-mapping reuse are unimplemented. All ingredients, instructions and constraints remain available; quantities retain their unit systems.
 
 ### Laboratory columns
 
@@ -99,6 +128,8 @@ CSV strings are escaped against spreadsheet formulas. Full evidence may contain 
 
 Review columns and the separate evidence dossier/trace are described in [research and feedback](research.md). The registry is local and versioned; accepted targets/factors are rechecked on reuse. `approved_mapping_ready` counts currently supported approved plans, not full patient-resource validation.
 
+The HTML shows this count explicitly in every laboratory mode. Each expandable set compares the input with assessment and proposed output by lookup, AI and study evidence. Source data and full machine-readable objects remain available in the CSV and expandable details. No clinician registry means `approved_mapping_ready=false`; research re-evaluates approval instead of copying a previous run's decision.
+
 Optional mapped roles `component`, `property`, `time_aspect` and `scale` preserve known source axis descriptors alongside specimen/method. Use resolved descriptors, not inferred aliases. For native FHIR, a context file can supply `source_axes={component,property,time,scale}`; time here is the observation definition (such as Pt or a collection duration), not a patient timestamp. Conflicts with resolved LOINC axes stay under review.
 
 ## Complete review projection
@@ -113,7 +144,7 @@ Every laboratory checked/researched row contains:
 | `matched_analyte`, `suggested_analyte` | Existing exact-code component versus proposed-code component; absent when not resolved |
 | `suggested_code_version` | Edition associated with the proposed target code |
 
-A proposal never rewrites input. Exact membership, definition/name, dimensional fit, numeric completeness and evidence applicability remain separate. The HTML presents these structured fields as source → linked data → proposal, with checks in the final column.
+A proposal never rewrites input. Exact membership, definition/name, dimensional fit, numeric completeness and evidence applicability remain separate. The visible HTML table places each input field beside its method/finding, recommendation and two status labels. Complete source objects, reasons and lookup traces are available in one expandable section per item.
 
 Lookup provenance is available in `lookup_attempts_json` and the HTML lookup trace: attempted alias/type, state, source, edition, available artifact hash and redacted failure type. Conflicting sources remain unresolved. Medication uses `sources_json` for the same purpose and `ddd_references_json` for exact publisher DDD text; see its domain contract.
 

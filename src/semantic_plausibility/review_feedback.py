@@ -27,6 +27,14 @@ REVIEW_FIELDS = ["review_decision", "reviewer", "reviewed_at", "approved_code", 
 DECISIONS = {"approved", "rejected", "deferred", "revoked"}
 
 
+def approved_mapping_ready(approval, payload, stats):
+    """Readiness needs a currently reverified clinician decision, never a model vote."""
+    return bool(approval.get("state") == "reused_clinician_approval"
+        and approval.get("review_required") is False and not stats.get("invalid")
+        and (stats.get("minimum") is not None or stats.get("maximum") is not None)
+        and not payload.get("modifier_extensions") and not payload.get("quantity", {}).get("comparator"))
+
+
 def profile_fingerprint(profile):
     return hashlib.sha256(encoded(asdict(profile)).encode()).hexdigest()
 

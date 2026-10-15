@@ -282,7 +282,9 @@ def recommendation_html(row):
         if complete.get("code", {}).get("code") == candidate.get("code"):
             continue
         add(("Code proposal: " if code else "Code candidate: ") + str(candidate.get("code", "")),
-            [candidate, candidate.get("retrieval", {})], "Exactly looked up; semantic correctness requires clinician review.")
+            [candidate, candidate.get("retrieval", {})],
+            "Exactly looked up; semantic correctness requires clinician review." if candidate.get("selectable") else
+            "Not selectable: " + ", ".join(candidate.get("context_conflicts", []) or ["unit fit or complete definition not established"]))
     if code and not complete and not any(candidate.get("code") == code for candidate in candidates):
         mappings = document(row.get("coding_proposal_json"))
         matching = [candidate for candidate in mappings if candidate.get("target_code") == code] if isinstance(mappings, list) else []
