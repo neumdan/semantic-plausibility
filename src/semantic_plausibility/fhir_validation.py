@@ -351,7 +351,7 @@ def initialise_terminology(config_path):
             "submitted_sha256": hashlib.sha256(body).hexdigest(), "id": identifier})
     if not installed:
         raise ValueError("No real ValueSets or complete CodeSystems were explicitly supplied")
-    receipt = config.root / "local/validation/terminology-installation.json"
+    receipt = config.path_value(settings.get("setup_directory", "local/validation")) / "terminology-installation.json"
     receipt.parent.mkdir(parents=True, exist_ok=True)
     result = {"state": "installed", "endpoint": endpoint, "retrieved_at": datetime.now(timezone.utc).isoformat(),
         "configuration_sha256": config.deployment.sha256, "resources": installed,

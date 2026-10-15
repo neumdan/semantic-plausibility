@@ -2,7 +2,7 @@
 
 ## Goal
 
-Support correct semantic filling of the selected MII KDS laboratory Observation from LIS, FHIR or research exports. A complete set is **code + code system/edition + analyte name + value or observed bounds + unit + unit system + every reference interval and its context**. Professionals decide semantic correctness using source definitions, terminology and evidence of reported practice.
+Support correct semantic filling of the selected MII KDS quantitative laboratory Observation from LIS, FHIR or research exports. A complete set is **code + code system/edition + analyte name + value or observed bounds + unit + unit system + every reference interval and its context**. Professionals decide semantic correctness using source definitions, terminology and evidence of reported practice.
 
 The first deployment uses MII Laboratory **2026.0.3**, a stable published release. Its resolved snapshot supplies the selected rules. The referenced laboratory ValueSet makes LOINC a preferred binding; the quantitative value system is fixed to UCUM. A preferred binding is not a universal prohibition of local codings. [Official module](https://github.com/medizininformatik-initiative/kerndatensatzmodul-labor), [terminology guidance](https://www.medizininformatik-initiative.de/Kerndatensatz/KDS_Laborbefund_2026/MIIIGModulLaborbefund-TechnischeImplementierung-Terminologien.html).
 
@@ -30,14 +30,14 @@ The project produces a mapping plan, not a patient Observation from aggregate st
 
 A reference interval, analytical measurement range and reported extreme are different evidence types. Age/sex, assay/platform, calibration, preanalytical conditions and population can limit applicability. Literature quotations and unit compatibility support plausibility; clinician adjudication establishes semantic correctness in the defined source context.
 
-## Later domain adapters
+## Future work
 
-Medication needs ingredient/product identity, strength numerator/denominator, dose/unit, route, frequency/timing and status; ATC alone does not identify all of these. Condition needs code/edition, verification/clinical status, severity/stage and body site. Procedure needs code/edition, status, timing, site and technique. Timing primitives can use FHIR units-of-time while dose Quantities use an IG-selected unit system; do not assume every unit element is UCUM. Each adapter must load its actual MII profile/bindings and source catalogues before mapping.
+The laboratory workflow covers quantitative results, not all uses of Observation. Medication A1 already checks source terminology and quantities as described below; medication AI/evidence and clinical dose assessment remain future work. Condition needs code/edition, verification/clinical status, severity/stage and body site. Procedure needs code/edition, status, timing, site and technique. Timing primitives can use FHIR units-of-time while dose Quantities use an IG-selected unit system; do not assume every unit element is UCUM. Each adapter must load its actual MII profile/bindings and source catalogues before mapping.
 
 FDPG access is not a public literature lookup. A future provider must use an authorised feasibility/research interface or permitted aggregate export, retain selection/cohort provenance and keep observed practice separate from reference-interval validation.
 
 ## Medication checks
 
-Medication, MedicationRequest, MedicationAdministration and MedicationStatement are implemented for source terminology, unit/quantity checks, timing/range consistency and conditional strength/infusion calculations. The [executable recipes and contract](../examples/medication/README.md) retain every ingredient and dosage instruction. The published MII Medication 2026.0.1 guide is selected for optional full-resource validation.
+Laboratory is the primary workflow. Medication A1 is available for technical terminology and quantity review; further medication development is deferred. Medication, MedicationRequest, MedicationAdministration and MedicationStatement implement source terminology, unit/quantity checks, timing/range consistency and conditional strength/infusion calculations. The [executable recipes and contract](../examples/medication/README.md) retain every ingredient and dosage instruction. The published MII Medication 2026.0.1 guide is selected for optional full-resource validation.
 
 Source strength is not catalogue evidence. Clinical dose appropriateness, product/form/route compatibility beyond the explicit lexical check, medication AI literature research and clinician-registry reuse remain future work. ATC alone cannot establish formulation or concentration. Condition and Procedure still need domain adapters.

@@ -243,3 +243,34 @@ def initialise_packages(path, alias=None):
             token=config.deployment.secret(row, "token"),
         )
     return results
+
+
+def check_package_updates(config):
+    """Metadata-only release check; never fetch archives, accept terms, or change pins."""
+    if config.network_mode != 'lookups':
+        return {'state': 'offline', 'packages': [], 'downloads': False}
+    from .progress import LOGGER
+    results = []
+    for alias, row in config.data.get('packages', {}).items():
+        if not row.get('enabled'):
+            continue
+        registry = https_url(row.get('registry', REGISTRY))
+        entry = {'alias': alias, 'name': row['name'], 'configured_version': row['version'],
+                 'local_path_exists': config.path_value(row['path']).exists(),
+                 'source': registry + '/packages/' + row['name']}
+        try:
+            response = _HttpSession().get(entry['source'], timeout=15)
+            response.raise_for_status()
+            versions = [v for v in response.json().get('versions', {}) if re.fullmatch(r'\d+\.\d+\.\d+', v)]
+            if not versions:
+                raise ValueError('No stable package releases returned')
+            latest = max(versions, key=lambda v: tuple(map(int,v.split('.'))))
+            entry.update(latest_version=latest, state='pinned_latest' if latest==row['version'] else 'different_release_available')
+            LOGGER.info('Package %s: configured %s, registry latest %s; manual download only', alias, row['version'], latest)
+        except (OSError, ValueError, RuntimeError) as exc:
+            entry.update(state='unavailable', error_type=type(exc).__name__)
+            LOGGER.warning('Package metadata unavailable for %s; configured edition retained', alias)
+        results.append(entry)
+    return {'state': 'checked' if results else 'no_packages_configured', 'packages': results,
+            'checked_at': datetime.now(timezone.utc).isoformat(), 'downloads': False,
+            'policy': 'Keep exact edition pins. Operator downloads and reviews a new edition explicitly.'}

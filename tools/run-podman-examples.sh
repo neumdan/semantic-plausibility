@@ -7,17 +7,20 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 DRY_RUN=false
 REBUILD=false
 LOOKUP_ONLY=false
+LAB_ONLY=false
 for argument in "$@"; do
 case "$argument" in
   --dry-run) DRY_RUN=true ;;
   --rebuild) REBUILD=true ;;
   --lookup-only) LOOKUP_ONLY=true ;;
+  --lab-only) LAB_ONLY=true ;;
   -h|--help)
-    printf '%s\n' 'Usage: bash tools/run-podman-examples.sh [--lookup-only] [--dry-run] [--rebuild]' \
+    printf '%s\n' 'Usage: bash tools/run-podman-examples.sh [--lab-only] [--lookup-only] [--dry-run] [--rebuild]' \
       'Runs four laboratory modes, four medication types and a medication terminology example.' \
       'Uses real APIs, local Matchbox/Blaze and Ollama; first use downloads images/model.' \
       'Writes separate reports under output/podman-examples-<timestamp>-<unique suffix>/.' \
-      '--lookup-only runs six lookup/check reports without starting Ollama or the FHIR validator.' \
+      '--lab-only runs four laboratory modes; omit it to also run five medication A1 examples.' \
+      '--lookup-only runs six A1 reports (one with --lab-only), without Ollama or the FHIR validator.' \
       '--dry-run prints the plan without creating files, downloading or running containers.' \
       '--rebuild explicitly rebuilds the runner and validator, retaining cached layers/volumes.'
     exit 0 ;;
@@ -54,11 +57,20 @@ step() {
   "$@"
 }
 
+stop_services() {
+  if "$DRY_RUN"; then printf '  pc stop'; printf ' %s' "$@"; printf '\n'; return 0; fi
+  local service container
+  for service in "$@"; do
+    container="$(podman ps -aq --filter "label=com.docker.compose.project=$PROJECT" --filter "label=com.docker.compose.service=$service")"
+    if [[ -n "$container" ]]; then pc stop "$service" || return $?; fi
+  done
+}
+
 cleanup() {
   local status=$?
   trap - EXIT
   # Stop only this script's project; keep model/terminology volumes and reports.
-  if ! "$LOOKUP_ONLY" && ! pc stop ollama matchbox blaze; then
+  if ! "$LOOKUP_ONLY" && ! stop_services ollama matchbox blaze; then
     printf 'Could not stop test services. Project: %s\n' "$PROJECT" >&2
     status=1
   fi
@@ -142,8 +154,11 @@ report() {
   return "$code"
 }
 
-printf '%s\n' 'Example inputs; real terminology APIs; local validation and inference.' \
-  'Configuration: pipeline.example.toml; examples/lab/fhir-csv.toml; examples/medication/{request,administration,product,statement,terminology}.toml.' \
+SQC_CONFIGURATION_SUMMARY='pipeline.example.toml'
+if ! "$LOOKUP_ONLY"; then SQC_CONFIGURATION_SUMMARY+='; examples/lab/fhir-csv.toml'; fi
+if ! "$LAB_ONLY"; then SQC_CONFIGURATION_SUMMARY+='; examples/medication/{request,administration,product,statement,terminology}.toml'; fi
+printf '%s\n' 'Example inputs; real terminology APIs; selected local services.' \
+  "Configuration: $SQC_CONFIGURATION_SUMMARY" \
   "Private test caches: $STATE" "Compose project: $PROJECT" \
   'Host ports are assigned dynamically on localhost; services communicate inside the stack.'
 if ! "$DRY_RUN"; then
@@ -173,7 +188,7 @@ if step 'Prepare pinned MII laboratory validator' pc run --rm validator-init val
 else
   record 02-lab-fhir-validation - setup_failed
 fi
-step 'Release validator memory before model inference' pc stop matchbox blaze || true
+step 'Release validator memory before model inference' stop_services matchbox blaze || true
 
 if "$lookup_ready" \
    && step 'Start local Ollama' pc up -d ollama && wait_healthy ollama \
@@ -190,12 +205,14 @@ fi
 
 fi # Full lab workflow; --lookup-only skips validator and model services.
 
+if ! "$LAB_ONLY"; then
 report 05-medication-request run-plausibility-check check --config /app/examples/medication/request.toml || true
 report 06-medication-administration run-plausibility-check check --config /app/examples/medication/administration.toml || true
 
 report 07-medication-product run-plausibility-check check --config /app/examples/medication/product.toml || true
 report 08-medication-statement run-plausibility-check check --config /app/examples/medication/statement.toml || true
 report 09-medication-terminology run-plausibility-check check --config /app/examples/medication/terminology.toml || true
+fi
 
 if ! "$DRY_RUN"; then
   printf '%s\n' '</ul><p><a href="summary.tsv">Exit summary</a> · <a href="run.log">Run log</a></p></html>' >> "$RUN_DIR/index.html"

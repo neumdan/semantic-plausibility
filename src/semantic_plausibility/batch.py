@@ -116,7 +116,9 @@ class BatchConfiguration:
         logging = table(data.get("logging", {}), "logging", {"level"})
         if logging.get("level", "INFO") not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
             raise ValueError("logging.level must be DEBUG, INFO, WARNING or ERROR")
-        routing = table(data.get("terminology", {}), "terminology", {"strategy"})
+        routing = table(data.get("terminology", {}), "terminology", {"strategy", "check_updates"})
+        if type(routing.get("check_updates", False)) is not bool:
+            raise ValueError("terminology.check_updates must be true or false")
         self.lookup_strategy = routing.get("strategy", "fallback")
         if self.lookup_strategy not in {"fallback", "all"}:
             raise ValueError("terminology.strategy must be fallback or all")
@@ -339,7 +341,7 @@ class BatchConfiguration:
             "status",
             "resource_json",
         }
-        supported |= {"range_text"}
+        supported |= {"range_text", "value_mean", "value_sd", "value_mean_unit", "value_sd_unit", "value_min_unit", "value_max_unit"}
         for prefix in ("range_low", "range_high", "range_age_low", "range_age_high"):
             supported |= {
                 prefix,
@@ -352,7 +354,7 @@ class BatchConfiguration:
             supported = MEDICATION_FIELDS
         if (set(columns) | set(defaults)) - supported:
             raise ValueError("Unknown semantic column/default role; use the documented field map for RESOURCE_TYPE")
-        if "value" in columns and {"value_min", "value_max"} & set(columns):
+        if "value" in columns and {"value_min", "value_max", "value_mean", "value_sd"} & set(columns):
             raise ValueError("Choose point values OR aggregate min/max, not an ambiguous combination")
         mapping = {
             "resource_type": self.kind,

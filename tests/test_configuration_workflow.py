@@ -1,7 +1,8 @@
 """Setup contracts, logging and real downloaded catalogues; no invented lookup responses."""
 
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 import io
+import json
 import os
 from pathlib import Path
 import sqlite3
@@ -45,6 +46,18 @@ class ConfigurationWorkflowTests(unittest.TestCase):
             self.assertEqual(check["error_type"], "ValueError")
             self.assertEqual(report["selected_input"]["columns"]["code"], "code")
             self.assertEqual(report["target_specification"]["FHIR_VERSION"], "4.0.1")
+
+    def test_package_check_uses_named_command_without_fetching_archives(self):
+        from semantic_plausibility.cli import run_main
+
+        with tempfile.TemporaryDirectory() as name:
+            path = Path(name) / "pipeline.toml"
+            path.write_text((ROOT / "pipeline.example.toml").read_text().replace('mode = "lookups"', 'mode = "offline"'))
+            with redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(run_main(["package-check", "--config", str(path)]), 0)
+            result = json.loads(output.getvalue())
+            self.assertEqual(result["state"], "offline")
+            self.assertFalse(result["downloads"])
 
     def test_logging_controls_and_config_validation(self):
         with redirect_stderr(io.StringIO()) as out:

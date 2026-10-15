@@ -1,0 +1,4 @@
+id,code,name,code_system,unit,unit_code,unit_system,value,reference_low,reference_high,specimen,status
+example-1,718-7,Hemoglobin,http://loinc.org,g/dL,g/dL,http://unitsofmeasure.org,12,12,16,Bld,final
+example-2,718-7,Hemoglobin,http://loinc.org,g/dL,g/dL,http://unitsofmeasure.org,14,12,16,Bld,final
+example-3,718-7,Hemoglobin,http://loinc.org,g/dL,g/dL,http://unitsofmeasure.org,16,12,16,Bld,final

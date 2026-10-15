@@ -293,7 +293,8 @@ class FhirQualityPipeline:
                 "state": "valid" if ucum_valid is True else "invalid" if ucum_valid is False else "unknown",
                 "source": getattr(self.ucum, "source", None),
                 "candidates": [],
-                "errors": [],
+                "errors": list(getattr(self.ucum, "errors", [])) if ucum_valid is None else [],
+                "availability": "service_unavailable" if ucum_valid is None and getattr(self.ucum, "errors", []) else "responded" if ucum_valid is not None else "not_established",
             }
         elif quantity.get("system") and quantity.get("code") and self.terminology:
             unit_check = self.terminology.check(

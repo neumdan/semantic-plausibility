@@ -1,0 +1,42 @@
+config_version=3
+[general]
+PROJECT_NAME="laboratory-study-example"
+RESOURCE_TYPE="Observation"
+[input]
+type="fhir_file"
+origin="fhir"
+source_namespace="example-site"
+path="observation.json"
+granularity="individual"
+[input.context]
+loinc_system="Bld"
+method=""
+source_test=""
+[specification]
+FHIR_VERSION="4.0.1"
+PROFILE="fhir-r4-lab"
+[aggregation]
+engine="duckdb"
+group_by=["code","code_system","unit","unit_system","reference_range"]
+[network]
+mode="lookups"
+[study]
+cohort="example-cohort-v1"
+period_start="2026-01-01"
+period_end="2026-01-31"
+source_label="fhir"
+[output]
+mode="distinct"
+path="../../output/single-fhir.csv"
+include_evidence=true
+include_distribution=true
+
+[lookups.ucum]
+enabled = true
+type = "ucum"
+endpoint = "https://ucum.nlm.nih.gov/ucum-service/v1"
+
+[lookups.loinc]
+enabled = true
+type = "loinc"
+endpoint = "https://tx.fhir.org/r4"

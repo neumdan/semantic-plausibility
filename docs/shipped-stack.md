@@ -255,7 +255,7 @@ Matchbox/HL7 validates actual FHIR inputs against the pinned MII guide; the MII 
 
 ## Local terminology and disconnected checking
 
-Install real artifacts under `local/terminologies/` or configure APIs with secret references. For BfArM setup, copy `terminology.example.toml` to `terminology.toml`, select `SQC_CONFIG_FILE=terminology.toml` in `.env`, and run `docker compose --profile terminology run --rm package-init` (or `podman-compose`). Package download conditions must be explicitly accepted; normal checks never download packages automatically. [Local/API setup](lookups.md#choose-local-files-or-an-api).
+Install real artifacts under `local/terminologies/` or configure APIs with secret references. BfArM files are downloaded and extracted manually; ordinary checks never fetch archives. [Manual setup and optional local Blaze](index.html#terminology).
 
 For disconnected operation, provide installed artifacts and actual captured UCUM/LOINC evidence in `input.snapshot`, then set `network.mode="offline"`. Select that TOML before running a prebuilt image with either engine:
 

@@ -1,23 +1,37 @@
 # Semantic plausibility
 
-Review laboratory and medication exports locally. The Python library writes a **CSV and HTML report: source data → linked terminology → findings and sourced proposals**. Clinicians review semantic correctness; input records remain unchanged.
+Review **laboratory exports** locally: source data → real terminology evidence → findings and sourced proposals. The Python library writes CSV and HTML; input records remain unchanged. A laboratory physician decides semantic correctness.
 
-## Choose four things
+## Which data do you have?
 
-| Category | Choices | Configure / run |
+| Your data | Choose this workflow | What you can check today |
 | --- | --- | --- |
-| **A. Plausibility level** | Lookup-only; AI-supported lookup; AI-supported evidence | `check`, then optionally `research-evidence --scope lookup` or `--scope studies` |
-| **B. Input** | CSV; PostgreSQL/SQLite; FHIR files; resources exported from a FHIR server | `[input]`, column mapping, `[database]` |
-| **C. Terminology sources** | Downloaded catalogues; APIs; a combination | `[lookups]`; credentials in `.env` or secret files |
-| **D. Clinical domain** | Laboratory Observation; Medication, Request, Administration or Statement | `general.RESOURCE_TYPE`, `[specification]`; optional `[validation]` |
+| Numeric laboratory results or their aggregate statistics | **Quantitative laboratory Observation** → [laboratory examples](examples/lab/README.md) | Codes, names, units, numbers, reference context and statistics; optional local AI, literature and expert feedback |
+| A medicine/product description | **Medication** → [product example](examples/medication/README.md#choose-your-data) | Product/ingredient codes, units and source-declared strength |
+| A prescription/order | **MedicationRequest** → [request example](examples/medication/README.md#first-medication-test) | Terminology, structured dosage/timing and conditional strength calculations |
+| A documented administration | **MedicationAdministration** → [administration example](examples/medication/README.md#choose-your-data) | The above, plus rate × duration when constant delivery is explicitly asserted |
+| Reported medication use | **MedicationStatement** → [statement example](examples/medication/README.md#choose-your-data) | Terminology and dosage structure; a statement is not proof of administration |
 
-**Start with A1 + CSV + public APIs + laboratory Observation.** Then add your BfArM files, source mapping and local AI. Full FHIR validation is an independent option for complete resources; it is not another AI level.
+**Laboratory is the primary workflow. Medication A1 is available for technical terminology and quantity review; further medication development is deferred.** Medication AI, evidence search, clinical dose assessment and review-registry reuse are not implemented. Other Observation domains (such as vital signs or qualitative findings), diagnoses and procedures have no general plausibility workflow here.
 
-[**Step-by-step manual: all four categories and every supplied profile**](docs/index.html) · [TOML field reference](docs/configuration.md)
+For a first run, follow the laboratory test below. It uses supplied synthetic input and real APIs; no BfArM download or model is needed. Then choose your input recipe and edit its mappings.
 
-## First test: Podman
+## Four configuration choices
 
-Run inside the repository. Install Podman and `podman-compose`; on macOS/Windows initialise/start your Podman machine if needed. The following copy commands preserve existing settings:
+| Category | Start here | Other supported options |
+| --- | --- | --- |
+| **A · Check level** | A1 lookup and deterministic checks | A2 local AI recommendations; A3 local AI + Europe PMC/PubMed |
+| **B · Input** | CSV of distinct laboratory sets | Individual CSV, SQLite/PostgreSQL view, FHIR JSON/Bundle/NDJSON/resource CSV |
+| **C · Sources** | Real LOINC and NLM UCUM APIs | Manually downloaded BfArM/LOINC data; own terminology server |
+| **D · Domain/profile** | Observation / MII KDS Laboratory 2026.0.3 | Base FHIR R4; medication A1 checks with the limits above |
+
+**Current focus: quantitative laboratory values, units, names, codes and reference context.** Full FHIR validation is a separate switch for complete resources. Direct hospital-server extraction remains upstream (for example TORCH/CQL); this runner reads the export or an explicitly mapped database view.
+
+[Step-by-step manual](docs/index.html) · [Working laboratory input recipes](examples/lab/README.md) · [TOML reference](docs/configuration.md)
+
+## First test — Podman
+
+Install Podman and `podman-compose`; on macOS/Windows start your Podman machine. In the repository:
 
 ```sh
 cp -n pipeline.example.toml pipeline.toml
@@ -29,124 +43,112 @@ podman-compose run --rm run-plausibility-check config-check
 podman-compose run --rm run-plausibility-check check --out output/01-lookup.csv
 ```
 
-Open **`output/01-lookup.html`**. With the unchanged example, expect **8 input rows → 7 distinct sets, representing 84 source occurrences**. Inputs are synthetic; terminology responses are real. A successful process can report errors or unresolved sets: those are findings, not necessarily a failed installation.
+Open **`output/01-lookup.html`**. The unchanged starter reads **`examples/laboratory.csv`: 8 synthetic input rows → 7 distinct sets / 84 source occurrences**. All terminology responses come from real services. **A successful test produces those seven rows and their CSV/HTML, even though the deliberately problematic examples contain `error` and `unclear` findings.** The contradictory reference bounds are an intended error case. `unknown` means validity was not established; inspect source coverage or connection errors. It is different from a failed command that produces no completed report.
 
-An existing `pipeline.toml` keeps its selected input and services. Inspect it before running. `config-check` checks configuration/files; `--connections` additionally contacts selected APIs; a model is probed only when research is enabled. No credentials are required by the fresh example's public endpoints. Secrets are required only by an API you explicitly select.
+An existing `pipeline.toml` retains its settings. `config-check` checks configuration/files; `--connections` also contacts selected services. Choose a fresh output name for another run. Build only after code/dependency changes; the image, downloaded weights and named volumes are reused.
 
-Build once after installation or code updates. Ordinary runs reuse `semantic-plausibility-stack:local`. Each check exits after writing its report. Use a fresh output name for another run.
+**Docker:** replace `podman-compose` with `docker compose` in all commands.
 
-<details>
-<summary>Docker or Python instead</summary>
-
-Docker uses the same files and commands; replace `podman-compose` with `docker compose`.
-
-Python with [uv](https://docs.astral.sh/uv/getting-started/installation/):
+**Python:** same TOML, without containers:
 
 ```sh
-uv sync --locked --no-editable
+uv sync --locked --no-editable --extra postgres
 uv run --no-sync --env-file .env run-plausibility-check config-check
-uv run --no-sync --env-file .env run-plausibility-check --out output/01-lookup.csv
+uv run --no-sync --env-file .env run-plausibility-check check --out output/01-lookup.csv
 ```
 
-The direct script is equivalent: `uv run --no-sync --env-file .env python run-plausibility-check.py --config pipeline.toml`. Add `--extra postgres` to `uv sync` for PostgreSQL. [Runtime details](docs/shipped-stack.md).
+Direct script: `uv run --no-sync --env-file .env python run-plausibility-check.py --config pipeline.toml`. PostgreSQL support is optional for native Python. No shell `export` commands are required.
 
-</details>
+## Read the result before adding AI
 
-## A. Plausibility level
+- **Terminology/semantic findings:** `passed` means the implemented checks found no issue. Laboratory `suggestion` and `unclear`, or medication `needs_review`, require review; `error` records a supported inconsistency.
+- **Full FHIR validation:** separate structural/profile result for complete resources. It does not run on scalar CSV summaries.
+- **Clinical assessment:** remains with the physician. A consistent calculation or a valid code is not clinical approval.
 
-| Level | What happens | Availability |
+[Status definitions, including medication `dose_check`](docs/data-contract.md#status-meanings-across-workflows). For medication, read the plain-language item summary before its technical evidence.
+
+## A · Add local AI, then study evidence
+
+| Level | Work performed | Output |
 | --- | --- | --- |
-| **A1 — Lookup-only** | Exact code/unit lookup, names, numeric/context checks, code–unit fit and supported transformations | Labs and all four medication types |
-| **A2 — AI-supported lookup** | A1 report → real terminology/name/unit candidates → local model → exact rechecks; no studies | Labs |
-| **A3 — AI-supported evidence** | A1 report → same AI pass plus bounded Europe PMC/PubMed retrieval and cited extraction | Labs |
+| A1 | Exact membership/syntax, code–unit fit, numeric/reference consistency, supported transformations | Checked CSV/HTML + evidence/audit |
+| A2 | A1 report → real candidate lookups → local model → exact guards | Code, analyte/name and unit proposals |
+| A3 | A1 report → A2 tasks + bounded article retrieval/extraction | Sourced statistics/intervals for clinician review |
 
-A1 already includes deterministic plausibility checks. A2/A3 are independent second passes on the **original A1 CSV and its sidecars**, not successive edits to source data. Lack of evidence stays explicit. Medication AI/evidence and clinical dose safety are not implemented.
+A2 and A3 both start from the **original A1 report and sidecars**. They do not overwrite source data or turn a published interval into an approved local reference interval.
 
-### Prepare Ollama once, then choose A2 or A3
-
-The starter is [Ministral 3B](https://ollama.com/library/ministral-3:3b), an Apache-2.0 model from Mistral. Allow approximately 3 GB for weights plus runtime memory. CPU inference in a macOS/Windows VM can take minutes; native Ollama is an optional faster local route on supported hardware.
+The starter uses local Ollama **`ministral-3:3b`**. Provision once:
 
 ```sh
 podman-compose --profile research up -d ollama
 podman-compose --profile research run --rm model-init
 podman-compose --profile research run --rm catalog-init
-podman-compose --profile research exec -T ollama ollama list
 
-# A2: terminology/name/unit recommendations
+# A2: no study search
 podman-compose --profile research run --rm research-evidence research-evidence --scope lookup --report output/01-lookup.csv --out output/02-ai-lookup.csv
 
-# A3: recommendations with study evidence
+# A3: Europe PMC + PubMed
 podman-compose --profile research run --rm research-evidence research-evidence --scope studies --report output/01-lookup.csv --out output/03-ai-evidence.csv
 ```
 
-Open the HTML beside each CSV. Add `--plan` to either research command to inspect prompts/queries first. Model selection is `[models.local]`; evidence APIs are `[research]`. Europe PMC needs no key. **`model-init` checks/downloads weights; it does not itself prove inference quality.** [Detailed setup and troubleshooting](docs/index.html#model).
+Add `--plan` to inspect prompts and queries first. Research logs the group, article URL, task, elapsed model time every 15 seconds, and acceptance/rejection. CPU inference can take minutes per article. One extraction request covers that article's statistics and intervals using short source-sentence IDs; exact quotations are restored locally; results are reused per LOINC/edition. The starter limits retrieval to four distinct articles per code, not a systematic review.
 
-Weights persist in a shared named volume, also used by the example script. Set `SQC_OLLAMA_VOLUME` in `.env` to an existing volume if migrating; otherwise it defaults to `semantic-plausibility-ollama`. Run one Ollama service at a time against that store. `stop ollama` preserves it; `down --volumes` does not.
+**Open `output/03-ai-evidence.html` and `output/03-ai-evidence.studies.csv`.** The study table contains actual quotations, units, statistic kind, source URL/DOI and extraction state. A retrieved article with no supported extraction is a discovery, not numeric evidence. The report counts these separately. [Research methods and limitations](docs/research.md).
 
-## B. Input
+## B · Input and statistics
 
-[Input recipes](docs/index.html#input): CSV, PostgreSQL/SQLite, FHIR JSON/Bundle/NDJSON or TORCH/CQL exports. Direct FHIR-server querying is upstream; this runner reads the resulting resources.
+Map your headers in `[input.columns]`; choose the input type/path or database table in `[input]`/`[database]`. The profile supplies target rules, not a mapping of unknown source columns.
 
-Map **your** CSV/DB column names in `[input.columns]`; choose the table/view in `[database]`. The IG supplies target rules, not a mapping of unknown source columns. `output.mode="distinct"` groups complete sets; `"items"` retains IDs from individual inputs. The current output is CSV/HTML, not a FHIR/OMOP/database writer.
+For distinct lab exports, preserve **code + code system/edition + name + unit/system + reference ranges + specimen/method/context**. Optional summary columns are **count, mean, sample SD, min, max**, each statistic with its unit. The supplied [aggregate example](examples/lab/aggregated.csv) and [TOML](examples/lab/aggregated.toml) show the complete mapping.
 
-Full FHIR validation requires complete resources and the pinned guide: [Matchbox/HL7 setup](docs/index.html#validation). Scalar lab aggregates cannot establish full FHIR conformance.
+- `output.mode="distinct"`: guarded semantic groups, known occurrence counts and available statistics.
+- `output.mode="items"`: individual records with their IDs; not a way to recreate IDs from aggregates.
+- Mean/SD pooling requires disjoint source groups and sufficient counts. SD means sample SD (`n−1`), not standard error. No median/IQR or reference interval is invented from summary data.
+- Statistic units must match the source measurement unit. A verified linear conversion scales mean, SD, min/max and reference bounds together; a spelling hypothesis alone is not a conversion.
 
-## C. Lookup and terminology sources
+[Working CSV, SQLite, PostgreSQL and FHIR examples](examples/lab/README.md) · [Input contract](docs/data-contract.md).
 
-| Needed source | Download / local route | API route |
+## C · Sources and explicit downloads
+
+| Source | How obtained | What it establishes |
 | --- | --- | --- |
-| LOINC membership, names, axes, example units | Official full `Loinc.csv`, with actual edition | Official LOINC FHIR API + account; public test API for an initial trial |
-| German laboratory names | BfArM LOINC/UCUM FHIR supplements | A terminology server hosting the corresponding edition |
-| German ATC/DDD | BfArM `bfarm.terminologien.atcgm`, licensed edition | A server covering the German ATC canonical system |
-| UCUM syntax and conversions | Previously captured real responses for the required queries | NLM UCUM service |
-| SNOMED CT / RxNorm / UNII | Licensed national exports or actual published FHIR/CSV data | Configured FHIR terminology server; public trial covers selected international codes |
-| German products / ingredients / forms | Authorised PZN, ASK, EDQM/CAS catalogues | Own server or [MII SU-TermServ with client certificate](docs/lookups.md#mii-client-certificates), according to coverage |
-| Local LIS codes/units | Your actual CSV/SQLite/FHIR catalogue | Your terminology API |
+| LOINC | Public trial FHIR API by default; official API/account or local full catalogue configurable | Code, display, axes and documented example units |
+| NLM UCUM | Live validation/conversion API | Syntax and dimensional conversion; not the correct analyte |
+| BfArM German LOINC/UCUM supplements | **You download/extract them manually**, then configure their paths | German labels for the stated base edition; not a complete code catalogue or syntax engine |
+| UCUM candidate catalogue | Explicit `catalog-init`: official UCUM definitions + published common expressions | Candidates for spelling review; UCUM has infinitely many expressions |
+| Ollama model | Explicit `model-init`: configured Ollama model registry | Local inference; no terminology authority |
+| MII/FHIR packages | Explicit `validator-init`: pinned package registry versions | Structure/binding rules for local Matchbox validation |
+| Europe PMC / PubMed | APIs during A3; abstracts and metadata | Quoted reported measurements/intervals, with applicability still to review |
 
-[Download paths, credentials and exact TOML entries](docs/index.html#terminology) · [Full source inventory](docs/lookups.csv).
+[Download origins, manual BfArM setup and optional local Blaze server](docs/index.html#terminology). Credentials belong in ignored `.env` or secret files; TOML holds their variable/file names. Public starter APIs need no credentials. A bearer-token setting is only needed for the selected authenticated service.
 
-BfArM translations are **supplements**: they do not replace full LOINC membership or a UCUM grammar service. DDD is classification context, not a patient dose limit. Use `terminology.strategy="fallback"` for local-first routing; `"all"` cross-checks every **enabled source matching the actual system**. Missing coverage and disagreements remain visible.
+Blaze can run in the same Compose stack and retain its database. It serves built-in LOINC membership and supported installed CodeSystems/ValueSets. The pinned service's LOINC lookup lacks axes/example units, so the local-server recipe keeps a full LOINC API for those checks. BfArM translation supplements remain local label evidence; do not assume that uploading a supplement installs its base terminology. NLM remains the conversion API. Optional `package-check` checks release metadata without downloading archives or changing pinned versions.
 
-## D. Clinical domain and target guide
+## D · Scope and review
 
-| Data to review | Starter | What to preserve |
-| --- | --- | --- |
-| Laboratory Observation | `pipeline.example.toml`, MII Laboratory 2026.0.3 | Code/system/edition, analyte, value or observed bounds, unit/system, all reference ranges/context |
-| Medication product | `examples/medication/product.toml` | Product/form/ingredients, strength, status; no dose required |
-| MedicationRequest | `examples/medication/request.toml` | Product plus every prescribed dose/unit/route/timing instruction |
-| MedicationAdministration | `examples/medication/administration.toml` | Product plus given dose/rate, actual duration, status |
-| MedicationStatement | `examples/medication/statement.toml` | Product plus reported use/dosage/status; not evidence of administration |
+The active workflow is quantitative **laboratory Observation**, with MII KDS Laboratory 2026.0.3 or base FHIR R4. Full-resource validation uses local Matchbox/HL7 with pinned packages, before aggregation. Scalar summaries cannot prove full FHIR conformance. [Validation setup](docs/validation.md).
 
-Medication starters select MII Medication 2026.0.1. [Each profile's commands and limits](docs/index.html#profiles) include its native FHIR recipe. Quantitative laboratory Observations are supported; other Observation domains are not yet implemented.
+The report records configuration, input mapping, assumptions, methods and actual sources per item. Review source → linked definition → proposed code/name/unit/transform → quoted evidence. Confirm specimen, method, population and every reference range before approving. Out-of-range results alone do not prove a semantic error. [Clinician feedback](docs/research.md#clinician-feedback) · [Position alongside MII quality checks](docs/mii-quality.md).
 
-The guide defines target elements and bindings; it does not supply API credentials or prove that an enabled server covers a system. Use the code's **actual system and edition**. For medication, ATC classifies; PZN identifies a German pack; SNOMED/UNII/ASK and selected RxNorm concepts identify ingredients; EDQM describes form/route; UCUM checks quantities. RxNorm is an optional international source, not a required MII binding. [Exact roles, codes and sources](examples/medication/README.md#terminology-walkthrough).
+Medication A1 is available for technical terminology and quantity review; further medication development is deferred. [Choose a medication example, run it and interpret its open points](examples/medication/README.md).
 
-### Run the examples across domains
+## Run examples and inspect reports
 
 ```sh
-# Preview, then run A1 for lab + four medication types + a terminology showcase
-bash tools/run-podman-examples.sh --lookup-only --dry-run
-bash tools/run-podman-examples.sh --lookup-only
+# Four active laboratory scenarios: A1, full FHIR validation, A2, A3
+bash tools/run-podman-examples.sh --lab-only
 
-# Optional: also run lab FHIR validation, A2 and A3 (nine reports total)
+# All nine scenarios, including five medication examples
 bash tools/run-podman-examples.sh
 ```
 
-Open the new `output/podman-examples-…/index.html`; every scenario has its own CSV/HTML and audit. The script uses **public example TOMLs**, not your private root configuration. It reuses images and persistent model volumes. Lookup-only needs neither Ollama nor Matchbox. Missing German/licensed data stays unknown; synthetic source data never supplies its own lookup evidence. [Single-example Python/Docker/Podman commands](docs/index.html#profiles).
-
-## Read, audit and review
-
-Every report starts with **Configuration and methods**: selected A–D choices, input mapping/defaults, target profile, configured sources, model/research settings and output. Credential values and connection strings are excluded.
-
-Each row has **How this item was assessed**: source counts/IDs where retained, applied methods/results, assumptions and limitations, actual lookup evidence/editions, and the next improvement step. The CSV stores this in `assessment_context_json`; the summary stores the shared `run_context`. A configured service is not evidence that it was used. AI reports identify inherited A1 verdicts separately from newly researched proposals.
-
-HTML shows source → linked data → proposal and citations beside each set. CSV is the full result; HTML previews at most 2,000 rows. Keep `.summary.json`, `.evidence.jsonl`, `.audit.jsonl` and any AI `.trace.jsonl` together. Logs support `--log-level DEBUG|INFO|WARNING|ERROR`; console progress omits credentials and clinical values.
+Add `--dry-run` for the plan or `--lookup-only` to omit model/validator setup. The script uses public example TOMLs, writes a new `output/podman-examples-…/index.html`, and stops its own services afterward. It retains images and volumes. Stop a manually started Ollama service first if it uses the same model volume:
 
 ```sh
-podman-compose run --rm run-plausibility-check verify /app/output/01-lookup.audit.jsonl
+podman-compose --profile research stop ollama
 ```
 
-[Report interpretation](docs/index.html#output) · [Clinician feedback](docs/research.md#clinician-feedback) · [Position alongside MII quality checks](docs/mii-quality.md).
+Each report has separate CSV/HTML, summary, evidence and audit; research also has `.studies.csv` and `.trace.jsonl`. `summary.tsv` reports process outcomes, not clinical correctness. Keep sidecars together. Logs support `--log-level DEBUG|INFO|WARNING|ERROR`; values/IDs are not sent to public searches.
 
 ## Architecture and decision flow
 
@@ -154,41 +156,27 @@ podman-compose run --rm run-plausibility-check verify /app/output/01-lookup.audi
 
 ![Decision flow](docs/decision-flow.svg)
 
-[Input → grouping → report](docs/batch-flow.svg). The batch walkthrough above covers all implemented domains; live message interception remains future work. [Operation and storage](docs/shipped-stack.md#storage-and-persistent-data).
+[Input → grouping → report](docs/batch-flow.svg). No live message interception is implemented.
 
-## Library, versions and publishing
+## Library and publishing
 
 ```python
 from semantic_plausibility import run_plausibility_check
 result = run_plausibility_check("pipeline.toml", output="output/review.csv")
 ```
 
-Python 3.14; DuckDB 1.5.6; optional psycopg 3.3.6. Exact dependencies: `uv.lock`. [Implementation and tests](docs/implementation.md).
+Python 3.14; DuckDB 1.5.6; optional psycopg 3.3.6. Exact versions: `uv.lock`. [Implementation/tests](docs/implementation.md).
 
 ```sh
 git status --short
-git diff --stat
+git diff --check
 git add -A
 git diff --cached --stat
 git diff --cached --check
-git commit -m "Add domain examples and transparent assessment reports"
+git commit -m "Improve laboratory statistics, evidence transparency and input examples"
 git push origin main
 ```
 
-After pushing, test all **nine** shipped examples:
+Inspect staged files. `.env`, private root TOMLs, `local/`, `output/`, caches and builds are ignored. Keep hospital exports and downloaded catalogues in `local/` or sibling `../input/`. Do not prune volumes or use `down --volumes` to reclaim image space. [Storage](docs/shipped-stack.md#storage-and-persistent-data).
 
-```sh
-podman info
-# If your manual Ollama service is running, stop it before the example stack uses the same model volume.
-podman-compose --profile research stop ollama
-bash tools/run-podman-examples.sh --dry-run
-bash tools/run-podman-examples.sh
-```
-
-If `podman info` fails on macOS/Windows, start your existing machine with `podman machine start`. The script builds changed images once, prepares the pinned lab validator, reuses/downloads the configured Ollama model (`ministral-3:3b`) and runs literature retrieval with **Europe PMC and PubMed**. It uses the public example TOMLs, not private `pipeline.toml`. No API key is needed for those default public services. CPU inference can take many minutes.
-
-Open the new `output/podman-examples-…/index.html`. Its `summary.tsv` records command outcomes; each scenario has a separate report directory. Inspect configuration, per-item evidence and model-call failures inside each report: “completed” does not mean every finding passed or every AI answer was accepted. The script stops its own services at the end and keeps images, model weights and volumes. Do not use volume pruning or `down --volumes` for this workflow.
-
-Inspect staged files. `.env`, private root TOMLs, `local/`, `output/`, caches and builds are ignored. Store exports/downloads in `local/` or sibling `../input/`. If macOS reports “Operation canceled”/“mmap failed”, inspect the affected file with `ls -lO`; iCloud placeholders need **Keep Downloaded**, including `.git`. Prefer future clones outside synced Documents/Desktop.
-
-Apache-2.0; separate terminology and model licences apply.
+Apache-2.0; separate terminology/model licences apply.

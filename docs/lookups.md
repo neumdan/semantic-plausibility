@@ -13,7 +13,7 @@ Choose **per lookup**; a run can combine local labels with API validation. Labor
 
 | Route | One-time setup | Reference in TOML | During a batch |
 | --- | --- | --- | --- |
-| **A — downloaded/local data** | Download a pinned FHIR package with `package-init`, install real FHIR JSON yourself, or provide an actual CSV/SQLite catalogue | `type="fhir_artifacts"`, `"loinc_csv"`, `"csv"` or `"sqlite"`; `path`, `systems`, `enabled=true` | Read the selected local files; no download occurs |
+| **A — downloaded/local data** | Manually download/extract official FHIR JSON, or provide an actual CSV/SQLite catalogue | `type="fhir_artifacts"`, `"loinc_csv"`, `"csv"` or `"sqlite"`; `path`, `systems`, `enabled=true` | Read the selected local files; no download occurs |
 | **B — API** | Choose the appropriate adapter/endpoint; obtain credentials when required | `type`, `endpoint`, `enabled=true`; `systems` for generic sources; credential environment/file references | Request and cache results from the explicitly enabled service |
 
 For A, keep installed terminology under `local/terminologies/`. A package's `[packages.NAME].path` and its `[lookups.NAME].path` must refer to the same installation. Existing FHIR artifacts need only the lookup table. CSV catalogues require `system,code`; optional `version,display` are supported. SQLite requires `codes(system,code,version,display)`.
@@ -121,15 +121,10 @@ podman-compose run --rm run-plausibility-check lookup --lookup mii_termserv --sy
 
 ## Germany and Europe
 
-BfArM/gematik publishes versioned FHIR R4 **packages** through an [NPM-compatible package API](https://terminologien.bfarm.de/fhirpackages.html). The runner now downloads pinned editions explicitly and reads their CodeSystems, label supplements and expanded ValueSets locally. The registry is a package service; it is not assumed to expose `$validate-code`.
+BfArM/gematik publishes versioned FHIR R4 [packages](https://terminologien.bfarm.de/fhirpackages.html). For the laboratory workflow, **download and extract these manually** after reviewing the conditions. Reference the actual directory with `lookups.bfarm_lab`; the check never downloads BfArM archives or accepts conditions. Keep package metadata, licences and exact edition alongside the JSON. [Step-by-step setup and optional local Blaze](index.html#terminology).
 
-Austria's ELGA TerminoloGit offers public terminology artifacts and versioned releases. Import the exact relevant edition; the old `termpub` service is not the current publication channel. [ELGA documentation](https://www.elga.gv.at/technischer-hintergrund/technische-elga-leitfaeden/).
+`package-check --config …` checks registry release metadata only. Enable `[terminology] check_updates=true` plus exact `[packages.*]` pins to record that check at the start of each run. A newer edition is a notice, not an automatic update. `package-init` remains a separate legacy explicit installer; it is not part of this manual laboratory workflow.
 
-WHO ATC offers a free searchable index, while complete downloads use registered access and its ordering portal. Its codes can be checked by the medication adapter using a configured FHIR service or a properly licensed local catalogue. [WHO Centre access](https://atcddd.fhi.no/atc_ddd_index_and_guidelines/atc_ddd_index/).
-
-EMA SPOR has read-only browser access and version-specific account/role requirements for its APIs. Its dedicated API is listed as **known, not implemented**; it is not a FHIR terminology endpoint. [EMA SPOR](https://spor.ema.europa.eu/).
-
-SNOMED CT content needs the appropriate licence and edition. A public browser is not a production service guarantee. EBI OLS provides ontology lookup; its dedicated API also requires an adapter rather than being treated as FHIR.
 
 ## German packages and labels
 
@@ -291,17 +286,12 @@ uv run --no-sync --env-file .env run-plausibility-check lookup --config pipeline
 
 BfArM publishes the German ATC/DDD package **`bfarm.terminologien.atcgm`**; package **2026.0.0** contains CodeSystem edition **2026**, canonical **`http://fhir.de/CodeSystem/bfarm/atc`**. Its `ddd` concept property is a publisher-provided string. See the [package catalogue](https://terminologien.bfarm.de/fhirpackages.html) and [official ATC resource description](https://terminologien.bfarm.de/CodeSystem-atcgm-2026.html).
 
-1. Copy `terminology.example.toml` to ignored `terminology.toml`.
-2. Enable `[packages.atc_de]`. Read the [ATC download conditions](https://terminologien.bfarm.de/bfarm.terminologien.atcgm-conditions.html); set `accept_download_conditions=true` only if you accept them.
-3. Install that selected package:
+For the existing medication A1 checks, use a **manual download**, just as for the laboratory supplements:
 
-```sh
-uv run --no-sync --env-file .env run-plausibility-check package-init --config terminology.toml --package atc_de
-```
-
-For containers, select `SQC_CONFIG_FILE=terminology.toml` in `.env`, then use `podman-compose --profile terminology run --rm package-init` (or `docker compose …`). Restore `SQC_CONFIG_FILE=pipeline.toml` afterwards. Only enabled packages are installed. If you already downloaded/extracted the package, step 3 is unnecessary.
-
-4. Add this lookup to the **medication check's TOML**, then run its `config-check` and `check`:
+1. Open the official package catalogue and the [ATC download conditions](https://terminologien.bfarm.de/bfarm.terminologien.atcgm-conditions.html). Review and accept the conditions yourself, if appropriate.
+2. Download the required exact edition and extract its actual FHIR JSON files into ignored `local/terminologies/atc-2026/`. Retain metadata and licences. Skip this if your files are already installed; no synthetic catalogue is provided.
+3. Enable a file lookup in the **medication check's TOML** as below, or enable its existing `lookups.downloads` block with that path/system. Do not add two identical sources accidentally.
+4. Run that recipe's `config-check`, then `check`. Local reading needs no API secret. An authenticated terminology API is an alternative; configure its endpoint/system/credential reference explicitly.
 
 ```toml
 [lookups.atc_de]

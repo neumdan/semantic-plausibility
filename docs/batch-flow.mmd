@@ -1,24 +1,24 @@
 %% Same node/edge contract as batch-flow.svg.
 flowchart TD
     CSV["CSV / LIS / CDS Hub DB<br/>Individual or distinct source rows<br/>Column map + actual source counts<br/>Read-only site-specific view"]
-    FHIR["Complete FHIR documents<br/>Bundle / array / NDJSON / JSON<br/>or resource_json in a CSV cell<br/>Resolve exported Medication locally"]
-    CONFIG["D · Explicit domain selection<br/>Observation / MedicationRequest<br/>or Medication / Admin / Statement<br/>TOML profile, lookups and secrets"]
+    FHIR["Complete FHIR documents<br/>Bundle / array / NDJSON / JSON<br/>or resource_json in a CSV cell<br/>Preserve every reference context"]
+    CONFIG["D · Laboratory Observation<br/>MII guide or base FHIR R4<br/>Explicit mapping and editions<br/>TOML; secrets in separate files"]
     LAB["Laboratory semantic set<br/>code + system/edition + analyte/name<br/>value or observed bounds + unit/system<br/>Every reference range and its qualifiers<br/>Specimen, method, comparator and modifiers"]
-    MED["Medication semantic set<br/>Product + system/edition + form/ingredients; DDD context<br/>Strength + all dose/unit, route and timing data<br/>Status/intent + actual duration + modifiers<br/>No averaging different doses or regimens"]
+    STATS["Supplied aggregate statistics<br/>Same laboratory semantic context as the source set<br/>Count + mean + sample SD + minimum + maximum<br/>Each statistic has its declared measurement unit<br/>Pool only disjoint groups with sufficient information"]
     GROUP["Choose output representation<br/>distinct: complete guarded sets + known counts; laboratory numeric distributions<br/>items: individual inputs with original resource/database ID and source locator<br/>Missing counts and unresolved references remain explicit; no missing context is invented"]
-    CHECK["Domain checks → CSV + HTML with sources<br/>Lab: lookups, code–unit–range fit; optional local AI and literature evidence<br/>Medication: terminology + numeric/dimensional dose checks and conditional calculations"]
-    REVIEW["Clinician review of the complete set<br/>Each source set → linked definitions → explanations, transformations and sources<br/>FHIR validation is separate and applies only to full resources; input stays unchanged<br/>Clinical dose safety and medication AI/evidence research are not implemented"]
+    CHECK["Laboratory checks → CSV + HTML with sources<br/>Lookups, code–unit–context fit; optional local AI and literature evidence<br/>Study CSV: quotations, statistic roles, units, sources and extraction failures"]
+    REVIEW["Clinician review of the complete set<br/>Each source set → linked definitions → explanations, transformations and sources<br/>FHIR validation is separate and applies only to full resources; input stays unchanged<br/>Terminology validity, numerical readiness and clinical correctness stay separate"]
     CSV --> LAB
-    CSV --> |"selected type"| MED
+    CSV --> |"summary rows"| STATS
     FHIR --> LAB
-    FHIR --> MED
-    CONFIG -.-> MED
+    FHIR --> STATS
+    CONFIG -.-> STATS
     LAB --> GROUP
-    MED --> GROUP
+    STATS --> GROUP
     GROUP --> CHECK
     CHECK --> REVIEW
     classDef normal fill:#f3f7fa,stroke:#c4d5df,color:#142d42
-    class CSV,FHIR,CONFIG,LAB,MED,GROUP,REVIEW normal
+    class CSV,FHIR,CONFIG,LAB,STATS,GROUP,REVIEW normal
     classDef teal fill:#eef7f4,stroke:#a8cfc6,color:#142d42
     class CHECK teal
     classDef error fill:#fcf1f3,stroke:#ecc7cf,color:#142d42

@@ -169,8 +169,7 @@ class LaboratorySuggestions:
                 row["context_conflicts"].append("multiple_candidate_editions")
         if self.llm and any(row["selectable"] for row in result["coding_candidates"]):
             # Send a small evidence projection, never patient data or the complete lookup response.
-            shortlist = [{key: row[key] for key in ("code", "display", "names", "axes", "unit_fit",
-                "context_conflicts", "missing_context", "selectable")} for row in result["coding_candidates"]]
+            shortlist = model_shortlist(result["coding_candidates"])
             try:
                 choice = self.llm.json(prompts.LOINC_REVIEW, {"input_names": names, "source_unit": unit,
                     "specimen": specimen, "method": method, "source_axes": source_axes, "candidates": shortlist})
@@ -201,3 +200,12 @@ class LaboratorySuggestions:
                 result.append(label)
                 seen.add(label["name"])
         return result[:30]
+
+
+def model_shortlist(candidates):
+    """Retain all candidates in reports; send only selectable definitions to the model."""
+    return [{**{key: row[key] for key in ("code", "display", "names", "context_conflicts", "missing_context", "selectable")},
+             "axes": {key: value for key, value in row["axes"].items() if key != "axis_sources"},
+             "unit_fit": {key: value for key, value in row["unit_fit"].items()
+                          if key in {"class", "target", "factor", "interpreted_source_unit", "source_unit_mapping_verified", "factor_from_original"}}}
+            for row in candidates if row["selectable"]]

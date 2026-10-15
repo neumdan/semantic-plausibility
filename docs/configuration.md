@@ -2,16 +2,16 @@
 
 ## Configure in four categories
 
-Start with the [step-by-step manual](index.html). This page is the field reference; choose one entry in each category:
+Start with [“Which data do you have?”](../README.md#which-data-do-you-have) and one working example. Laboratory is the primary workflow. Medication A1 is available for technical terminology and quantity review; further medication development is deferred. This page is the technical field reference; choose one entry in each category:
 
 | Category | Select | Settings / command |
 | --- | --- | --- |
 | **A. Plausibility level** | A1 lookup-only; A2 AI-supported lookup; A3 AI-supported evidence | `check`; optionally `research-evidence --scope lookup` or `--scope studies` on the original checked report |
 | **B. Input** | CSV, PostgreSQL/SQLite, native FHIR or server export | `[input]`, `[input.columns]`, `[database]`, `[output]` |
 | **C. Lookup / terminology sources** | Downloaded catalogues, enabled APIs, or a combination | `[lookups]`, `[terminology]`, `[network]`; credential references only |
-| **D. Clinical domain** | Laboratory Observation or Medication / Request / Administration / Statement | `general.RESOURCE_TYPE`, `[specification]`, optional `[validation]` |
+| **D. Clinical domain** | Quantitative laboratory Observation (A1–A3); Medication / Request / Administration / Statement (A1 only) | `general.RESOURCE_TYPE`, `[specification]`, optional `[validation]` |
 
-FHIR validation is independent: `[validation]` applies to complete resources, not scalar aggregates. A2/A3 currently support laboratory Observations only. Model settings belong in `[models]`; study APIs/budgets in `[research]`. **Use one TOML for all three levels**, and keep `.env`/secret files for credentials. No shell exports are needed.
+FHIR validation is independent: `[validation]` applies to complete resources, not scalar aggregates. A2/A3 currently support laboratory Observations only. Model settings belong in `[models]`; study APIs/budgets in `[research]`. **For laboratory, use one TOML for all three levels**, and keep `.env`/secret files for credentials. No shell exports are needed.
 
 Map actual source facts: a local LIS test identifier stays local until reviewed. Profiles supply target rules, not a guess about source column meanings. Reports are CSV/HTML; automatic FHIR/OMOP/database output writers are not implemented. All relative paths resolve from the selected TOML. [Every supplied profile recipe](index.html#profiles) · [Input walkthroughs](index.html#input) · [Download/API walkthroughs](index.html#terminology).
 
@@ -47,7 +47,7 @@ These sections cover the supported workflow. Unknown settings are rejected. Use 
 | `output` | `path`, `mode`, `overwrite`, `include_distribution`, `lookup_pack` | CSV report prefix, item/group mode and optional captured evidence |
 | `network` | `mode`, `allowed_http_hosts` | Offline/connected lookups and explicit local plain-HTTP hosts |
 | `lookups.NAME` | `enabled`, `role`, `type`, `endpoint` or `path`, `systems` | Real primary/source/optional terminology services |
-| `packages.NAME` | Registry, name, exact version, path, acceptance | Optional explicit BfArM package installation |
+| `packages.NAME` | Registry, name, exact version, path, acceptance | Exact pins for optional release metadata checks; laboratory downloads are manual |
 | `models.NAME` | Runtime, native URL reference, `container_base_url`, model ID, budgets | Optional local inference endpoint |
 | `research` | Scope, providers, per-LOINC budget, catalogue | Separate page/study evidence retrieval |
 | `quality` | `review_registry`, optional `concept_map` | Reviewed local mappings; clinician registry is the feedback route |
@@ -353,3 +353,9 @@ The inventory never enables a service automatically. Missing code/system, uncove
 `run_context` in the summary is a whitelist of effective settings: A–D choices, input column/element/table selection, defaults/context, profile, grouping, source aliases, credential mechanism (not its values), model/scope and output. URL credentials/query strings are omitted from this projection. It is not a copy of TOML or the process environment.
 
 Each CSV row's `assessment_context_json` references the configuration hash and records input accounting, method results, assumptions, actual lookup evidence, validation scope and the next improvement step. Individual mode retains IDs; distinct mode does not. Defaults are disclosed as configured source assertions; the adapter does not track which individual fields originally used each default. Research reads the audited A1 report, records its original input/configuration, and keeps its verdict separate from new candidates. New model/retrieval events are counted per item; cached results may be reused without a new call. Existing reports without these fields are never retroactively assigned today's settings.
+
+## Laboratory summary statistics
+
+Map `value_mean`, `value_sd`, `value_min`, `value_max` and optional corresponding `*_unit` roles in `[input.columns]`. Map `count` only when it is the actual number of contributing source observations. Missing statistic-unit mappings use the declared measurement unit. Mixed supplied units, nonfinite numbers, negative SD and contradictory mean/bounds fail preflight. SD is sample SD, not SE. Matching disjoint groups can be pooled with sufficient counts/SD; missing information is not inferred. [Working CSV/DB examples](../examples/lab/README.md).
+
+`[terminology] check_updates=true` performs metadata-only version checks for enabled `[packages.*]` entries. Pins and files are never changed; defaults leave the check off. `package-check` runs it separately.

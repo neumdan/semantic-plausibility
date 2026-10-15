@@ -1,0 +1,23 @@
+# Optional synthetic PostgreSQL source. No hospital connection; no host DB port.
+services:
+  example-postgres:
+    image: docker.io/library/postgres:17.10-bookworm
+    profiles: [laboratory-inputs]
+    environment:
+      POSTGRES_DB: laboratory
+      POSTGRES_USER: ${EXAMPLE_DB_USER:?Set EXAMPLE_DB_USER in .env}
+      POSTGRES_PASSWORD: ${EXAMPLE_DB_PASSWORD:?Set EXAMPLE_DB_PASSWORD in .env}
+    volumes:
+      - lab_example_postgres:/var/lib/postgresql/data
+      - ./examples/lab/postgres-init.sql:/docker-entrypoint-initdb.d/01-lab.sql:ro
+      - ./examples/lab/aggregated.csv:/seed/aggregated.csv:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d laboratory"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    mem_limit: 512m
+    networks: [default]
+    restart: "no"
+volumes:
+  lab_example_postgres:

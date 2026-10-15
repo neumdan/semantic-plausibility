@@ -36,7 +36,7 @@ podman-compose --profile validation ps
 
 For Docker replace `podman-compose` with `docker compose`. Matchbox depends on local Blaze for terminology checks. Allow the first build/start to finish; inspect `podman-compose --profile validation logs --tail=30 matchbox` if it is not healthy. Access the local Matchbox interface at `http://127.0.0.1:8081/matchboxv3/`.
 
-For later runs with the same guide, use `podman-compose --profile validation up -d blaze matchbox` and then the check command. This reuses the image and Blaze volume. The [example launcher](../README.md#architecture-and-decision-flow) handles these reuse/build decisions automatically.
+For later runs with the same guide, use `podman-compose --profile validation up -d blaze matchbox` and then the check command. This reuses the image and Blaze volume. The [example launcher](../README.md#run-examples-and-inspect-reports) handles these reuse/build decisions automatically.
 
 Allocate **16 GiB** to the Docker/Podman VM when running the 3B Ollama model and validation together; Matchbox is limited to 4 GiB and Blaze to 2 GiB. On macOS, a stopped Podman machine can be resized:
 
@@ -51,6 +51,8 @@ Stop active workloads before resizing. Native Linux uses host memory and does no
 ## Two concrete FHIR examples
 
 The [complete illustrative Bundle](../examples/fhir/laboratory-valid.bundle.json) contains a Patient, Organization and hemoglobin Observation. The Observation has the MII-required OBI identifier and assigner, both laboratory category codings, subject, effective time and UCUM Quantity. The reference bounds illustrate conversion only.
+
+**Expected positive result:** the valid Bundle produces `passed` or `passed_with_warnings` with no validation errors when the pinned guide and its terminology are available. Missing narrative/performer warnings are distinct from a failed setup.
 
 The [invalid variant](../examples/fhir/laboratory-invalid.bundle.json) removes that required identifier. The analyte/unit/value set is otherwise identical: semantic numeric readiness cannot detect the missing identifier, whereas full MII profile validation can.
 
@@ -124,4 +126,4 @@ Sources: [Matchbox validation API](https://ahdis.github.io/matchbox/validation/)
 
 ## Medication profiles
 
-`examples/medication/request-fhir.toml` and `administration-fhir.toml` select MII Medication 2026.0.1. Generate and rebuild the validator using the chosen medication configuration before running it. The requested canonical profile is attached to copies of the selected resource type only; linked Medication and Patient resources are preserved for full Bundle validation. Original input is unchanged. The small supplied Bundles are synthetic validation inputs, not claimed MII-conformant examples. See the [medication commands and limits](../examples/medication/README.md#full-validation-and-real-catalogues). Without an explicit guide, the fallback is the corresponding international R4 resource profile. Scalar medication sets and direct database JSON receive semantic checks only.
+`examples/medication/request-fhir.toml` and `administration-fhir.toml` select MII Medication 2026.0.1. Generate and rebuild the validator using the chosen medication configuration before running it. The requested canonical profile is attached to copies of the selected resource type only; linked Medication and Patient resources are preserved for full Bundle validation. Original input is unchanged. The small supplied Bundles are advanced diagnostic inputs with expected missing-data/coverage findings, not an installation acceptance test or claimed MII-conformant examples. Start medication with its A1 CSV recipe; use the laboratory valid/invalid pair above to check the validator installation. See the [medication commands and limits](../examples/medication/README.md#full-validation-and-real-catalogues). Without an explicit guide, the fallback is the corresponding international R4 resource profile. Scalar medication sets and direct database JSON receive semantic checks only.

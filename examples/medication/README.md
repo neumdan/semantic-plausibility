@@ -2,27 +2,40 @@
 
 Executable adapters for **Medication**, **MedicationRequest**, **MedicationAdministration** and **MedicationStatement**, using FHIR R4. The examples select the published **MII Medication 2026.0.1** guide. All example clinical/formulation data are synthetic input. No synthetic terminology responses or drug catalogue are supplied.
 
-## Run once
+## Choose your data
 
-From the repository root, after the [standard setup](../../docs/shipped-stack.md#first-setup):
+**Laboratory is the primary workflow. Medication A1 is available for technical terminology and quantity review; further medication development is deferred.** Use these examples to inspect source codes, quantities and conditional calculations. Medication AI, literature research, clinical dose assessment and clinician-registry reuse are not implemented. These checks need no Ollama.
+
+| What do I have? | Recipe in this folder | Expected rows / report | Intended check |
+| --- | --- | --- | --- |
+| Product/ingredient description | `product.toml` → Medication | 2 → `output/medication-product.html` | Codes, units and declared strength; no dose requirement |
+| Prescription/order | `request.toml` → MedicationRequest | 3 → `output/medication-request.html` | Structured dose/timing and conditional strength calculation |
+| Documented administration | `administration.toml` → MedicationAdministration | 2 → `output/medication-administration.html` | Dose/rate/duration consistency when constant delivery is asserted |
+| Reported medication use | `statement.toml` → MedicationStatement | 2 → `output/medication-statement.html` | Source use statement and dosage structure; no administration proof |
+| Several medication terminology systems | `terminology.toml` → Medication | 2 → `output/medication-terminology.html` | Ingredient/product/form codes routed to their configured services |
+
+## First medication test
+
+1. Complete the [root setup](../../README.md#first-test--podman) once (runner image, `.env`, `pipeline.toml`, input/output folders).
+2. Start with the supplied prescription CSV. No private terminology download or credentials are needed for its configured public APIs:
 
 ```sh
-uv run --no-sync --env-file .env run-plausibility-check --config examples/medication/request.toml
-uv run --no-sync --env-file .env run-plausibility-check --config examples/medication/administration.toml
-uv run --no-sync --env-file .env run-plausibility-check --config examples/medication/statement.toml
-uv run --no-sync --env-file .env run-plausibility-check --config examples/medication/product.toml
+podman-compose run --rm run-plausibility-check config-check --config /app/examples/medication/request.toml
+podman-compose run --rm run-plausibility-check check --config /app/examples/medication/request.toml
 ```
 
-Equivalent container calls (same files and output):
+3. Open **`output/medication-request.html`** and read each item's summary, then its sources. Successful execution produces **three rows** plus CSV/HTML/summary/evidence/audit. With responsive services, all three still require review: product strength is source-declared, one code is local, and one dose says “tablet” for a liquid. These open points are expected; they do not mean installation failed.
+4. For the first source set, expect **5 mL at a declared 20 mg/1 mL → conditional 100 mg** when NLM verifies the units. This is a consistency calculation, not a recommended dose. If it is absent, inspect `unit_check`, lookup coverage and connection errors; no result is substituted.
+5. For another kind of data, replace `request.toml` with the selected recipe above. The administration example deliberately includes one inconsistent constant infusion. A supported mismatch should produce `error`; without required lookup evidence it stays under review.
+
+**Docker:** replace `podman-compose` with `docker compose` in both commands. **Python**, after `uv sync --locked --no-editable`:
 
 ```sh
-docker compose run --rm run-plausibility-check check --config /app/examples/medication/request.toml
-podman-compose run --rm run-plausibility-check check --config /app/examples/medication/administration.toml
+uv run --no-sync --env-file .env run-plausibility-check config-check --config examples/medication/request.toml
+uv run --no-sync --env-file .env run-plausibility-check check --config examples/medication/request.toml
 ```
 
-Open `output/medication-request.html`, `medication-administration.html`, `medication-statement.html` or `medication-product.html`, with the matching CSV. Each set shows source data → terminology check/name → findings → conditional calculations, with source references. Repeat with a new `--out ../../output/medication-request-2.csv`; paths resolve relative to the selected TOML. Python can also call `semantic_plausibility.run_plausibility_check(config_path)` or the repository's `run-plausibility-check.py` wrapper.
-
-These checks do **not** need Ollama. AI/evidence research and clinician-registry reuse currently support laboratory Observations only; medication research is rejected explicitly. Patient-specific dose safety, interactions, renal/weight adjustments and evidence-based dose limits are not implemented.
+Repeat with a fresh output, e.g. container `--out /app/output/medication-request-2.csv` or Python `--out ../../output/medication-request-2.csv`. Paths resolve relative to the selected TOML. The library entry is `semantic_plausibility.run_plausibility_check(config_path)`. Patient-specific dose safety, interactions and renal/weight adjustments are unassessed.
 
 ## What the examples demonstrate
 
@@ -119,19 +132,42 @@ The grouping key retains **product/ingredients/strength + all dosages/routes/tim
 
 ### Full validation and real catalogues
 
-Prepare the validator with the **same medication TOML** before running its FHIR recipe. [Validator setup](../../docs/validation.md#docker-or-podman-setup):
+**Advanced diagnostic examples, not an installation acceptance test.** The supplied `*-fhir.toml` Bundles may intentionally lack MII-required information; terminology coverage can also be incomplete. First establish runner operation with the A1 CSV recipe above. For a positive/negative validator installation check, use the [laboratory validation pair](../../docs/validation.md#two-concrete-fhir-examples).
+
+Then run this complete Podman recipe for a MedicationRequest export. It keeps the same TOML through preparation, terminology installation and checking. Run from the repository root after the standard setup:
 
 ```sh
-uv run --no-sync --env-file .env run-plausibility-check validator-init --config examples/medication/request-fhir.toml --overwrite
-docker compose --profile validation up -d --build blaze matchbox
-uv run --no-sync --env-file .env run-plausibility-check --config examples/medication/request-fhir.toml
+podman-compose --profile validation stop matchbox
+podman-compose --profile validation run --rm validator-init validator-init --config /app/examples/medication/request-fhir.toml --overwrite
+podman-compose --profile validation up -d blaze
+podman-compose --profile validation run --rm terminology-init terminology-init --config /app/examples/medication/request-fhir.toml
+podman-compose --profile validation up -d --build --force-recreate matchbox
+podman-compose --profile validation ps
+podman-compose run --rm run-plausibility-check check --config /app/examples/medication/request-fhir.toml
 ```
 
-Podman: replace `docker compose` with `podman-compose`. `validator-init` generates files only; rebuild Matchbox after changing guide packages. Its `--overwrite` replaces generated validator configuration, not source input. Without a selected guide, validation falls back to the matching international R4 resource. Scalar CSV rows never count as full-resource validation.
+Wait until Matchbox is healthy before the last command; inspect `podman-compose --profile validation logs --tail=30 matchbox` if needed. **Docker:** replace every `podman-compose` with `docker compose`; no Python command is mixed into this setup. `terminology-init` installs only configured real definitions, not missing licensed catalogues. This does not guarantee complete medication binding coverage.
+
+**Expected output:** `output/medication-request-fhir.html` and CSV, plus `.fhir-validation.jsonl` with the validator's OperationOutcomes. `invalid`, `incomplete` or `unavailable` returns exit code 1 with `fail_on_error=true`; inspect whether the cause is missing required input, terminology coverage or an unavailable service. An OperationOutcome about a missing field is a functioning validator detecting a finding, not proof of conformity. These diagnostic examples are not promised to be green. Stop the services afterward with `podman-compose --profile validation stop matchbox blaze`; their volumes remain.
+
+For Administration, Statement or Product, replace **all three** `--config` arguments with `administration-fhir.toml`, `statement-fhir.toml` or `product-fhir.toml`. `--overwrite` replaces generated validator configuration, not source input. After switching back to laboratory, regenerate/rebuild with the laboratory TOML. Without a selected guide, validation uses the corresponding international R4 resource. Scalar CSV rows never count as full-resource validation.
 
 `request.toml` and `administration.toml` enable actual NLM UCUM and a public FHIR terminology test server. Public coverage/availability is not guaranteed, and failure remains `unknown`. For your server, edit `endpoint`, `systems` and `token_env` (secret in `.env`). For downloaded BfArM/other real artifacts, enable `lookups.downloads`, point `path` to their directory and list their **actual** canonical systems. A supplement cannot establish complete membership, and a partial list cannot disprove a missing code. Local CSV catalogues use `system,code,version,display`; SQLite uses the same `codes` table. No strength is inferred from their labels or an ATC lookup.
 
 ## Output and implemented limits
+
+Read the **Item summary** first: source name/form and strength, each supplied dose, conditional calculations, and what still needs review. No model writes this summary; it only formats source fields and existing findings. JSON, element paths and lookup details remain expandable below it.
+
+| Field | Meaning |
+| --- | --- |
+| `status=needs_review` | At least one unresolved/conditional check; a consistent partial calculation can coexist with it |
+| `dose_check=review_required` | Overall dosage review remains open; it does **not** say that a calculation failed |
+| `dose_check=inconsistent` | A dosage/duration/strength finding is an error; inspect its explanation |
+| `dose_check=not_applicable` | Product description without a dose requirement |
+| `clinical_dose_safety=not_assessed` | The checker does not evaluate whether the dose is appropriate for a patient |
+
+A 20 mL/h × 30 min comparison can be numerically consistent with 10 mL while the product strength/route and clinical dose still need review. [Status meanings across workflows](../../docs/data-contract.md#status-meanings-across-workflows).
+
 
 - `status`: `error` for supported inconsistencies, `needs_review` for unknowns/conditional evidence, `passed` only when the implemented checks found no issue. Never clinical approval.
 - CSV keeps the source set, product codings, dosages, counts, terminology states, canonical names, findings, sources and transformations. HTML presents these beside each set. Summary/evidence/audit files accompany it; `verify` checks their hashes.
@@ -140,7 +176,7 @@ Podman: replace `docker compose` with `podman-compose`. `validator-init` generat
 - PRN schedules, titration, rate ranges/ratios and max-dose constraints are preserved and marked for review; no daily total or patient-specific limit is invented. Only rateQuantity × elapsed duration is integrated.
 - Product/form/route **compatibility** is not established merely by valid individual codes. No comprehensive product catalogue, dose appropriateness model, medication AI research or automatic FHIR rewrite is claimed.
 
-A standalone Medication has no dose requirement (`dose_check=not_applicable`). A Statement describes reported medication use; it is not evidence of an administration. `not-taken`, inactive/prohibited states and modifiers suppress dose transformations. Missing structured dosage remains a review task. The two new CSVs contain two distinct source rows each.
+A standalone Medication has no dose requirement (`dose_check=not_applicable`). A Statement describes reported medication use; it is not evidence of an administration. `not-taken`, inactive/prohibited states and modifiers suppress dose transformations. Missing structured dosage remains a review task. The product and statement CSVs contain two distinct source rows each.
 
 The product/statement examples use **German ATC 2026**. Install `bfarm.terminologien.atcgm#2026.0.0`, then enable their `lookups.downloads` pointing at `local/terminologies/atc-2026` (the supplied nested TOMLs use `../../local/…`). Until then code membership remains unknown. Their `ddd_references_json` contains exact published DDD text, edition and source where available; it is never a patient dose limit or a product strength. [Local ATC/DDD setup](../../docs/lookups.md#local-atcddd).
 

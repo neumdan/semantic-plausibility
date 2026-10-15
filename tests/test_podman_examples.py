@@ -36,9 +36,17 @@ class PodmanExampleTests(unittest.TestCase):
             self.assertIn("/examples/lab/fhir-csv.toml", commands[1])
             self.assertIn("/examples/medication/request.toml", commands[4])
             self.assertIn("/examples/medication/administration.toml", commands[5])
-            self.assertLess(result.stdout.index("pc stop matchbox blaze"), result.stdout.index("pc up -d ollama"))
+            self.assertLess(result.stdout.index("stop_services matchbox blaze"), result.stdout.index("pc up -d ollama"))
             self.assertIn("Compose project: semantic-plausibility-examples", result.stdout)
             self.assertNotIn("--build matchbox", result.stdout)
+
+    def test_lab_only_plan_preserves_four_modes(self):
+        result = subprocess.run([shutil.which("bash"), str(SCRIPT), "--lab-only", "--dry-run"], cwd=ROOT,
+                                capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(sum(" --out " in line for line in result.stdout.splitlines()), 4)
+        self.assertNotIn(">>> 05-medication", result.stdout)
+        self.assertNotIn("examples/medication/", result.stdout)
 
     def test_lookup_only_plan_covers_every_domain_without_model_or_validator(self):
         result = subprocess.run(

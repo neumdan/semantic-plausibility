@@ -68,9 +68,39 @@ class MedicationTests(unittest.TestCase):
                 self.assertEqual(verify_audit(result.log)["status"], "verified")
                 self.assertNotIn("source_id", result.csv.read_text().splitlines()[0])
                 self.assertIn("Source:", result.report.read_text())
+                self.assertIn("Item summary", result.report.read_text())
+                self.assertIn("Clinical dose safety is not assessed", result.report.read_text())
                 self.assertNotIn("strength_conversion", result.csv.read_text())
                 with self.assertRaisesRegex(ValueError, "Output already exists"):
                     run_plausibility_check(config)
+
+    def test_readable_report_retains_all_doses_and_escapes_source_text(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            path = configuration(folder)
+            row = deepcopy(input_rows("request")[0])
+            row["product_name"] = '<img src=x onerror="alert(1)"> source name'
+            dose = json.loads(row["dosage_instructions_json"])
+            second = deepcopy(dose[0])
+            second["doseAndRate"][0]["doseQuantity"]["value"] = 7
+            row["dosage_instructions_json"] = json.dumps(dose + [second])
+            source = folder / "source.csv"
+            with source.open("w", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=list(row))
+                writer.writeheader()
+                writer.writerow(row)
+            path.write_text(path.read_text().replace(str(ROOT / "examples/medication-request.csv"), str(source)))
+            result = run_plausibility_check(path)
+            html = result.report.read_text()
+            self.assertNotIn('<img src=x', html)
+            self.assertIn('&lt;img src=x', html)
+            self.assertIn('instruction 1, entry 1: 5 mL', html)
+            self.assertIn('instruction 2, entry 1: 7 mL', html)
+            self.assertIn('20 mg per 1 mL', html)
+            self.assertIn('No supported dose calculation is available', html)
+            self.assertNotIn('Conditional calculation:', html)
+            self.assertIn('dose_check is an overall review flag', html)
+            self.assertEqual(verify_audit(result.log)["status"], "verified")
 
     def test_malformed_negative_and_string_quantities_and_all_instructions(self):
         with tempfile.TemporaryDirectory() as name:

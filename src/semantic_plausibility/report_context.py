@@ -92,7 +92,7 @@ def compact_sources(checks):
     for check in checks:
         metadata = check.get("metadata") or {}
         artifact = metadata.get("artifact") or check.get("artifact") or {}
-        rows.append({**select(check, ("path", "alias", "system", "code", "state", "reason", "error_type", "checked_at")),
+        rows.append({**select(check, ("path", "alias", "system", "code", "state", "reason", "error_type", "checked_at", "errors", "availability")),
                      "source_sha256": check.get("source_sha256") or artifact.get("source_sha256", ""),
                      "version": metadata.get("version") or check.get("version") or artifact.get("artifact_version", ""),
                      "source": safe_location(check.get("source")),
@@ -149,8 +149,12 @@ def item_context(context, row, detail):
         methods.append({"method": "Terminology candidate review", "result": suggestions.get("state", "not_requested"),
                         "model_used": suggestions.get("model_used", False)})
         candidates = measurement.get("study_candidates", [])
-        methods.append({"method": "Study evidence", "result": "not_requested" if context["research"]["scope"] != "studies" else "retrieved_candidates" if candidates else "no_supported_candidate",
-                        "candidate_count": len(candidates)})
+        from .research_summary import counts
+        study_counts = counts(candidates)
+        methods.append({"method": "Study evidence", "result": "not_requested" if context["research"]["scope"] != "studies" else "supported_extraction" if study_counts["extracted_intervals"] or study_counts["extracted_measurements"] else "retrieved_without_supported_extraction" if candidates else "no_articles",
+                        **study_counts})
+    if row.get("statistics_availability") in {"supplied_summary", "pooled_disjoint_sample_summaries"}:
+        assumptions.append("Supplied SD uses the sample n-1 convention. Counts and disjoint source groups are operator assertions; no median/IQR or reference interval is inferred from mean/SD.")
     if not row.get("frequency_known") or str(row.get("frequency_known")).lower() == "false":
         assumptions.append("Source occurrence count is unknown; no population frequency is inferred.")
     if context["output"].get("mode") == "distinct":
@@ -188,7 +192,7 @@ def run_context_html(summary, csv_name):
     links = ' · '.join('<a href="' + escape(Path(csv_name).with_suffix(suffix).name, quote=True) + '">' + label + '</a>'
                        for suffix, label in ((".summary.json", "Run summary"), (".evidence.jsonl", "Item evidence"), (".audit.jsonl", "Audit log")))
     parts = [('Input and mapping', context['input']), ('Target and grouping', {"target": context['target'], "applied_profile_rules": summary.get('terminology_plan', {}), "grouping": context['grouping']}),
-             ('Configured terminology sources (including disabled sources)', {"strategy": context['lookup_strategy'], "sources": context['configured_lookups']}),
+             ('Configured terminology sources (including disabled sources)', {"strategy": context['lookup_strategy'], "sources": context['configured_lookups'], "release_metadata": summary.get('terminology_updates', {})}),
              ('Validation and research settings', {"validation": context['validation'], "research": context['research']}),
              ('Output and reproducibility', {"output": context['output'], "input_sha256": summary.get('input_sha256'), "software": summary.get('software')})]
     return '<section id="run-configuration"><h2>Configuration and methods</h2><p><b>' + escape(context['level'] + ' · ' + context['resource_type']) + '</b> · ' + escape(context['network_mode']) + '</p><p>Configuration: <code>' + escape(context['configuration_file']) + '</code><br>Configuration SHA-256: <code>' + escape(context['configuration_sha256']) + '</code></p><p>' + escape(context['configuration_scope']) + '</p>' + ''.join('<details><summary>' + label + '</summary>' + _json(data) + '</details>' for label, data in parts) + '<p>' + links + '</p></section>'
@@ -199,6 +203,6 @@ def item_context_html(row):
     if not item:
         return '<p>Assessment context was not captured in this report version.</p>'
     methods = ''.join('<tr><td>' + escape(str(r['method'])) + '</td><td>' + escape(str(r['result'])) + '</td></tr>' for r in item['methods'])
-    sources = ''.join('<tr><td>' + escape(str(r.get('code', ''))) + '<br>' + escape(str(r.get('system', ''))) + '</td><td>' + escape(str(r.get('state', 'unknown'))) + ('<br>' + escape(r['scope']) if r.get('scope') else '') + '</td><td>' + source_html(r.get('source'), version=r.get('version', ''), sha256=r.get('source_sha256', '')) + '</td></tr>' for r in item['lookup_evidence'])
+    sources = ''.join('<tr><td>' + escape(str(r.get('code', ''))) + '<br>' + escape(str(r.get('system', ''))) + '</td><td>' + escape(str(r.get('state', 'unknown'))) + ('<br>' + escape(r['scope']) if r.get('scope') else '') + ('<details><summary>Lookup availability / errors</summary>' + _json(select(r, ('availability', 'error_type', 'errors', 'reason'))) + '</details>' if r.get('errors') or r.get('error_type') or r.get('availability') == 'service_unavailable' else '') + '</td><td>' + source_html(r.get('source'), version=r.get('version', ''), sha256=r.get('source_sha256', '')) + '</td></tr>' for r in item['lookup_evidence'])
     execution = '<h4>Model and research activity for this item</h4>' + _json(item['execution']) if item.get('execution') else ''
     return '<details class="assessment"><summary>How this item was assessed · ' + escape(str(item.get('tuple_id', ''))) + '</summary><p><a href="#run-configuration">Run configuration, mapping and target profile</a> · ' + escape(item['level']) + '<br>Configuration SHA-256: <code>' + escape(item['configuration_sha256']) + '</code><br>Check result basis: ' + escape(item['check_result_basis']) + '</p><h4>Input accounting</h4>' + _json(item['input']) + '<h4>Methods and results</h4><table><tr><th>Method</th><th>Result</th></tr>' + methods + '</table>' + execution + '<p>FHIR validation (run-level): ' + escape(str(item['fhir_validation']['run_state'])) + '. ' + escape(item['fhir_validation']['scope']) + '</p><h4>Assumptions and limits</h4><ul>' + ''.join('<li>' + escape(t) + '</li>' for t in item['assumptions_and_limits']) + '</ul><h4>Lookup evidence and attempts for this item</h4><table><tr><th>Code / system</th><th>Result</th><th>Source / edition</th></tr>' + (sources or '<tr><td colspan="3">No lookup evidence recorded.</td></tr>') + '</table><h4>Output and improvement step</h4><p>' + escape(item['output']['status']) + ': ' + escape(item['output']['next_step']) + '</p><p>See the sourced proposal for candidate fields, explanations and conversion factors. Input data remains unchanged.</p></details>'

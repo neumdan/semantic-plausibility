@@ -5,6 +5,8 @@ import json
 from urllib.parse import urlsplit
 
 from .audit import encoded
+from .aggregate_statistics import quantities
+from .fhir_quality_pipeline import number
 
 
 SET_FIELDS = ["source_data_json", "linked_data_json", "recommendation_set_json",
@@ -24,7 +26,7 @@ def lookup_attempts(item, unit=None):
             if not attempt:
                 continue
             metadata = attempt.get('metadata') or {}
-            row = {key: attempt[key] for key in ('alias', 'type', 'role', 'state', 'source', 'source_sha256', 'error_type', 'reason') if key in attempt}
+            row = {key: attempt[key] for key in ('alias', 'type', 'role', 'state', 'source', 'source_sha256', 'error_type', 'reason', 'errors', 'availability') if key in attempt}
             row.update(system=check.get('system', ''), code=check.get('code', ''),
                        version=metadata.get('version', check.get('version', '')),
                        artifact=metadata.get('artifact', {}))
@@ -62,7 +64,8 @@ def review_set_fields(row, evidence):
     source = {"code": metadata.get("code", {"coding": [{"code": row.get("code"), "system": row.get("code_system")}]}),
               "name": row.get("analyte_name", ""),
               "quantity": metadata.get("quantity", {"unit": row.get("unit"), "code": row.get("unit_code"), "system": row.get("unit_system")}),
-              "values": {key: row.get(key, "") for key in ("value", "value_min", "value_max", "value_mean", "value_se", "value_median", "value_iqr")},
+              "values": {key: row.get(key, "") for key in ("value", "value_min", "value_max", "value_mean", "value_sd", "value_se", "value_median", "value_iqr")},
+              "statistics": quantities(row), "statistics_basis": row.get("statistics_availability", ""),
               "reference_ranges": metadata.get("reference_ranges", document(row.get("reference_ranges_json"))),
               "context": metadata.get("context", {}), "method": row.get("method", ""), "specimen": row.get("specimen", ""),
               "occurrence_count": row.get("occurrence_count"), "frequency_known": row.get("frequency_known"),
@@ -107,6 +110,8 @@ def review_set_fields(row, evidence):
                                    "reason": "Terminology name conditional on the chosen code; do not reinterpret the measured analyte from its value.", "sources": name_sources},
                 "quantity": {"unit": unit, "system": unit_system, "factor": row.get("suggested_factor") or transform.get("factor"),
                              "transformation": transform, "source_values": source["values"],
+                             "source_statistics": quantities(row),
+                             "converted_statistics": quantities(row, number(transform.get("factor")), transform.get("target_unit")) if transform.get("state") == "verified_linear" and number(transform.get("factor")) is not None else {},
                              "reason": "Use the verified transformation for values and each bound; an unresolved spelling/interpretation has no executable factor."},
                 "values": {"comparison_loinc": item.get("loinc_code"),
                            "local_reference": evidence.get("check", {}).get("values", {}).get("local_reference", []),
@@ -169,6 +174,8 @@ def source_set_html(row):
             "coding": data.get("code", {"code": row.get("code"), "system": row.get("code_system")}),
             "quantity": data.get("quantity", {"code": row.get("unit_code"), "system": row.get("unit_system")}),
             "value / bounds": values or {"min": row.get("value_min"), "max": row.get("value_max")},
+            "statistics (each with unit)": data.get("statistics", {}),
+            "statistics basis": data.get("statistics_basis", ""),
             "reference ranges": data.get("reference_ranges", document(row.get("reference_ranges_json"))),
             "context": data.get("context", {}), "specimen": row.get("specimen", ""), "method": row.get("method", ""),
             "source status": data.get("status"), "modifiers": data.get("modifier_extensions"),
@@ -302,7 +309,7 @@ def recommendation_html(row):
     for candidate in evidence:
         kind = candidate.get("evidence_type", "unclassified_discovery")
         if kind == "reported_measurement":
-            label = f"Reported measurement: {candidate.get('reported_value', '') or ''} {candidate.get('unit', '')}"
+            label = f"Reported {candidate.get('value_kind', 'measurement')}: {candidate.get('reported_value', '') or ''} {candidate.get('unit', '')}"
         elif kind in {"reference_interval", "analytical_interval", "documented_extreme"}:
             label = f"{kind.replace('_', ' ').capitalize()}: {candidate.get('low')}–{candidate.get('high')} {candidate.get('unit', '')}"
         else:

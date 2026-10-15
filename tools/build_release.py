@@ -19,6 +19,7 @@ ROOT_FILES = {
     "uv.lock",
     ".python-version",
     "compose.yaml",
+    "compose.examples.yaml",
     ".env.example",
     ".dockerignore",
     ".gitignore",

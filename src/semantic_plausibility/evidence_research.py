@@ -20,6 +20,7 @@ from . import research_prompts as prompts
 from .model_schemas import response_schema
 from .observation_services import PublicEvidenceClient
 from .report_sources import review_set_fields
+from .research_summary import counts, write_studies
 from .report_context import run_context, item_context, execution_position, execution_since
 
 
@@ -54,7 +55,7 @@ def research_plan(config_path, report=None, *, scope=None):
         "europe_pmc_query_filter": config.data.get("research", {}).get("europe_pmc", {}).get("QUERY_FILTER", "") if scope == "studies" else "",
         "system_prompt": prompts.SYSTEM,
         "prompts": {name: {"instruction": getattr(prompts, name), "response_schema": response_schema(getattr(prompts, name))}
-            for name in ("NAME_QUERIES", "LOINC_REVIEW", "UNIT_SPELLING", "UNIT_CANDIDATES", "LOINC_UNITS", "LOINC_RANGES", "STUDY_BOUNDS", "STUDY_MEASUREMENTS", "TERMINOLOGY_CLAIMS")
+            for name in ("NAME_QUERIES", "LOINC_REVIEW", "UNIT_SPELLING", "UNIT_CANDIDATES", "LOINC_UNITS", "LOINC_RANGES", "STUDY_BOUNDS", "STUDY_MEASUREMENTS", "STUDY_EXTRACT", "TERMINOLOGY_CLAIMS")
             if scope == "studies" or not name.startswith("STUDY_")},
         "source_values_and_reference_bounds": "Compared locally; not included in public search/model prompts",
         "execution": "plan_only_no_network_or_model_call"}
@@ -74,7 +75,9 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
     target = config.path_value(output) if output else source.with_name(source.stem + suffix)
     paths = {name: target.with_suffix(suffix) for name, suffix in {
         "csv": ".csv", "summary": ".summary.json", "evidence": ".evidence.jsonl",
-        "trace": ".trace.jsonl", "html": ".html", "audit": ".audit.jsonl"}.items()}
+        "trace": ".trace.jsonl", "studies": ".studies.csv", "html": ".html", "audit": ".audit.jsonl"}.items()}
+    if progress:
+        progress("Outputs: " + str(paths["html"]) + " ; study table: " + str(paths["studies"]) + " ; prompts/results: " + str(paths["trace"]))
     if any(path.exists() for path in paths.values()):
         raise ValueError("Research output already exists; choose a fresh --out prefix")
     if config.path in paths.values() or source in paths.values():
@@ -112,6 +115,8 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
                     try:
                         with (folder / paths["evidence"].name).open("w") as evidence_file:
                             for original_row in original:
+                                if progress:
+                                    progress(f"Group {len(reviewed)+1}/{len(original)} · code {original_row.get('code', 'unmapped')} · source statistics remain local")
                                 execution_start = execution_position(checker)
                                 detail = details[original_row["tuple_id"]]
                                 payload = detail["metadata"]
@@ -128,9 +133,9 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
                                     term = checker.loinc.lookup(target_code["code"], target_code["code_version"])
                                     item["study_candidates"] += [vars(candidate) | {"candidate_loinc": term.code, "candidate_version": term.version}
                                                                 for candidate in checker.evidence.search_studies(term)]
-                                # Also research exactly verified alternative codes for unmapped LIS sets.
+                                # Research a selected, exactly verified alternative; do not expand every unresolved hypothesis.
                                 for candidate in proposals.get("coding_candidates", []):
-                                    if candidate["code"] != item.get("loinc_code") and candidate["selectable"]:
+                                    if candidate["code"] == proposals.get("selected_code") and candidate["code"] != item.get("loinc_code") and candidate["selectable"]:
                                         term = checker.loinc.lookup(candidate["code"], candidate["version"])
                                         found = [vars(c) | {"candidate_loinc": term.code, "candidate_version": term.version}
                                                  for c in checker.evidence.search_studies(term)]
@@ -183,7 +188,7 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
                                 row["assessment_context_json"] = encoded(assessment["assessment_context"])
                                 reviewed.append(row)
                                 if progress:
-                                    progress(f"Completed {len(reviewed)}/{len(original)} groups; {len(item['study_candidates'])} study evidence records for this set.")
+                                    progress(f"Completed {len(reviewed)}/{len(original)} groups; study retrieval/extraction: {counts(item['study_candidates'])}")
                                 evidence_file.write(encoded({"tuple_id": row["tuple_id"], "metadata": payload,
                                     "observed_values": detail["observed_values"], **assessment}) + "\n")
                         evidence = checker.evidence
@@ -205,7 +210,10 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
                                 "model_state": "responses_accepted" if getattr(llm, "audit_records", []) else "no_accepted_response",
                                 "groups_with_code_proposals": sum(bool(row.get("suggested_code")) for row in reviewed),
                                 "groups_with_name_proposals": sum(bool(row.get("suggested_name")) for row in reviewed),
-                                "groups_with_study_evidence": sum(bool(json.loads(row["study_evidence_json"])) for row in reviewed),
+                                "groups_with_retrieved_articles": sum(bool(json.loads(row["study_evidence_json"])) for row in reviewed),
+                                "groups_with_study_evidence": sum(any(c.get("evidence_type") != "unclassified_discovery" and c.get("status") == "candidate" for c in json.loads(row["study_evidence_json"])) for row in reviewed),
+                                "evidence_counts": write_studies(folder / paths["studies"].name, reviewed),
+                                "model_elapsed_seconds": round(sum(c.get("elapsed_seconds", 0) for c in getattr(llm, "trace", [])), 2),
                                 "semantic_correctness": "clinician_adjudication_required", "hospital_database_requeried": False})
                     finally:
                         if checker.terminology:
@@ -218,7 +226,7 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
                     writer.writerows({key: _csv_text(value) if isinstance(value, str) else value for key, value in row.items()} for row in reviewed)
                 write_html(folder / paths["html"].name, reviewed[:2000], summary, paths["csv"].name, paths["audit"].name)
                 summary["output_hashes"] = {paths[key].name: hashlib.sha256((folder / paths[key].name).read_bytes()).hexdigest()
-                                           for key in ("csv", "evidence", "trace", "html")}
+                                           for key in ("csv", "evidence", "trace", "studies", "html")}
                 (folder / paths["summary"].name).write_text(json.dumps(summary, indent=2) + "\n")
                 hashes = {path.name: hashlib.sha256((folder / path.name).read_bytes()).hexdigest()
                           for key, path in paths.items() if key != "audit"}
@@ -240,7 +248,8 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
         return {"csv": str(paths["csv"]), "html": str(paths["html"]), "trace": str(paths["trace"]),
                 "audit": str(paths["audit"]), "groups": len(original), "scope": scope, "source_changed": False,
                 "model_state": summary["research"]["model_state"],
-                "groups_with_study_evidence": summary["research"]["groups_with_study_evidence"]}
+                "groups_with_study_evidence": summary["research"]["groups_with_study_evidence"],
+                "studies": str(paths["studies"]), "evidence_counts": summary["research"]["evidence_counts"]}
     finally:
         if log:
             log.close()

@@ -280,7 +280,7 @@ def artifact_files(path):
     """Use the package's content directory, or an explicitly supplied artifact directory."""
     path = Path(path)
     if path.is_symlink() or not path.exists():
-        raise ValueError("Terminology artifacts are missing; run package-init for configured packages")
+        raise ValueError("Terminology artifacts are missing; manually download/extract the official files and configure their path")
     if not path.is_dir():
         return [path]
     content = path / "package" if (path / "package").is_dir() else path

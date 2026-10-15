@@ -17,12 +17,13 @@ from typing import Any
 from urllib.parse import quote, urlparse, urlsplit, urlunsplit
 from urllib.parse import urlencode
 from urllib.request import HTTPRedirectHandler, Request, build_opener
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 import base64
 import json
 from json import dumps as _json_dumps
 import os
 import re
+import ssl
 import time
 import xml.etree.ElementTree as ET
 
@@ -30,8 +31,9 @@ from .catalog_evidence import ObservationDefinitionCatalog
 from .observation_quality import LoincTerm, ResearchCandidate, UnitEvidence
 from .model_config import ModelEndpoint, allowed_endpoint, select_model
 from .model_schemas import explicit_token as _explicit_token
-from .model_schemas import evidence_schema, validate_grounding, validate_response
+from .model_schemas import evidence_schema, model_evidence, resolve_sentences, response_schema, validate_grounding, validate_response, supports_evidence_type
 from . import research_prompts as prompts
+from .progress import LOGGER, activity
 
 
 class _Response:
@@ -130,11 +132,26 @@ class NlmUcumClient:
         self._valid: dict[str, bool] = {}
         self._factors: dict[tuple[str, str], Decimal | None] = {}
 
+    def _get(self, url, **kwargs):
+        # Retry one transient transport/server failure; never bypass TLS verification.
+        for attempt in range(2):
+            try:
+                response = self.session.get(url, timeout=self.timeout, **kwargs)
+                if attempt == 0 and response.status_code in {429, 502, 503, 504}:
+                    LOGGER.warning("UCUM service temporarily unavailable (HTTP %s); retrying once", response.status_code)
+                else:
+                    return response
+            except (URLError, TimeoutError) as exc:
+                if attempt or isinstance(getattr(exc, 'reason', None), ssl.SSLCertVerificationError):
+                    raise
+                LOGGER.warning("UCUM connection failed (%s); retrying once", type(getattr(exc, 'reason', exc)).__name__)
+            time.sleep(0.5)
+
     def is_valid(self, unit: str) -> bool:
         if unit in self._valid:
             return self._valid[unit]
         url = f"{self.base_url}/isValidUCUM/{quote(unit, safe='/')}"
-        response = self.session.get(url, timeout=self.timeout)
+        response = self._get(url)
         response.raise_for_status()
         answer = response.text.strip().lower()
         if answer not in {"true", "false"}:
@@ -154,7 +171,7 @@ class NlmUcumClient:
                 f"{self.base_url}/ucumtransform/{amount}/from/{quote(source, safe='/')}"
                 f"/to/{quote(target, safe='/')}"
             )
-            response = self.session.get(url, headers={"Accept": "application/xml"}, timeout=self.timeout)
+            response = self._get(url, headers={"Accept": "application/xml"})
             if response.status_code in {400, 404, 422}:
                 return None
             response.raise_for_status()
@@ -441,29 +458,36 @@ class OpenAICompatibleJsonClient:
         schema = evidence_schema(instruction, evidence)
         trace = {"model": self.model, "endpoint": self.base_url, "instruction": instruction,
                  "system_prompt": prompts.SYSTEM + " Required JSON schema: " + json.dumps(schema),
-                 "user_prompt": json.dumps({"instruction": instruction, "evidence": evidence}, ensure_ascii=False),
+                 "user_prompt": json.dumps({"instruction": instruction, "evidence": model_evidence(instruction, evidence)}, ensure_ascii=False),
                  "response_schema": schema, "response_mode": self.response_mode,
                  "temperature": self.temperature, "max_tokens": self.max_tokens,
                  "evidence": evidence, "state": "requested"}
         self.trace.append(trace)
+        started = time.monotonic()
+        task = next((name for name, value in vars(prompts).items() if value == instruction), "EXTRACTION")
+        trace.update(task=task, started_at=datetime.now(timezone.utc).isoformat())
         try:
-            result = self._json(instruction, evidence)
+            with activity(f"Ollama/model call {len(self.trace)} · {task}"):
+                result = self._json(instruction, evidence)
         except (OSError, ValueError, RuntimeError) as exc:
             # A rejected extraction is not a service outage. Other bounded tasks
             # still run; only consecutive transport/HTTP failures open the circuit.
             self._failures = 0 if isinstance(exc, ValueError) else self._failures + 1
-            trace.update(state="rejected_or_unavailable", error_type=type(exc).__name__)
+            trace.update(state="rejected_or_unavailable", error_type=type(exc).__name__, elapsed_seconds=round(time.monotonic()-started, 3))
+            LOGGER.warning("Model call %s not accepted (%s); see report.trace.jsonl", len(self.trace), type(exc).__name__)
             diagnostic = str(exc)
             if isinstance(exc, ValueError) and diagnostic.startswith(("Model schema mismatch", "Model returned", "Model selected", "Model proposed", "Study bounds", "Study evidence")):
                 trace["guard_diagnostic"] = diagnostic[:600]
+                LOGGER.warning("Source guard: %s", diagnostic[:600])
             raise
         self._failures = 0
-        trace.update(state="accepted_by_source_guards", response=result)
+        trace.update(state="accepted_by_source_guards", response=result, elapsed_seconds=round(time.monotonic()-started, 3))
+        LOGGER.info("Model call %s accepted by source guards; clinical applicability remains unverified", len(self.trace))
         return result
 
     def _json(self, instruction: str, evidence: dict[str, Any]) -> dict[str, Any]:
         schema = evidence_schema(instruction, evidence)
-        supplied = json.dumps({"instruction": instruction, "evidence": evidence}, ensure_ascii=False)
+        supplied = json.dumps({"instruction": instruction, "evidence": model_evidence(instruction, evidence)}, ensure_ascii=False)
         if len(supplied) > 16000:
             raise ValueError("Model evidence exceeds the 16000-character input budget; split the source")
         payload = {
@@ -514,6 +538,10 @@ class OpenAICompatibleJsonClient:
             content = block.group(1)
         result = json.loads(content, object_pairs_hook=_unique_json_object, parse_constant=_reject_json_constant)
         validate_response(result, schema)
+        if instruction == prompts.STUDY_EXTRACT:
+            self.trace[-1]["model_response"] = result
+            result = resolve_sentences(result, evidence)
+            validate_response(result, response_schema(instruction))
         validate_grounding(instruction, result, evidence)
         self.audit_records.append({
             "model": self.model, "endpoint": self.base_url,
@@ -793,10 +821,11 @@ class PublicEvidenceClient:
     @staticmethod
     def study_queries(term):
         # LOINC display brackets are not PubMed field tags.
-        analyte = term.component or term.display.split("[", 1)[0]
+        analyte = term.display.split("[", 1)[0] or term.component
         topic = re.sub(r"[^\w -]", " ", analyte, flags=re.UNICODE).strip()[:240]
         return {
-            "reference_interval": f'({topic}) AND ("reference interval" OR "reference range")',
+            "reference_interval": f'({topic}) AND ("reference interval" OR "reference intervals" OR "reference range" OR "reference ranges")',
+            "summary_statistics": f'({topic}) AND ("mean" OR "standard deviation" OR "minimum" OR "maximum")',
             "analytical_interval": f'({topic}) AND ("analytical measuring interval" OR "reportable range")',
             "documented_extreme": f'({topic}) AND ("extreme value" OR "case report")',
             "reported_measurement": f'({topic}) AND (measurement OR concentration OR units)',
@@ -813,11 +842,18 @@ class PublicEvidenceClient:
             return []
         key = (term.code, term.version)
         if key in self._study_cache:
+            LOGGER.info("LOINC %s: reuse cached study evidence", term.code)
             return list(self._study_cache[key])
+        LOGGER.info("LOINC %s: retrieve up to %s distinct articles from %s", term.code, self.max_articles_per_loinc, ", ".join(self.research_sources))
         records = {}
         # Provider queries are interleaved; retrieval is bounded, not systematic evidence grading.
-        for query in self.study_queries(term).values():
+        for category, query in self.study_queries(term).items():
+            if len(records) >= self.max_articles_per_loinc:
+                break
             for source in self.research_sources:
+                if len(records) >= self.max_articles_per_loinc:
+                    break
+                LOGGER.info("Study search: %s · %s · LOINC %s", source, category, term.code)
                 try:
                     found = (self._pubmed_records(self._pubmed_ids(query)) if source == "pubmed"
                              else self._europe_pmc_records(query))
@@ -831,19 +867,16 @@ class PublicEvidenceClient:
         for record in records.values():
             before = len(candidates)
             extraction_unavailable = False
-            try:
-                candidates += self._extract_study_candidates("unclassified_discovery", [record], term)
-            except (OSError, ValueError, RuntimeError) as exc:
-                extraction_unavailable = True
-                self.query_log.append({"source": record["url"], "task": "bounds", "state": "unavailable", "error_type": type(exc).__name__})
+            LOGGER.info("LOINC %s: article %s/%s, source %s", term.code, list(records).index(record.get("record_key") or "pmid:" + record["pmid"]) + 1, len(records), record["url"])
             if self.llm is not None:
                 try:
-                    answer = self.llm.json(prompts.STUDY_MEASUREMENTS, {
+                    answer = self.llm.json(prompts.STUDY_EXTRACT, {
                         "loinc_code": term.code, "analyte": term.component or term.display,
-                        "analyte_definition": {"component": term.component, "property": term.property,
+                        "analyte_definition": {"display": term.display, "component": term.component, "property": term.property,
                                                "system": term.system, "scale": term.scale, "method": term.method,
                                                "example_units": list(term.example_ucum_units)},
                         "title": record["title"], **self._abstract_payload(record)})
+                    candidates += self._extract_study_candidates("unclassified_discovery", [record], term, answers=[answer["bounds"]])
                     for row in answer["measurements"]:
                         candidates.append(ResearchCandidate("reported_measurement", record["url"],
                             unit=row["unit"], population=row["population"], specimen=row["specimen"],
@@ -851,7 +884,7 @@ class PublicEvidenceClient:
                             value_kind=row["value_kind"], **self._study_provenance(record)))
                 except (OSError, ValueError, RuntimeError) as exc:
                     extraction_unavailable = True
-                    self.query_log.append({"source": record["url"], "task": "measurements", "state": "unavailable", "error_type": type(exc).__name__})
+                    self.query_log.append({"source": record["url"], "task": "study_extract", "state": "unavailable", "error_type": type(exc).__name__})
             if len(candidates) == before:
                 # Retrieval is evidence of a search result, even when extraction fails/abstains.
                 candidates.append(ResearchCandidate("unclassified_discovery", record["url"],
@@ -890,7 +923,7 @@ class PublicEvidenceClient:
 
     def _pubmed_ids(self, query: str) -> list[str]:
         response = self._ncbi_get(
-            "esearch.fcgi", {"db": "pubmed", "term": query, "retmode": "json", "retmax": self.pubmed_retmax}
+            "esearch.fcgi", {"db": "pubmed", "term": query, "retmode": "json", "retmax": self.pubmed_retmax, "sort": "relevance"}
         )
         ids = response.json().get("esearchresult", {}).get("idlist", [])
         return [str(pmid) for pmid in ids if str(pmid).isdigit()]
@@ -923,15 +956,15 @@ class PublicEvidenceClient:
         return records
 
     def _extract_study_candidates(
-        self, evidence_type: str, records: list[dict[str, str]], term: LoincTerm
+        self, evidence_type: str, records: list[dict[str, str]], term: LoincTerm, *, answers=None
     ) -> list[ResearchCandidate]:
         if self.llm is None:
             return [
                 ResearchCandidate(evidence_type, record["url"], excerpt=record["title"], **self._study_provenance(record)) for record in records
             ]
         result: list[ResearchCandidate] = []
-        for record in records:
-            answer = self.llm.json(
+        for index, record in enumerate(records):
+            answer = answers[index] if answers is not None else self.llm.json(
                 prompts.STUDY_BOUNDS,
                 {
                     "evidence_type": evidence_type,
@@ -983,12 +1016,7 @@ class PublicEvidenceClient:
             kind = answer["evidence_type"]
             if kind is None:
                 continue
-            marker = {
-                "reference_interval": r"reference (?:range|interval)|normal range",
-                "analytical_interval": r"analytical (?:measuring )?(?:range|interval)|reportable range",
-                "documented_extreme": r"case report|extreme|case of",
-            }.get(kind, "")
-            if (low is not None or high is not None) and marker and not re.search(marker, excerpt, re.I):
+            if not supports_evidence_type(kind, excerpt, record["abstract"]):
                 kind = "unclassified_numeric_range"
             result.append(
                 ResearchCandidate(

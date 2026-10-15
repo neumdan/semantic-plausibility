@@ -32,6 +32,74 @@ FIELDS = ["tuple_id", "resource_type", "source_rows", "occurrence_count", "frequ
           "recommendations_json", "sources_json", "ddd_references_json", "clinical_dose_safety", "fhir_validation_state", "assessment_context_json"]
 
 
+def quantity_text(value):
+    """Display the supplied quantity, without converting or approving it."""
+    if not isinstance(value, dict) or not value:
+        return "not supplied"
+    amount = value.get("value")
+    return f"{value.get('comparator', '')}{amount if amount is not None else 'missing value'} {value.get('code') or value.get('unit') or '(unit missing)'}"
+
+
+def concept_text(value):
+    if not isinstance(value, dict):
+        return "not supplied"
+    return value.get("text") or "; ".join(str(c.get("display") or c.get("code") or "")
+        for c in value.get("coding", []) if isinstance(c, dict)) or "not supplied"
+
+
+def item_summary(row, detail):
+    """Format source assertions and existing findings; never calculate a new dose."""
+    data = detail["source_set"]
+    product = data["medication"]
+    lines = [f"Source product: {row.get('product_name') or concept_text(product.get('code'))}. Form: {concept_text(product.get('form'))}."]
+    for index, ingredient in enumerate(product.get("ingredient", []), 1):
+        if isinstance(ingredient, dict) and isinstance(ingredient.get("strength"), dict):
+            strength = ingredient["strength"]
+            lines.append(f"Declared strength, ingredient {index}: {quantity_text(strength.get('numerator'))} per {quantity_text(strength.get('denominator'))}. Product strength is not independently verified.")
+    dose_label = {"MedicationRequest": "Ordered", "MedicationAdministration": "Recorded administration", "MedicationStatement": "Reported use"}.get(data["resource_type"], "Source")
+    for index, dosage in enumerate(data["dosages"], 1):
+        entries = dosage.get("doseAndRate", []) if data["resource_type"] in {"MedicationRequest", "MedicationStatement"} else [{"doseQuantity": dosage.get("dose")}]
+        for number, entry in enumerate(entries, 1):
+            if not isinstance(entry, dict):
+                continue
+            value = quantity_text(entry.get("doseQuantity"))
+            if isinstance(entry.get("doseRange"), dict):
+                bounds = entry["doseRange"]
+                value = f"range {quantity_text(bounds.get('low'))} to {quantity_text(bounds.get('high'))}"
+            lines.append(f"{dose_label} dose, instruction {index}, entry {number}: {value}.")
+        if dosage.get("rateQuantity"):
+            lines.append(f"Declared rate: {quantity_text(dosage['rateQuantity'])}; elapsed duration: {quantity_text(data['duration'])}.")
+        if dosage.get("route"):
+            lines.append(f"Declared route, instruction {index}: {concept_text(dosage['route'])}.")
+    if data["resource_type"] == "Medication":
+        lines.append("Product description: no dose is required (dose_check=not_applicable).")
+    elif not data["dosages"]:
+        lines.append("No structured dosage was supplied.")
+    dose_state = row.get("dose_check", "review_required")
+    explanation = {"review_required": "overall review remains open, including when a partial calculation is consistent",
+                   "inconsistent": "an error was found in dosage, duration or strength",
+                   "not_applicable": "standalone product; no dose check"}.get(dose_state, "inspect detailed findings")
+    lines.append(f"Dose review: {dose_state} — {explanation}.")
+    lines.append("All timing, PRN, rate and other constraints remain in the source details; no daily dose is inferred.")
+    calculations = 0
+    for proposal in detail["recommendations"]:
+        if proposal["type"] == "strength_conversion":
+            calculations += 1
+            lines.append(f"Conditional calculation: {proposal['input_value']} {proposal['input_unit']} → {proposal['proposed_value']} {proposal['target_unit']} (factor {proposal['factor']}). Requires verification of the source-declared strength and ingredient; not a replacement dose.")
+        elif proposal["type"] == "infusion_comparison":
+            calculations += 1
+            outcome = "numerically consistent" if proposal["matches"] else "numerically different"
+            assumption = "source asserts constant uninterrupted delivery" if proposal["constant_rate_asserted"] else "constant uninterrupted delivery is unconfirmed; comparison is conditional"
+            lines.append(f"Rate × duration: {proposal['expected_value']} {proposal['unit']}; recorded dose: {proposal['recorded_value']} {proposal['unit']} — {outcome}; {assumption}.")
+    if not calculations and data["resource_type"] != "Medication":
+        lines.append("No supported dose calculation is available; review the findings and lookup coverage below.")
+    errors = sum(f["state"] == "error" for f in detail["findings"])
+    open_points = sum(f["state"] == "review" for f in detail["findings"])
+    lines.append(f"Open findings: {errors} inconsistencies, {open_points} review points. Code check: {row['code_check']}; unit check: {row['unit_check']}. See explanations and sources below.")
+    lines.append("Clinical dose safety is not assessed. A consistent calculation does not close the overall dosage review.")
+    return lines
+
+
 def html_report(path, rows, summary, csv_name):
     def text(value):
         return escape(str(value))
@@ -52,9 +120,10 @@ def html_report(path, rows, summary, csv_name):
         findings = "".join(f'<li><b>{text(f["state"])} · {text(f["path"])}</b>: {text(f["message"])}<br>Source: {source(f["source"])}</li>' for f in detail["findings"])
         checks = "".join(f'<tr><td>{text(r["path"])}</td><td>{text(r.get("system", ""))}<br>{text(r.get("code", ""))}</td><td>{text(r["state"])}</td><td>{source(r.get("source") or "No configured source established membership")}</td></tr>' for r in detail["terminology"])
         trace = '<details><summary>Lookup attempts and catalogue editions</summary><pre>' + text(json.dumps(detail['terminology'], ensure_ascii=False, indent=2)) + '</pre></details>'
+        overview = '<div class="item-summary"><h3>Item summary</h3><ul>' + ''.join('<li>' + text(line) + '</li>' for line in item_summary(row, detail)) + '</ul></div>'
         ddd = '<h3>Published DDD context</h3><pre>' + text(json.dumps(detail['ddd_references'], ensure_ascii=False, indent=2)) + '</pre>' if detail['ddd_references'] else '<p>DDD: no published value retrieved from the configured catalogue. Clinical dose safety remains unassessed.</p>'
-        blocks.append(f'<section><h2>{text(label)} — {text(row["status"])}</h2><p>{text(row["resource_type"])} · {text(row["occurrence_count"] if row["frequency_known"] else "Unknown")} occurrences</p>{item_context_html(row)}<details><summary>Source set</summary><pre>{text(json.dumps(detail["source_set"], ensure_ascii=False, indent=2, default=str))}</pre></details><h3>Checks and explanations</h3><ul>{findings or "<li>No inconsistency found in the implemented checks.</li>"}</ul><table><thead><tr><th>Element</th><th>Code/system</th><th>Check</th><th>Source</th></tr></thead><tbody>{checks}</tbody></table>{trace}{ddd}<h3>Recommendations and calculations</h3><ul>{recommendations or "<li>No supported recommendation; review missing evidence.</li>"}</ul></section>')
-    path.write_text(f'''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';"><title>Medication plausibility review</title><style>body{{font:16px system-ui;margin:2rem auto;max-width:1100px;padding:0 1rem;color:#182e42;background:#f6f8fa}}section{{background:white;border:1px solid #cfd9df;padding:1rem;margin:1.5rem 0;border-radius:8px}}table{{border-collapse:collapse;width:100%;font-size:.9rem}}td,th{{padding:.6rem;border:1px solid #ddd;text-align:left;overflow-wrap:anywhere}}pre{{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f6f8;padding:.8rem}}li{{margin:.7rem 0}}a{{color:#006f82}}</style><h1>Medication plausibility review</h1><p>{text(SCOPE)}</p><p>{summary["input_records"]} source rows → {summary["distinct_tuples"]} report rows. <a href="{text(csv_name)}">Full CSV</a></p><p>FHIR validation: {text(summary["fhir_validation"]["state"])}. Counts: {text(summary["statuses"])}. This preview shows at most 2,000 rows; the CSV contains all results.</p><p>Strength is source-declared. Conversions are conditional review proposals, never dose replacements or automatic corrections.</p>{run_context_html(summary, csv_name)}{"".join(blocks)}</html>''', encoding="utf-8")
+        blocks.append(f'<section><h2>{text(label)} — {text(row["status"])}</h2><p>{text(row["resource_type"])} · {text(row["occurrence_count"] if row["frequency_known"] else "Unknown")} occurrences</p>{overview}{item_context_html(row)}<details><summary>Source set</summary><pre>{text(json.dumps(detail["source_set"], ensure_ascii=False, indent=2, default=str))}</pre></details><h3>Checks and explanations</h3><ul>{findings or "<li>No inconsistency found in the implemented checks.</li>"}</ul><table><thead><tr><th>Element</th><th>Code/system</th><th>Check</th><th>Source</th></tr></thead><tbody>{checks}</tbody></table>{trace}{ddd}<h3>Recommendations and calculations</h3><ul>{recommendations or "<li>No supported recommendation; review missing evidence.</li>"}</ul></section>')
+    path.write_text(f'''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';"><title>Medication plausibility review</title><style>body{{font:16px system-ui;margin:2rem auto;max-width:1100px;padding:0 1rem;color:#182e42;background:#f6f8fa}}section{{background:white;border:1px solid #cfd9df;padding:1rem;margin:1.5rem 0;border-radius:8px}}table{{border-collapse:collapse;width:100%;font-size:.9rem}}td,th{{padding:.6rem;border:1px solid #ddd;text-align:left;overflow-wrap:anywhere}}pre{{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f6f8;padding:.8rem}}li{{margin:.7rem 0}}.item-summary{{border-left:4px solid #176c63;background:#eef7f4;padding:.7rem 1rem}}a{{color:#006f82}}</style><h1>Medication plausibility review</h1><p>{text(SCOPE)}</p><p>{summary["input_records"]} source rows → {summary["distinct_tuples"]} report rows. <a href="{text(csv_name)}">Full CSV</a></p><p>FHIR validation: {text(summary["fhir_validation"]["state"])}. Counts: {text(summary["statuses"])}. This preview shows at most 2,000 rows; the CSV contains all results.</p><p><b>Reading statuses:</b> passed = no issue in implemented checks; needs_review = unresolved or conditional evidence; error = supported inconsistency. dose_check is an overall review flag, not the result of each calculation. Clinical dose safety is not assessed.</p><p>Strength is source-declared. Conversions are conditional review proposals, never dose replacements or automatic corrections.</p>{run_context_html(summary, csv_name)}{"".join(blocks)}</html>''', encoding="utf-8")
 
 
 def ordered(value):

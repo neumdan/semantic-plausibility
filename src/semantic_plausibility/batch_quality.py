@@ -34,7 +34,7 @@ class CsvMapping:
     def granularity(self) -> str:
         if self.input_granularity != "auto":
             return self.input_granularity
-        return "distinct" if {"count", "value_min", "value_max"} & self.fields.keys() else "individual"
+        return "distinct" if {"count", "value_min", "value_max", "value_mean", "value_sd"} & self.fields.keys() else "individual"
 
     def value(self, row: dict[str, str], key: str) -> str:
         column = self.fields.get(key)

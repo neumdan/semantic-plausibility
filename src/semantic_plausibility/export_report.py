@@ -258,6 +258,7 @@ def ratio(numerator, denominator):
 def write_html(path, rows, summary, csv_name, log_name):
     from .report_sources import recommendation_html, source_set_html, linked_data_html, source_html
     from .report_context import run_context_html, item_context_html
+    from .research_summary import html as evidence_summary_html
     title = "Laboratory evidence research" if summary.get("operation") == "research-evidence" else "Laboratory export review"
     if summary.get("operation") == "research-evidence" and summary.get("research", {}).get("scope") == "lookup":
         title = "Laboratory terminology recommendations"
@@ -303,6 +304,7 @@ def write_html(path, rows, summary, csv_name, log_name):
 section{{background:white;padding:24px;margin:18px 0;border:1px solid #d5e1e8;border-radius:8px}}h1,h2{{line-height:1.2}}a{{color:#176c63}}table{{border-collapse:collapse;font-size:13px;white-space:nowrap}}th,td{{padding:9px;text-align:left;vertical-align:top;border-bottom:1px solid #d5e1e8}}th{{background:#edf5f3}}.scroll{{overflow:auto}}.note{{border-left:3px solid #176c63;padding:14px;background:#eef7f4}}code{{font-family:monospace}}.recommendations{{white-space:normal;min-width:360px;max-width:520px}}.set{{white-space:normal;min-width:240px;max-width:360px;overflow-wrap:anywhere}}pre{{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}}.recommendation{{padding:12px 0;border-bottom:1px solid #d5e1e8}}.recommendation p{{margin:4px 0}}.recommendation ul{{padding-left:18px}}.source-meta{{display:block;color:#526978;font-size:12px;overflow-wrap:anywhere}}blockquote{{margin:8px 0;padding-left:12px;border-left:2px solid #176c63}}.recommendations code,.recommendations a{{overflow-wrap:anywhere}}.assessment-cell{{white-space:normal;max-width:1000px}}.assessment table{{white-space:normal}}summary{{cursor:pointer;font-weight:600}}</style>
 <main><h1>{title}</h1><p>Local batch · {escape(summary["mode"])} · {escape(summary["run_id"])}</p>
 {run_context_html(summary, csv_name)}
+{evidence_summary_html(summary, csv_name)}
 <section><h2>{percent} numerically ready laboratory sets</h2><p>{readiness["numerator"]} / {readiness["denominator"]} selected groups. {counts}</p>
 <p class="note">{escape(READINESS_DEFINITION)}</p><p>Evidence mode: <strong>{escape(summary["evidence_kind"])}</strong>. Research evidence is reported separately from numerical completeness.</p><ul>{definitions}</ul>
 <p>Observation-weighted readiness: {escape(str(summary.get("weighted_readiness")))}. Unknown source frequencies stay unknown.</p></section>

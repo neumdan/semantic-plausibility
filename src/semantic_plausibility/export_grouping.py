@@ -15,10 +15,11 @@ import duckdb
 
 from .audit import canonical, encoded, semantic_items
 from .fhir_quality_pipeline import number, serial
+from .aggregate_statistics import pool_summaries
 
 COLS = ["key", "payload", "value_key", "source_id", "source_ref", "item_path", "weight", "known",
         "aggregate_input", "distinct_input", "minimum", "maximum", "point", "numeric", "missing",
-        "invalid", "censored"]
+        "invalid", "censored", "summary"]
 
 
 def weighted_statistics(distribution: list[tuple[str, int]]) -> dict:
@@ -110,7 +111,8 @@ class ExportGroups:
                         record.source_ref if self.mode == "items" else "", path if self.mode == "items" else "",
                         record.occurrences, int(record.occurrences_known), int(record.aggregate_values), int(granularity == "distinct"),
                         serial(low) if not censored else None, serial(high) if not censored else None, point,
-                        len(valid_numbers), len(raw) - len(present), len(present) if invalid else 0, int(censored)])
+                        len(valid_numbers), len(raw) - len(present), len(present) if invalid else 0, int(censored),
+                        encoded({**record.supplied_statistics, "n": record.occurrences if record.occurrences_known else None}) if record.aggregate_values else ""])
         # External access is disabled after this single application-owned file read.
         if not self.accounting["semantic_items_seen"]:
             raise ValueError("Input contains no selected laboratory measurements")
@@ -171,6 +173,15 @@ class ExportGroups:
                         statistics_availability="point_values_with_known_frequency" if available else
                             "bounds_only" if row["aggregate_inputs"] else "unknown_frequency" if row["unknown_frequency_inputs"] else "censored_values")
                     row.update(weighted_statistics(distribution if available else []))
+                    if row["aggregate_inputs"]:
+                        if row["individual_inputs"]:
+                            raise ValueError("Do not mix point records and summary aggregates for the same semantic set")
+                        summaries = [json.loads(value) for (value,) in self.db.execute("SELECT summary FROM stage WHERE key=?", [key]).fetchall()]
+                        row.update(pool_summaries(summaries))
+                        row["supplied_statistics"] = summaries
+                        if row["mean"] is not None or row["sd"] is not None:
+                            row["statistics_availability"] = "supplied_summary" if len(summaries)==1 else "pooled_disjoint_sample_summaries"
+                            row["n_numeric"] = row["occurrences"]
                     row["value_distribution_sha256"] = hashlib.sha256(encoded(row["distribution"]).encode()).hexdigest() if available and not row["invalid"] and not row["missing"] else None
                     yield key, payload, row, metadata
         finally:

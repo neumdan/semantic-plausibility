@@ -76,7 +76,7 @@ response_mode = "json_schema"
 enabled = false                     # check stays deterministic; research-evidence explicitly enables research
 scope = "studies"                   # Override per call with research-evidence --scope lookup|studies
 sources = ["europe_pmc", "pubmed"]
-max_articles_per_loinc = 3
+max_articles_per_loinc = 4
 unit_catalog = "local/unit-catalog.json"
 loinc_website_base_url = "https://loinc.org"
 
@@ -125,9 +125,9 @@ fail_on_error = true
 
 [research.europe_pmc]
 BASE_URL = "https://www.ebi.ac.uk/europepmc/webservices/rest"
-MAX_RESULTS = 1
-# Optional public population restriction, recorded in the trace (not an applicability verdict):
-# QUERY_FILTER = '(human OR humans OR patients OR volunteers) NOT (feline OR cats OR canine OR dogs OR rats OR mice OR veterinary)'
+MAX_RESULTS = 2
+# Explicit hospital-research filter for Europe PMC; recorded, not an applicability verdict.
+QUERY_FILTER = '(human OR humans OR patients OR volunteers OR healthy OR population) NOT (feline OR cats OR canine OR dogs OR cattle OR rats OR mice OR veterinary)'
 
 [research.pubmed]
 BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"

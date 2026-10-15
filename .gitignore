@@ -1,5 +1,6 @@
 .venv/
 .uv-cache/
+.archive/
 __pycache__/
 *.py[cod]
 .ruff_cache/

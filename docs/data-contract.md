@@ -2,6 +2,8 @@
 
 ## Minimum export
 
+This contract describes **quantitative laboratory Observations**, including eligible summaries. It is not a general contract for vital signs, qualitative observations or medication dosing.
+
 Select the hospital cohort/time window upstream. Prefer one row per distinct **code + code system + value + unit code/display + unit system + complete reference set + semantic qualifiers**, with its real `count`. Preserve comparators (`<`, `<=`, `>=`, `>`), versions, status, method, specimen and population/age/type qualifiers. Do not retain a random first code/range or discard outliers before review.
 
 Supported inputs: scalar CSV, complete FHIR JSON in a CSV cell, FHIR R4 Bundle/JSON/array/NDJSON, mapped PostgreSQL view, read-only SQLite extract. Medication, MedicationRequest, MedicationAdministration and MedicationStatement use their separate [product/dose input contract](../examples/medication/README.md); diagnosis is not implemented. LIS vendor APIs and TORCH/CQL run upstream and produce these formats.
@@ -12,6 +14,8 @@ Supported inputs: scalar CSV, complete FHIR JSON in a CSV cell, FHIR R4 Bundle/J
 | `code`, `code_system`, `code_version` | Declared terminology identity and edition; no implicit LOINC assignment |
 | `analyte_name` / `code_text`, `code_display` | Source analyte/test name → CodeableConcept.text; optional coding display → Coding.display. Native FHIR retains both |
 | `value` | Point value, including genuine zero; finite decimal required for numeric readiness |
+| `value_mean`, `value_sd`, `value_min`, `value_max` | Supplied aggregate statistics; SD is sample SD (n−1); alternative to point values |
+| `value_mean_unit`, `value_sd_unit`, `value_min_unit`, `value_max_unit` | Explicit statistic units; when unmapped use the declared measurement unit; mixed units must be normalised upstream |
 | `value_comparator` | Preserve censoring; censored values are not expanded into a numeric distribution |
 | `unit`, `unit_code`, `unit_system` | Display label, machine code, canonical system; display is not proof of UCUM |
 | `reference_ranges_json` | Full FHIR `referenceRange` array; recommended over flattened bounds |
@@ -33,6 +37,7 @@ Supplied code displays/analyte names remain in guarded group identity. The name 
 
 - `granularity="individual"`: each measurement counts once. Components remain separate measurements; source records and selected measurement counts are both reported.
 - `granularity="distinct"`: supplied `count` weights the distribution. Without it, frequency stays unknown and weighted summaries stay unavailable.
+- Summary exports: mean/SD/min/max remain supplied summaries. Pool only disjoint groups with sufficient counts/SD; missing statistics remain missing and median/IQR are never inferred. Source and summary point records cannot be mixed in one group. [Worked example](../examples/lab/README.md#3-understand-the-aggregate-example).
 - Bounds-only exports: map `value_min/value_max`, omit `value`; they cannot supply mean/SE/median/IQR.
 - `output.mode="items"`: requires individual input; reports original ID/file locator/component path. Distinct mode never reconstructs IDs.
 
@@ -60,11 +65,25 @@ For `output.path="output/review.csv"`:
 
 An existing prefix requires `overwrite=true` or a new filename. Concurrent runs with the same output prefix are blocked. Files publish from staged temporary files; the summary is published last as the completion marker. Failed runs retain `.failed.<run-id>.audit.jsonl`, with safe diagnostics and no completed summary. A stale `.run.lock` should be removed only after confirming its owning process is no longer running.
 
-### Columns to read first
+### Status meanings across workflows
 
-The main statuses are `passed`, `suggestion`, `unclear`, `error`; `not_applicable` marks a measurement outside the quantitative laboratory scope.
+| Result | Laboratory | Medication A1 | What to do |
+| --- | --- | --- | --- |
+| `passed` | Implemented checks found no issue | Implemented checks found no issue | Review scope/coverage; this is not clinical approval |
+| `suggestion` | A supported improvement/transform is available | Not used as a top-level status | Review the proposal and its sources |
+| `unclear` / `needs_review` | `unclear`: unresolved evidence/context | `needs_review`: unknown, conditional or unresolved checks | Resolve missing information; a supported partial calculation can coexist with this status |
+| `error` | Supported inconsistency | Supported inconsistency | Inspect the finding and correct the source or mapping after review |
+| `not_applicable` | Measurement outside quantitative laboratory scope | Used for `dose_check` on a standalone product | No applicable dose/value check; it does not mean “passed” |
 
-`status`, `reason`, `code_check`, `unit_check`, `code_unit_fit`, `reference_check`, `value_reference_check`, `lookup_credibility`, `mii_numeric_set_ready`, `occurrence_count`, `value_min/max`, `value_mean/se`, `value_median/q1/q3/iqr`, `suggested_unit`, `transformation_json`, `coding_proposal_json`, `fhir_mapping_proposal_json`.
+These describe findings inside a completed report. A setup/processing failure is different: the command fails and a completed report may be absent. Full-resource validation has its own outcome and can make the command return a nonzero exit code even when a semantic report was written.
+
+**Medication columns:** `code_check` and `unit_check` describe individual terminology checks. `dose_check=inconsistent` means an error was found in a dosage/duration/strength field; `review_required` means the dose still needs review, even if an individual calculation is consistent. `not_applicable` is for a standalone Medication. Inspect `findings_json` / `recommendations_json` for the individual arithmetic result and its assumptions. `clinical_dose_safety=not_assessed` applies throughout; source strength is not authoritative product evidence. The HTML presents this in a readable summary. No CSV status names have been renamed.
+
+### Laboratory columns
+
+
+
+`status`, `reason`, `code_check`, `unit_check`, `code_unit_fit`, `reference_check`, `value_reference_check`, `lookup_credibility`, `mii_numeric_set_ready`, `occurrence_count`, `value_min/max`, `value_mean/sd/se`, `value_median/q1/q3/iqr`, `suggested_unit`, `transformation_json`, `coding_proposal_json`, `fhir_mapping_proposal_json`.
 
 Names/research: `analyte_name` is supplied; `canonical_name` is the exact lookup display. `suggested_code`/`suggested_name` record a model-selected, independently verified candidate or remain empty on abstention. `suggestion_state`, `laboratory_suggestions_json` retain the shortlist, conflicts, unresolved axes and provenance; `reference_candidates_json` contains quoted candidate intervals with context. Retrieved candidates are never asserted equivalent to the source test.
 
@@ -84,7 +103,7 @@ Optional mapped roles `component`, `property`, `time_aspect` and `scale` preserv
 
 ## Complete review projection
 
-Every checked/researched row now contains:
+Every laboratory checked/researched row contains:
 
 | Field | Meaning |
 | --- | --- |
@@ -97,3 +116,5 @@ Every checked/researched row now contains:
 A proposal never rewrites input. Exact membership, definition/name, dimensional fit, numeric completeness and evidence applicability remain separate. The HTML presents these structured fields as source → linked data → proposal, with checks in the final column.
 
 Lookup provenance is available in `lookup_attempts_json` and the HTML lookup trace: attempted alias/type, state, source, edition, available artifact hash and redacted failure type. Conflicting sources remain unresolved. Medication uses `sources_json` for the same purpose and `ddd_references_json` for exact publisher DDD text; see its domain contract.
+
+Research additionally writes `.studies.csv`: one sourced candidate per record, with LOINC, linked tuple IDs, statistic kind, unit, quotation, URL/DOI and extraction state. Distinct article counts are separate from numeric extractions. `source_data_json.statistics` and `recommendation_set_json.quantity.converted_statistics` preserve each statistic with its own unit and the verified factor.

@@ -7,7 +7,7 @@ reduced to semantic metadata; measured values never become model prompts.
 from __future__ import annotations
 
 import csv
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 import json
 from pathlib import Path
@@ -141,6 +141,7 @@ class SourceRecord:
     aggregate_values: bool = False
     input_granularity: str = "auto"
     occurrences_known: bool = True
+    supplied_statistics: dict = field(default_factory=dict)
 
 
 def file_records(
@@ -165,7 +166,9 @@ def file_records(
             weight = _weight(row, mapping)
             if weight < 1:
                 raise ValueError(f"CSV row {line}: count must be positive")
-            aggregate = bool(mapping.fields.get("value_min") or mapping.fields.get("value_max"))
+            from .aggregate_statistics import ROLES, supplied_statistics
+            aggregate = bool(set(ROLES) & mapping.fields.keys())
+            summaries = supplied_statistics({key: mapping.value(row, key) for key in (*ROLES, *(key+"_unit" for key in ROLES))}, resource.get("valueQuantity", {})) if aggregate else {}
             yield SourceRecord(
                 resource,
                 {**row_context, **(context or {})},
@@ -176,6 +179,7 @@ def file_records(
                 aggregate,
                 mapping.granularity,
                 mapping.granularity == "individual" or bool(mapping.value(row, "count")),
+                summaries,
             )
     return
 

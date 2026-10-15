@@ -73,6 +73,7 @@ def record_from_row(row: dict[str, Any], mapping: dict, source_ref: str, context
     from .audit import SourceRecord
     from .fhir_quality_pipeline import number
 
+    from .aggregate_statistics import ROLES, supplied_statistics
     resource, local_context = resource_from_row(row, mapping)
     raw_count = row.get("count")
     count = number(1 if raw_count is None else raw_count)
@@ -82,7 +83,7 @@ def record_from_row(row: dict[str, Any], mapping: dict, source_ref: str, context
     if granularity == "auto":
         granularity = (
             "distinct"
-            if {"count", "value_min", "value_max"} & (set(mapping["fields"]) | set(row))
+            if {"count", "value_min", "value_max", "value_mean", "value_sd"} & (set(mapping["fields"]) | set(row))
             else "individual"
         )
     return SourceRecord(
@@ -92,9 +93,10 @@ def record_from_row(row: dict[str, Any], mapping: dict, source_ref: str, context
         int(count),
         row.get("value_min"),
         row.get("value_max"),
-        "value_min" in row or "value_max" in row,
+        bool(set(ROLES) & row.keys()),
         granularity,
         granularity == "individual" or raw_count is not None,
+        supplied_statistics(row, resource.get("valueQuantity", {})) if set(ROLES) & row.keys() else {},
     )
 
 

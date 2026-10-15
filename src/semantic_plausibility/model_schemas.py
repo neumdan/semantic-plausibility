@@ -31,6 +31,11 @@ _BOUND = {
     "pattern": r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$",
 }
 _CONTEXT = {name: _text(512) for name in ("population", "specimen", "method")}
+_CONTEXT_MARKERS = {
+    "population": r"\b(?:participants?|subjects?|volunteers?|patients?|adults?|children|newborns?|neonates?|cohort)\b",
+    "specimen": r"\b(?:serum|plasma|urine|whole blood|blood samples?|blood specimens?|cerebrospinal fluid)\b",
+    "method": r"\b(?:assay|analy[sz]er|chromatography|spectrometry|spectrophotometry|immunoassay|HPLC|LC-MS|flow cytometry|measurement method)\b",
+}
 
 SCHEMAS = {
     prompts.NAME_QUERIES: _object({"queries": _array(_text(120, nonempty=True), 2)}),
@@ -62,13 +67,15 @@ SCHEMAS = {
     }),
     prompts.STUDY_MEASUREMENTS: _object({"measurements": _array(_object({
         "reported_value": _BOUND,
-        "value_kind": {"type": "string", "enum": ["individual_value", "summary_statistic", "unit_only", "unspecified"]},
+        "value_kind": {"type": "string", "enum": ["individual_value", "mean", "sd", "min", "max", "median", "iqr", "summary_statistic", "unit_only", "unspecified"]},
         "unit": _text(80, nonempty=True), **_CONTEXT, "excerpt": _text(6000, nonempty=True),
     }), 3)}),
     prompts.TERMINOLOGY_CLAIMS: _object({
         "claims": _array(_object({"claim": _text(300, nonempty=True), "excerpt": _text(1200, nonempty=True)}), 10),
     }),
 }
+
+SCHEMAS[prompts.STUDY_EXTRACT] = _object({"bounds": SCHEMAS[prompts.STUDY_BOUNDS], "measurements": {**SCHEMAS[prompts.STUDY_MEASUREMENTS]["properties"]["measurements"], "maxItems": 4}})
 
 
 def response_schema(instruction: str) -> dict[str, Any]:
@@ -80,6 +87,25 @@ def response_schema(instruction: str) -> dict[str, Any]:
 
 def evidence_schema(instruction: str, evidence: dict[str, Any]) -> dict[str, Any]:
     """Constrain study quotations to actual source sentences, including abstention."""
+    if instruction == prompts.LOINC_REVIEW:
+        schema = deepcopy(response_schema(instruction))
+        rows = evidence.get("candidates", [])
+        allowed = [row for row in rows if row.get("selectable") and sum(other["code"] == row["code"] for other in rows) == 1]
+        schema["properties"]["selected_code"]["enum"] = [None] + [row["code"] for row in allowed]
+        schema["properties"]["selected_name"]["enum"] = [None] + list(dict.fromkeys(name for row in allowed for name in row["names"]))
+        return schema
+    if instruction == prompts.STUDY_EXTRACT:
+        schema = deepcopy(response_schema(instruction))
+        sentences = source_sentences(evidence)
+        for index, properties in enumerate((schema["properties"]["bounds"]["properties"], schema["properties"]["measurements"]["items"]["properties"])):
+            properties["excerpt"] = {"type": "string", "enum": ([""] if index == 0 else []) + list(sentences)}
+            for field in _CONTEXT:
+                properties[field] = {"type": "string", "enum": [""] + [key for key, text in sentences.items()
+                    if len(text) <= 512 and re.search(_CONTEXT_MARKERS[field], text, re.I)]}
+        if not sentences:
+            schema["properties"]["measurements"]["maxItems"] = 0
+            schema["properties"]["measurements"]["items"]["properties"]["excerpt"] = _text(6000, nonempty=True)
+        return schema
     schema = deepcopy(response_schema(instruction))
     excerpts = evidence.get("excerpt_candidates")
     if excerpts and instruction in {prompts.STUDY_BOUNDS, prompts.STUDY_MEASUREMENTS}:
@@ -91,6 +117,30 @@ def evidence_schema(instruction: str, evidence: dict[str, Any]) -> dict[str, Any
         for name in _CONTEXT:
             properties[name]["enum"] = [""] + [part for part in excerpts if len(part) <= 512]
     return schema
+
+
+def source_sentences(evidence):
+    return {"s" + str(i + 1): text for i, text in enumerate(evidence.get("excerpt_candidates", []))}
+
+
+def model_evidence(instruction, evidence):
+    if instruction != prompts.STUDY_EXTRACT:
+        return evidence
+    return {**{k: v for k, v in evidence.items() if k not in {"abstract", "excerpt_candidates"}},
+            "sentences": source_sentences(evidence)}
+
+
+def resolve_sentences(value, evidence):
+    """Resolve only enumerated source IDs, then subject restored quotations to normal guards."""
+    result = deepcopy(value)
+    sentences = {"": "", **source_sentences(evidence)}
+    for row in [result["bounds"], *result["measurements"]]:
+        for field in ("excerpt", *_CONTEXT):
+            try:
+                row[field] = sentences[row[field]]
+            except KeyError:
+                raise ValueError("Model returned an unknown source sentence ID") from None
+    return result
 
 
 def validate_response(value: Any, schema: dict[str, Any], path: str = "response") -> None:
@@ -163,7 +213,10 @@ def _range_guard(row: dict[str, Any], source: str) -> None:
 
 def validate_grounding(instruction: str, value: dict[str, Any], evidence: dict[str, Any]) -> None:
     """Source presence is necessary; it does not establish clinical applicability."""
-    if instruction == prompts.NAME_QUERIES:
+    if instruction == prompts.STUDY_EXTRACT:
+        validate_grounding(prompts.STUDY_BOUNDS, value["bounds"], evidence)
+        validate_grounding(prompts.STUDY_MEASUREMENTS, {"measurements": value["measurements"]}, evidence)
+    elif instruction == prompts.NAME_QUERIES:
         if any(re.search(r"[\r\n<>]|\b\d+-\d\b|https?://", query) for query in value["queries"]):
             raise ValueError("Name queries must be short terminology search phrases, not codes or URLs")
     elif instruction == prompts.LOINC_REVIEW:
@@ -195,10 +248,7 @@ def validate_grounding(instruction: str, value: dict[str, Any], evidence: dict[s
         kind = value["evidence_type"]
         if (value["low"] is not None or value["high"] is not None) and kind is None:
             raise ValueError("Study bounds need an explicit evidence type, not a search-query category")
-        markers = {"reference_interval": r"(?:reference|normal)\s+(?:intervals?|ranges?)",
-                   "analytical_interval": r"analytical|reportable|measuring\s+(?:interval|range)",
-                   "documented_extreme": r"case\s+report|extreme|highest|lowest|maximum|minimum"}
-        if kind is not None and not re.search(markers[kind], value["excerpt"], re.I):
+        if kind is not None and not supports_evidence_type(kind, value["excerpt"], evidence.get("abstract", "")):
             raise ValueError("Study evidence category is not explicitly supported by its quotation")
     elif instruction == prompts.STUDY_MEASUREMENTS:
         for row in value["measurements"]:
@@ -206,6 +256,9 @@ def validate_grounding(instruction: str, value: dict[str, Any], evidence: dict[s
             component = evidence.get("analyte_definition", {}).get("component", "")
             if component and component.casefold() not in row["excerpt"].casefold():
                 raise ValueError("Study evidence quotation does not explicitly name the verified analyte")
+            markers = {"mean": r"\bmean\b|average", "sd": r"\bSD\b|standard deviation", "min": r"minimum|lowest|\bmin\b", "max": r"maximum|highest|\bmax\b", "median": r"median", "iqr": r"interquartile|\bIQR\b"}
+            if row["value_kind"] in markers and not re.search(markers[row["value_kind"]], row["excerpt"], re.I):
+                raise ValueError("Study evidence statistic role is not explicitly labelled")
             if row["value_kind"] == "unit_only" and row["reported_value"] is not None:
                 raise ValueError("A unit-only excerpt must not supply a measured value")
     elif instruction == prompts.UNIT_CANDIDATES:
@@ -217,3 +270,18 @@ def validate_grounding(instruction: str, value: dict[str, Any], evidence: dict[s
         for row in value["claims"]:
             if not any(row["excerpt"] in source for source in excerpts) or row["claim"] not in row["excerpt"]:
                 raise ValueError("Model returned a statement without an exact source quotation")
+
+
+def source_defined_reference_abbreviation(excerpt, source):
+    """Accept only a reference-range abbreviation explicitly defined in this source."""
+    aliases = re.findall(r"(?:reference|normal)\s+(?:intervals?|ranges?)\s*\(\s*([A-Za-z]{1,8})\s*\)", source, re.I)
+    return any(explicit_token(alias, excerpt) for alias in aliases)
+
+
+def supports_evidence_type(kind, excerpt, source):
+    """Use the same category guard during extraction and candidate projection."""
+    markers = {"reference_interval": r"(?:reference|normal)\s+(?:intervals?|ranges?)",
+               "analytical_interval": r"analytical|reportable|measuring\s+(?:interval|range)",
+               "documented_extreme": r"case\s+report|extreme|highest|lowest|maximum|minimum"}
+    return bool(kind in markers and (re.search(markers[kind], excerpt, re.I)
+        or kind == "reference_interval" and source_defined_reference_abbreviation(excerpt, source)))

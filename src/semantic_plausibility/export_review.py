@@ -216,7 +216,15 @@ class ReliableLookup:
                 self.failures = 0
             except Exception as exc:
                 self.failures += 1
-                self.errors.append({"operation": name, "error_type": type(exc).__name__})
+                diagnostic = {"operation": name, "error_type": type(exc).__name__,
+                              "cause_type": type(getattr(exc, "reason", exc)).__name__}
+                if isinstance(getattr(exc, "code", None), int):
+                    diagnostic["http_status"] = exc.code
+                self.errors.append(diagnostic)
+                from .progress import LOGGER
+                LOGGER.warning("Lookup %s failed (%s/%s); result remains unknown%s", name,
+                               diagnostic["error_type"], diagnostic["cause_type"],
+                               "; source circuit open for this run" if self.failures >= 3 and self.circuit_breaker else "")
                 result = None
             self.cache[key] = result
             return result
@@ -716,6 +724,8 @@ def _review_export(config):
                     if config.network_mode == "offline"
                     else "configured_lookup_services"
                 )
+                from .terminology_packages import check_package_updates
+                package_updates = check_package_updates(config) if config.data.get("terminology", {}).get("check_updates") else {"state": "disabled", "downloads": False}
                 phase = "input_preflight"
                 fhir_validation = {"state": "not_applicable" if config.validation.get("enabled") else "disabled",
                     "scope": "Scalar CSV/database tuples are not full FHIR resources" if not config.full_fhir_input else "Full FHIR validation was not enabled"}
@@ -993,6 +1003,7 @@ def _review_export(config):
                     "software": versions(),
                     "configuration_sha256": config.deployment.sha256,
                     "run_context": assessment_run,
+                    "terminology_updates": package_updates,
                     "input_sha256": input_hash,
                     "reference_pack_sha256": _input_hash(snapshot) if snapshot else None,
                     "reference_artifacts": artifacts,

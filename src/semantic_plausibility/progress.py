@@ -2,10 +2,31 @@
 
 import logging
 import sys
+import time
+from contextlib import contextmanager
+from threading import Event, Thread
 
 LOGGER = logging.getLogger("semantic_plausibility")
 LOGGER.addHandler(logging.NullHandler())
 LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR")
+
+
+@contextmanager
+def activity(label):
+    """Explain slow calls without streaming prompts, measurements or credentials."""
+    started, done = time.monotonic(), Event()
+    LOGGER.info("%s: started", label)
+    def heartbeat():
+        while not done.wait(15):
+            LOGGER.info("%s: still working (%.0f s elapsed)", label, time.monotonic() - started)
+    thread = Thread(target=heartbeat, daemon=True)
+    thread.start()
+    try:
+        yield
+    finally:
+        done.set()
+        thread.join()
+        LOGGER.info("%s: finished in %.1f s; acceptance is recorded separately", label, time.monotonic() - started)
 
 
 def configure(level="INFO"):

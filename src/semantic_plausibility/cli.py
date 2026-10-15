@@ -48,6 +48,8 @@ def main(argv: list[str] | None = None) -> int:
     packages = sub.add_parser("package-init", help="Install explicitly enabled, pinned BfArM FHIR packages locally")
     packages.add_argument("--config", type=Path, default=Path("pipeline.toml"))
     packages.add_argument("--package", default=None, help="Optional configured package alias")
+    updates = sub.add_parser("package-check", help="Check configured package release metadata; never download content")
+    updates.add_argument("--config", type=Path, default=Path("pipeline.toml"))
     lookup = sub.add_parser("lookup", help="Inspect one configured code or name source; no batch/model is started")
     lookup.add_argument("--config", type=Path, default=Path("pipeline.toml"))
     lookup.add_argument("--lookup", required=True, help="Alias in [lookups]")
@@ -119,6 +121,10 @@ def main(argv: list[str] | None = None) -> int:
             result = validate_fhir(args.config, args.input, args.out)
             print(json.dumps(result, indent=2))
             return 1 if result["state"] in {"invalid", "incomplete", "unavailable"} else 0
+        elif args.command == "package-check":
+            from .batch import BatchConfiguration
+            from .terminology_packages import check_package_updates
+            print(json.dumps(check_package_updates(BatchConfiguration(args.config, research=False)), indent=2))
         elif args.command == "terminology-init":
             from .fhir_validation import initialise_terminology
             print(json.dumps(initialise_terminology(args.config), indent=2))
@@ -186,7 +192,7 @@ def run_main(argv=None):
     """The named runner defaults to the deterministic check; legacy CLI stays available."""
     arguments = list(sys.argv[1:] if argv is None else argv)
     commands = {"batch", "check", "research-evidence", "review-import", "compare", "verify", "lookup",
-                "profile-import", "config-check", "model-init", "catalog-init", "package-init", "validator-init", "terminology-init", "validate-fhir"}
+                "profile-import", "config-check", "model-init", "catalog-init", "package-init", "package-check", "validator-init", "terminology-init", "validate-fhir"}
     if not arguments or arguments[0] not in commands and arguments[0] not in {"-h", "--help"}:
         arguments.insert(0, "check")
     return main(arguments)
