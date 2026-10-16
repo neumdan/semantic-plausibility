@@ -27,15 +27,14 @@ class PodmanExampleTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(sorted(p.relative_to(root) for p in root.rglob("*")), before)
             commands = [line for line in result.stdout.splitlines() if " --out " in line]
-            self.assertEqual(len(commands), 9)
-            self.assertEqual(len({line.split(" --out ")[1].strip() for line in commands}), 9)
+            self.assertEqual(len(commands), 4)
+            self.assertEqual(len({line.split(" --out ")[1].strip() for line in commands}), 4)
             for line in commands[2:4]:
                 self.assertIn("/01-lab-lookup/report.csv", line)
             self.assertIn("--scope lookup", commands[2])
             self.assertIn("--scope studies", commands[3])
-            self.assertIn("/examples/lab/fhir-csv.toml", commands[1])
-            self.assertIn("/examples/medication/request.toml", commands[4])
-            self.assertIn("/examples/medication/administration.toml", commands[5])
+            self.assertIn("/tests/configurations/lab/fhir-csv.toml", commands[1])
+            self.assertNotIn(">>> 05-medication", result.stdout)
             self.assertLess(result.stdout.index("stop_services matchbox blaze"), result.stdout.index("pc up -d ollama"))
             self.assertIn("Compose project: semantic-plausibility-examples", result.stdout)
             self.assertNotIn("--build matchbox", result.stdout)
@@ -46,11 +45,11 @@ class PodmanExampleTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(sum(" --out " in line for line in result.stdout.splitlines()), 4)
         self.assertNotIn(">>> 05-medication", result.stdout)
-        self.assertNotIn("examples/medication/", result.stdout)
+        self.assertNotIn("tests/configurations/medication/", result.stdout)
 
-    def test_lookup_only_plan_covers_every_domain_without_model_or_validator(self):
+    def test_medication_is_explicit_opt_in_and_needs_no_model_or_validator(self):
         result = subprocess.run(
-            [shutil.which("bash"), str(SCRIPT), "--lookup-only", "--dry-run"],
+            [shutil.which("bash"), str(SCRIPT), "--include-medication", "--lookup-only", "--dry-run"],
             cwd=ROOT, capture_output=True, text=True, timeout=15,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -58,9 +57,16 @@ class PodmanExampleTests(unittest.TestCase):
         self.assertEqual(len(commands), 6)
         self.assertEqual(len({line.split(" --out ")[1].strip() for line in commands}), 6)
         for name in ("request", "administration", "product", "statement", "terminology"):
-            self.assertTrue(any(f"/examples/medication/{name}.toml" in line for line in commands))
+            self.assertTrue(any(f"/tests/configurations/medication/{name}.toml" in line for line in commands))
         for forbidden in ("pc up -d ollama", "validator-init", "--scope studies", "--scope lookup"):
             self.assertNotIn(forbidden, result.stdout)
+
+    def test_lookup_only_defaults_to_one_laboratory_report(self):
+        result = subprocess.run([shutil.which("bash"), str(SCRIPT), "--lookup-only", "--dry-run"],
+                                cwd=ROOT, capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(sum(" --out " in line for line in result.stdout.splitlines()), 1)
+        self.assertNotIn("medication", result.stdout)
 
     def test_bad_arguments_fail_before_changing_a_checkout(self):
         with tempfile.TemporaryDirectory() as name:
@@ -86,6 +92,7 @@ class PodmanExampleTests(unittest.TestCase):
         self.assertTrue(public_file(SCRIPT, ROOT))
         with tempfile.TemporaryDirectory() as name:
             site = build_site(ROOT, Path(name) / "site")
+            self.assertEqual([p.relative_to(site).as_posix() for p in site.rglob("*.toml")], ["pipeline.example.toml"])
             self.assertEqual((site / "tools/run-podman-examples.sh").read_bytes(), SCRIPT.read_bytes())
             self.assertEqual((site / "tools/container-cache.sh").read_bytes(), (ROOT / "tools/container-cache.sh").read_bytes())
 

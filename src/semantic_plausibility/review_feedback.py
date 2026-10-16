@@ -60,7 +60,7 @@ def mapping_scope(payload, namespace, profile, catalogue_fingerprint=()):
     return scope, hashlib.sha256(encoded(scope).encode()).hexdigest()
 
 
-def report_details(report):
+def report_details(report, *, hydrate=False):
     report = Path(report).resolve()
     verify_audit(report.with_suffix(".audit.jsonl"))
     rows = read_csv(report)
@@ -72,6 +72,10 @@ def report_details(report):
         details[item["tuple_id"]] = item
     if len({row["tuple_id"] for row in rows}) != len(rows) or {row["tuple_id"] for row in rows} != set(details):
         raise ValueError("CSV and evidence tuple identities differ")
+    if hydrate:
+        rows = [{**details[row["tuple_id"]].get("report_row", row),
+                 "evidence_json": encoded({key: val for key, val in details[row["tuple_id"]].items()
+                                           if key != "report_row"})} for row in rows]
     return rows, details
 
 

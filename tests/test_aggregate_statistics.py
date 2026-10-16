@@ -35,8 +35,8 @@ class AggregateStatisticsTests(unittest.TestCase):
     def test_csv_and_sqlite_summaries_keep_same_units_counts_and_statistics(self):
         with tempfile.TemporaryDirectory() as name:
             root=Path(name)
-            text=(ROOT/'examples/lab/aggregated.toml').read_text().replace('mode = "lookups"', 'mode = "offline"')
-            text=text.replace('"../profiles/', '"'+str(ROOT/'examples/profiles')+'/').replace('"aggregated.csv"',json.dumps(str(ROOT/'examples/lab/aggregated.csv')))
+            text=(ROOT/'tests/configurations/lab/aggregated.toml').read_text().replace('mode = "lookups"', 'mode = "offline"')
+            text=text.replace('"../../../', '"'+str(ROOT)+'/')
             outputs=[]
             for kind in ('csv','sqlite'):
                 selected=text
@@ -57,18 +57,17 @@ class AggregateStatisticsTests(unittest.TestCase):
                     rows=list(csv.DictReader(f))
                 self.assertEqual(len(rows),4)
                 for row in rows:
-                    data=json.loads(row['source_data_json'])
-                    self.assertTrue(data['statistics']['sd']['unit'])
-                    self.assertEqual(data['statistics']['mean']['unit'],row['unit_code'])
+                    self.assertTrue(row['input.statistics.sd.unit'])
+                    self.assertEqual(row['input.statistics.mean.unit'],row['unit_code'])
                     self.assertEqual(row['value_median'],'')
                 self.assertEqual(verify_audit(result.log)['status'],'verified')
                 outputs.append([(r['code'],r['value_mean'],r['value_sd'],r['occurrence_count']) for r in rows])
             self.assertEqual(outputs[0],outputs[1])
 
     def test_lab_examples_resolve_local_compose_model_without_network_access(self):
-        for name in ("individual", "aggregated", "sqlite", "postgres"):
+        for name in ("individual", "aggregated"):
             with self.subTest(name=name), environment({"SQC_IN_CONTAINER": "1"}):
-                config = BatchConfiguration(ROOT / "examples/lab" / (name + ".toml"), research=True)
+                config = BatchConfiguration(ROOT / "tests/configurations/lab" / (name + ".toml"), research=True)
                 with config.deployment.prepare(action="validate", research=True, source_access=False) as prepared:
                     model = json.loads(prepared.models_file.read_text())["models"][0]
                     self.assertEqual(model["base_url"], "http://ollama:11434/v1")

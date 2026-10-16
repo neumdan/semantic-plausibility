@@ -1,40 +1,21 @@
 %% Same node/edge contract as architecture.svg.
 flowchart TD
-    SCALAR["B · Scalar exports<br/>LIS / CDS Hub CSV or DB view<br/>Individual rows or distinct sets<br/>Explicit columns and real counts"]
-    FHIR["B · Complete FHIR exports<br/>Bundle / resource array / NDJSON<br/>or CSV resource_json cells<br/>TORCH / CQL selection upstream"]
-    CONFIG["Four choices in one TOML<br/>A: check level · B: input<br/>C: sources · D: domain + profile<br/>Credentials in .env / secret files"]
-    VALIDATE["Independent: FHIR validation<br/>Full resources → local Matchbox<br/>HL7 validator + pinned MII guide<br/>Outcome stays separate from fit"]
-    DOMAIN["D · Laboratory target guide<br/>Quantitative Observation<br/>MII Laboratory 2026.0.3<br/>Base FHIR R4 also selectable"]
-    NORMAL["Standardise and group<br/>Code + name + unit + context<br/>Values or mean / SD / min / max<br/>Distinct sets or items with IDs"]
-    SOURCES["C · Real terminology evidence<br/>LOINC API / local Blaze<br/>NLM UCUM syntax + conversion<br/>BfArM labels: manual download<br/>Retain editions, hashes, failures"]
-    CHECK["A1 · Lookup-only check<br/>Source identity + target profile rules<br/>Code / name / unit fit and numbers<br/>Reference contexts + summary units<br/>Supported unit transformations"]
-    MODEL["Optional local model<br/>Ollama: ministral-3:3b starter<br/>or local compatible endpoint<br/>Guarded JSON; sources required"]
-    AI["A2 · AI-supported lookup<br/>Checked report → candidates<br/>Real names, codes and unit lists<br/>LOINC pages; no study queries<br/>Exact rechecks; may abstain"]
-    OUTPUT["CSV + HTML review report<br/>Source → linked data → proposal<br/>Checks and citations beside each set<br/>Summary + evidence + audit hashes<br/>Input remains unchanged"]
-    STUDIES["A3 · AI-supported evidence<br/>Original report → same AI pass<br/>Plus Europe PMC / PubMed<br/>Quoted statistics / units / intervals<br/>Study CSV + extraction states"]
-    REGISTRY["Laboratory review registry<br/>Approved / rejected / revoked<br/>Source + profile + context scope<br/>Reverify target and factor on reuse"]
-    EXPERT["Clinician review<br/>Decide semantic correctness<br/>Apply approved mappings in ETL<br/>Validate resulting FHIR resources"]
-    MII["Complementary MII checks<br/>FHIR conformance: validator<br/>Availability / completeness: FDE<br/>This tool: semantic-set review"]
-    SCALAR --> |"scalar path"| NORMAL
-    FHIR --> |"if enabled"| VALIDATE
-    FHIR -.-> |"otherwise"| NORMAL
-    CONFIG -.-> DOMAIN
-    DOMAIN -.-> |"profile"| VALIDATE
-    DOMAIN -.-> |"domain rules"| CHECK
-    VALIDATE --> |"outcomes retained"| NORMAL
-    NORMAL --> CHECK
-    SOURCES --> |"lookups"| CHECK
-    CHECK --> OUTPUT
-    MODEL -.-> |"local inference"| AI
-    OUTPUT -.-> |"scope=lookup"| AI
-    OUTPUT -.-> |"scope=studies"| STUDIES
-    OUTPUT --> EXPERT
-    AI -.-> |"candidates"| EXPERT
-    STUDIES -.-> |"evidence"| EXPERT
-    EXPERT --> |"review-import"| REGISTRY
-    REGISTRY -.-> |"scoped reuse"| CHECK
+    INPUT["Input: selected laboratory data<br/>CSV columns or read-only SQLite / PostgreSQL view<br/>FHIR JSON / Bundle / NDJSON / DB resource column<br/>TORCH / CQL creates the selected FHIR export"]
+    CONFIG["pipeline.toml + catalog.csv + separate secrets<br/>Input/columns, item / distinct output<br/>profile-init downloads pinned profile / bindings to local/<br/>Terminology endpoints/files; local model + research"]
+    RUN["Python runner: one-shot container or uv command<br/>Read and check input contract; optional full FHIR validation<br/>Preserve code + name + value + unit + reference context<br/>Aggregate complete sets and statistics with embedded DuckDB<br/>A1 checks; separate A2 / A3 research from audited A1 output<br/>CSV + HTML + evidence + hash-chained audit"]
+    TX["Terminology evidence<br/>Direct local files OR API<br/>Optional Blaze: explicit imports<br/>UCUM: NLM API OR local service<br/>Sources / editions / hashes"]
+    AI["Optional Ollama service<br/>Local inference; shared weights<br/>A2: real lookup candidates<br/>A3: Europe PMC / PubMed<br/>Quotes + numbers + unit guards"]
+    VALIDATE["Optional local validation services<br/>Matchbox: HL7 validator + acquired FHIR / MII packages<br/>Blaze: terminology, persistent database, internal network<br/>Complete documents checked before semantic grouping"]
+    OUT["Output and clinical review<br/>One item/group per CSV row; one value per cell; numbered columns for repeated elements<br/>HTML: source value → method/finding → proposal → source/proposal status and citations<br/>Original structures in evidence JSONL; clinician decisions in a versioned local registry"]
+    INPUT --> RUN
+    CONFIG --> RUN
+    RUN --> |"lookups"| TX
+    RUN -.-> |"A2 / A3"| AI
+    RUN -.-> |"selected validation"| VALIDATE
+    RUN --> |"reports"| OUT
+    VALIDATE --> |"outcomes"| OUT
     classDef normal fill:#f3f7fa,stroke:#c4d5df,color:#142d42
-    class SCALAR,FHIR,CONFIG,DOMAIN,NORMAL,SOURCES,MODEL,REGISTRY,MII normal
+    class INPUT,CONFIG,TX,VALIDATE normal
     classDef teal fill:#eef7f4,stroke:#a8cfc6,color:#142d42
-    class VALIDATE,CHECK,AI,OUTPUT,STUDIES,EXPERT teal
+    class RUN,AI,OUT teal
     classDef error fill:#fcf1f3,stroke:#ecc7cf,color:#142d42

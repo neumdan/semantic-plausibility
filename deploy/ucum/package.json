@@ -1,0 +1,7 @@
+{
+  "name": "semantic-plausibility-ucum-service",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Local NLM-compatible routes backed by the official UCUM library",
+  "dependencies": {"@lhncbc/ucum-lhc": "8.0.0"}
+}

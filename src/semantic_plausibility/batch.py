@@ -44,10 +44,19 @@ REQUIRED_GROUP = {"code", "code_system", "unit", "unit_system", "reference_range
 def roles(values):
     if not isinstance(values, dict) or any((not isinstance(value, str) for value in values.values())):
         raise ValueError("Column/default mappings must be tables of string values")
-    result = {ROLE_ALIASES.get(key, key): value for key, value in values.items()}
+    result = {}
+    for key, value in values.items():
+        role = ROLE_ALIASES.get(key, key)
+        if role in result:
+            raise ValueError("Map each semantic role once; choose its public name or internal alias")
+        result[role] = value
     if "reference_unit" in values:
+        if "range_high_code" in result:
+            raise ValueError("Choose a common reference_unit or separate low/high unit columns")
         result["range_high_code"] = values["reference_unit"]
     if "reference_unit_system" in values:
+        if "range_high_system" in result:
+            raise ValueError("Choose a common reference_unit_system or separate low/high systems")
         result["range_high_system"] = values["reference_unit_system"]
     return result
 
@@ -75,6 +84,8 @@ class BatchConfiguration:
             self.data = tomllib.loads(self.path.read_text())
         except tomllib.TOMLDecodeError, UnicodeError:
             raise ValueError("Invalid batch TOML configuration") from None
+        from .source_catalog import resolve_catalog
+        self.catalog_path = resolve_catalog(self.data, self.root)
         self.operation = "batch" if research is None else "research-evidence" if research else "check"
         if research is not None:
             self.data.setdefault("research", {})["enabled"] = research
@@ -87,6 +98,7 @@ class BatchConfiguration:
             "batch",
             {
                 "config_version",
+                "catalog",
                 "general",
                 "input",
                 "database",
@@ -116,9 +128,12 @@ class BatchConfiguration:
         logging = table(data.get("logging", {}), "logging", {"level"})
         if logging.get("level", "INFO") not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
             raise ValueError("logging.level must be DEBUG, INFO, WARNING or ERROR")
-        routing = table(data.get("terminology", {}), "terminology", {"strategy", "check_updates"})
+        routing = table(data.get("terminology", {}), "terminology", {"strategy", "check_updates", "import_lookups"})
         if type(routing.get("check_updates", False)) is not bool:
             raise ValueError("terminology.check_updates must be true or false")
+        imports = routing.get("import_lookups", [])
+        if not isinstance(imports, list) or any(not isinstance(value, str) or value not in data.get("lookups", {}) for value in imports):
+            raise ValueError("terminology.import_lookups must list existing lookup aliases")
         self.lookup_strategy = routing.get("strategy", "fallback")
         if self.lookup_strategy not in {"fallback", "all"}:
             raise ValueError("terminology.strategy must be fallback or all")
@@ -164,6 +179,9 @@ class BatchConfiguration:
                 "IG_CANONICAL",
                 "STRUCTURE_DEFINITION",
                 "VALUE_SETS",
+                "BINDING_URLS",
+                "BINDING_VERSIONS",
+                "PACKAGE_URL",
                 "links",
             },
         )
@@ -231,6 +249,11 @@ class BatchConfiguration:
             raise ValueError("output.mode must be distinct or items")
         if self.output.get("mode") == "items" and self.input.get("granularity", "individual") != "individual":
             raise ValueError("Item mode needs individual input; distinct exports cannot restore source IDs")
+        if (self.operation == "batch" and self.kind == "Observation"
+                and isinstance(data.get("research"), dict) and data["research"].get("enabled", False)
+                and (self.output.get("mode", "distinct") != "distinct" or "value" in self.group_by)):
+            raise ValueError('For an AI/evidence batch, set output.mode="distinct" and omit "value" '
+                             'from aggregation.group_by to assess measurements together')
         if spec.get("STRUCTURE_DEFINITION") and spec.get("PROFILE_FILE"):
             raise ValueError("Choose STRUCTURE_DEFINITION or PROFILE_FILE")
         if type(self.output.get("include_distribution", True)) is not bool:
@@ -354,6 +377,9 @@ class BatchConfiguration:
             supported = MEDICATION_FIELDS
         if (set(columns) | set(defaults)) - supported:
             raise ValueError("Unknown semantic column/default role; use the documented field map for RESOURCE_TYPE")
+        all_roles = set(columns) | set(defaults)
+        if "reference_ranges_json" in all_roles and any(k.startswith("range_") for k in all_roles):
+            raise ValueError("Choose explicit reference columns OR the complete reference_ranges_json column")
         if "value" in columns and {"value_min", "value_max", "value_mean", "value_sd"} & set(columns):
             raise ValueError("Choose point values OR aggregate min/max, not an ambiguous combination")
         mapping = {

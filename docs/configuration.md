@@ -1,19 +1,19 @@
-# Configure a laboratory or medication review
+# Laboratory configuration reference
 
-## Configure in four categories
+## One pipeline.toml
 
-Start with [“Which data do you have?”](../README.md#which-data-do-you-have) and one working example. Laboratory is the primary workflow. Medication A1 is available for technical terminology and quantity review; further medication development is deferred. This page is the technical field reference; choose one entry in each category:
+Start with the [setup in pipeline.toml](../README.md#1-first-setup). This page explains the available fields; the [input manual](../examples/lab/README.md) supplies source-specific blocks for the same file. The operator workflow focuses on laboratory Observations.
 
 | Category | Select | Settings / command |
 | --- | --- | --- |
 | **A. Plausibility level** | A1 lookup-only; A2 AI-supported lookup; A3 AI-supported evidence | `check`; optionally `research-evidence --scope lookup` or `--scope studies` on the original checked report |
 | **B. Input** | CSV, PostgreSQL/SQLite, native FHIR or server export | `[input]`, `[input.columns]`, `[database]`, `[output]` |
 | **C. Lookup / terminology sources** | Downloaded catalogues, enabled APIs, or a combination | `[lookups]`, `[terminology]`, `[network]`; credential references only |
-| **D. Clinical domain** | Quantitative laboratory Observation (A1–A3); Medication / Request / Administration / Statement (A1 only) | `general.RESOURCE_TYPE`, `[specification]`, optional `[validation]` |
+| **D. Laboratory target** | Quantitative Observation with the pinned MII Laboratory guide | `general.RESOURCE_TYPE`, `[specification]`, optional `[validation]` |
 
 FHIR validation is independent: `[validation]` applies to complete resources, not scalar aggregates. A2/A3 currently support laboratory Observations only. Model settings belong in `[models]`; study APIs/budgets in `[research]`. **For laboratory, use one TOML for all three levels**, and keep `.env`/secret files for credentials. No shell exports are needed.
 
-Map actual source facts: a local LIS test identifier stays local until reviewed. Profiles supply target rules, not a guess about source column meanings. Reports are CSV/HTML; automatic FHIR/OMOP/database output writers are not implemented. All relative paths resolve from the selected TOML. [Every supplied profile recipe](index.html#profiles) · [Input walkthroughs](index.html#input) · [Download/API walkthroughs](index.html#terminology).
+Map actual source facts: a local LIS test identifier stays local until reviewed. Profiles supply target rules, not a guess about source column meanings. Reports are CSV/HTML; automatic FHIR/OMOP/database output writers are not implemented. All relative paths resolve from the selected TOML. [Laboratory configuration overview](index.html#configure) · [Input walkthroughs](index.html#inputs) · [Download/API walkthroughs](index.html#terminology).
 
 ## Select the configuration
 
@@ -23,9 +23,7 @@ Map actual source facts: a local LIS test identifier stays local until reviewed.
 | Docker Compose | `.env` contains `SQC_CONFIG_FILE=pipeline.toml`; run `docker compose run --rm run-plausibility-check` | Host `pipeline.toml`, mounted at `/app/pipeline.toml` |
 | Podman Compose | Same `.env`; run `podman-compose run --rm run-plausibility-check` | Same host/container paths |
 
-For another container TOML, change the selector in `.env` or use `--env-file local/research.env` with a selector file. [Exact examples](shipped-stack.md#select-another-toml). This Compose parameter chooses a host mount; it is different from the runner's `--config` parameter. The services continue to load project `.env` credentials.
-
-An old shell assignment can override the file selector. Remove it once with `unset SQC_CONFIG_FILE`; `.env.example` and the Compose fallback now select `pipeline.toml`. Existing `.env`/TOML files are never replaced by the setup copy commands.
+Keep the default `pipeline.toml` selector for CSV, FHIR, database and research runs. `SQC_CONFIG_FILE` remains available for deployments that already select a private root file. The setup copy commands preserve an existing `.env` and `pipeline.toml`.
 
 ## Configuration sections
 
@@ -34,19 +32,20 @@ These sections cover the supported workflow. Unknown settings are rejected. Use 
 | Section | Main settings | Purpose |
 | --- | --- | --- |
 | Root | `config_version=3` | Current configuration schema, separate from the software version |
-| `general` | `PROJECT_NAME`, `RESOURCE_TYPE` (Observation / Medication / MedicationRequest / MedicationAdministration / MedicationStatement), `MODEL_ALIAS` | Run label, supported resource type, selected named model (default alias `local`) |
+| `catalog` | `path="catalog.csv"` | Editable directory of source metadata; no concept content |
+| `general` | `PROJECT_NAME`, `RESOURCE_TYPE="Observation"`, `MODEL_ALIAS` | Run label, supported resource type, selected named model (default alias `local`) |
 | `input` | `type`, `origin`, `source_namespace`, `path`, `granularity`, `delimiter` | Location, source/site identity and input representation |
 | `input.columns` / `input.defaults` | Semantic role → column / known constant | CSV/database field mapping; defaults only for documented source facts |
 | `input.elements` | Semantic role → `Observation.*` path | Optional scalar FHIR selection; the native adapter normally needs no mapping |
 | `input.context` / `context_file` / `manifest` | Context and export-selection artifacts | Known axes/qualifiers and source-selection accounting |
 | `input.snapshot` | Captured real lookup-pack path | UCUM/LOINC evidence for offline checks |
 | `database` | `DB_TABLE`, optional `DB_SCHEMA`, connection references | Read-only PostgreSQL or SQLite selection |
-| `specification` | `FHIR_VERSION`, `PROFILE`, `PROFILE_VERSION`, `STRUCTURE_DEFINITION` or `PROFILE_FILE`, `VALUE_SETS`, `IG_*`, `links` | Selected target rules and pinned artifacts |
+| `specification` | `FHIR_VERSION`, `PROFILE`, `PROFILE_VERSION`, `STRUCTURE_DEFINITION` or `PROFILE_FILE`, `VALUE_SETS`, `BINDING_URLS`, `BINDING_VERSIONS`, `PACKAGE_URL`, `IG_*`, `links` | Selected target rules and pinned artifacts |
 | `validation` | `enabled`, `backend`, `endpoint`, `container_endpoint`, `terminology_server`, `setup_directory`, `additional_packages`, `timeout_seconds`, `fail_on_error` | Local full-resource/guide validation before grouping FHIR input |
 | `aggregation` | `engine="duckdb"`, `group_by` | Grouped sets; optional exact point-value grouping |
-| `output` | `path`, `mode`, `overwrite`, `include_distribution`, `lookup_pack` | CSV report prefix, item/group mode and optional captured evidence |
+| `output` | `path`, `mode`, `overwrite`, `include_distribution`, `lookup_pack` | Scalar CSV/HTML prefix, item/group mode and optional captured evidence |
 | `network` | `mode`, `allowed_http_hosts` | Offline/connected lookups and explicit local plain-HTTP hosts |
-| `lookups.NAME` | `enabled`, `role`, `type`, `endpoint` or `path`, `systems` | Real primary/source/optional terminology services |
+| `lookups.NAME` | `enabled`, `role`, `source` (catalogue ID), optional `type`, `endpoint`/`container_endpoint` or `path`, `systems` | Real primary/source/optional terminology services |
 | `packages.NAME` | Registry, name, exact version, path, acceptance | Exact pins for optional release metadata checks; laboratory downloads are manual |
 | `models.NAME` | Runtime, native URL reference, `container_base_url`, model ID, budgets | Optional local inference endpoint |
 | `research` | Scope, providers, per-LOINC budget, catalogue | Separate page/study evidence retrieval |
@@ -57,7 +56,7 @@ These sections cover the supported workflow. Unknown settings are rejected. Use 
 
 For Python, relative input, output, artifact and secret-file paths resolve against the selected TOML's directory. `--config` itself resolves from your current directory. Keep a configuration beside the paths it describes, or use appropriate absolute paths.
 
-For the supplied Compose stack, keep TOMLs in the repository root. `SQC_CONFIG_FILE` is a repository-relative host filename; the file always appears at `/app/pipeline.toml`. Its relative paths therefore resolve under `/app`.
+For the supplied Compose stack, edit `pipeline.toml` in the repository root. `SQC_CONFIG_FILE` is a repository-relative host filename; the file always appears at `/app/pipeline.toml`. Its relative paths therefore resolve under `/app`.
 
 | TOML path | Host location | Container location / access |
 | --- | --- | --- |
@@ -65,6 +64,7 @@ For the supplied Compose stack, keep TOMLs in the repository root. `SQC_CONFIG_F
 | `../input/laboratory.csv` | Sibling private input directory | `/input/laboratory.csv`, read-only |
 | `../input/terminologies/…` | Sibling real downloads | `/input/terminologies/…`, read-only |
 | `local/laboratory.csv` | Your input export | `/app/local/laboratory.csv`, read-only for checking |
+| `local/profiles/…` | Downloaded profile/bindings | `/app/local/profiles/…`, read-only for checking |
 | `local/terminologies/…` | Installed real terminology | `/app/local/terminologies/…`, read-only for checking |
 | `local/secrets/…` | Secret files | `/app/local/secrets/…`, read-only for checking |
 | `output/laboratory-review.csv` | Reports | `/app/output/laboratory-review.csv`, writable |
@@ -73,42 +73,13 @@ A host path such as `/Users/…/lab.csv` is not automatically available in a con
 
 ## CSV and aggregation
 
-Replace the corresponding tables in `pipeline.toml`; do not append a second table with the same name. This example assumes the headers shown in the mapping:
+Follow the [individual/aggregate CSV manual](../examples/lab/README.md). `input.columns` maps pipeline roles on the left to source headers on the right. Use `input.granularity="individual"` for one measurement per row, or `"distinct"` for supplied frequencies/statistics. `output.mode="distinct"` is the evidence workflow default.
 
-```toml
-[input]
-type = "csv"
-origin = "lis"
-source_namespace = "site-lis-a"
-path = "../input/laboratory.csv"
-granularity = "individual"
-delimiter = ","
+Grouping retains codes/editions, name, unit/system, reference qualifiers, comparator, specimen, method and status. Individual values produce count, mean, sample SD/SE, observed min/max, median and quartiles. Summary pooling uses disjoint groups, counts and sample SD; retain that assumption in your source-export documentation. Use numeric statistics and one common `unit_code` per row. Omit unavailable count/statistic roles.
 
-[input.columns]
-code = "test_code"
-code_system = "test_system"
-analyte_name = "test_name"
-value = "result"
-unit = "unit_text"
-unit_code = "unit_code"
-unit_system = "unit_system"
-reference_ranges_json = "reference_ranges_json"
-# source_id = "observation_id"     # Optional; needed for an explicit source ID in items mode.
-```
+For separate A1 inspection, `output.mode="items"` retains source IDs. Adding `"value"` to the default `aggregation.group_by` creates exact code–value sets. Evidence research reads an audited context-grouped report; run a fresh `check` with `mode="distinct"` and the default grouping for that stage.
 
-Use `granularity="individual"` for one measurement per row. For an already distinct export, set `granularity="distinct"` and map `count="count"` only when real source frequencies are supplied. Omit count when unknown; do not manufacture a frequency of one. For aggregate extrema, map `value_min/value_max` instead of `value`.
-
-Full `reference_ranges_json` preserves all intervals and qualifiers. For one unqualified interval only, map `reference_low`, `reference_high`, `reference_unit`, `reference_unit_system` instead. Preserve code versions, comparators, status and available method/specimen context. The optional `specimen` role expects a resolved LOINC system-axis token, not a raw SNOMED code. [All field roles and examples](data-contract.md#minimum-export).
-
-`output.mode="distinct"` combines eligible values per complete guarded set. Names, codings/editions, units, all reference qualifiers, comparators, status and context remain part of the guards. To retain exact point values as separate sets:
-
-```toml
-[aggregation]
-engine = "duckdb"
-group_by = ["code", "code_system", "unit", "unit_system", "reference_range", "value"]
-```
-
-The five non-value fields above are mandatory grouping keys. Min/max-only inputs cannot use exact-value grouping or reconstruct mean/SE/median/IQR. `output.mode="items"` preserves IDs/locators and requires individual input; distinct input cannot restore them.
+Map one reference interval to scalar columns; preserve multiple qualified intervals through native FHIR or a DB `reference_ranges_json` column. The `specimen` scalar role is a resolved LOINC system-axis token. [Complete field roles](data-contract.md#minimum-export).
 
 ## Complete FHIR resources in CSV
 
@@ -128,24 +99,13 @@ resource_json = "resource_json"
 
 Each cell contains one complete R4 resource, Bundle or resource array, quoted according to CSV rules. Map **only** `resource_json`; remove scalar mappings/defaults and counts. Native fields supply IDs, codings, quantities and all reference ranges. Additional unmapped columns are ignored. Set `validation.enabled=true` for the same local validation used by native FHIR files. Bundle references stay together; independent resources/array entries have independent validation scope. CSV cells are bounded to 32 MiB; use native files for large exports.
 
-The [working recipe](../examples/lab/fhir-csv.toml) reads [laboratory-fhir.csv](../examples/laboratory-fhir.csv). It works in place with Python `--config examples/lab/fhir-csv.toml` or Compose `--config /app/examples/lab/fhir-csv.toml`. Its paths resolve from `examples/lab/`, so it needs no extra config mount. The invalid example removes the MII identifier and should fail formal validation while preserving the same numeric set. Never copy one resource into a distinct row and use a count to claim validation of all original resources.
+For the working example set `path="examples/laboratory-fhir.csv"` in the same `pipeline.toml`. The invalid variant, `examples/laboratory-fhir-invalid.csv`, removes the required MII identifier while preserving the numerical set. Run `check` with a fresh output filename after [preparing validation](validation.md).
 
 ## FHIR Bundle and NDJSON
 
-Replace `[input]` with:
+The [FHIR input manual](../examples/lab/README.md#fhir) provides commands and native-field mappings. Set `input.type="fhir_file"`, `path`, `granularity="individual"` and `output.mode="distinct"`. Remove scalar `input.columns/defaults`. The adapter reads native R4 resources, components and reference intervals, then aggregates equivalent measurements.
 
-```toml
-[input]
-type = "fhir_file"
-origin = "fhir"
-source_namespace = "site-fhir-a"
-path = "local/laboratory.bundle.json"
-granularity = "individual"
-```
-
-Remove `[input.columns]` and `[input.defaults]`. The native adapter reads R4 Observation fields, alternative codings, components and all reference ranges. It supports Bundle/JSON, NDJSON files and NDJSON directories; export one current version per Observation ID. Optional `input.elements` is limited to selected scalar `Observation.*` paths; components use the native reader. [Runnable source example](../examples/lab/fhir.toml).
-
-Extract resources upstream using TORCH/CRTDL or the server's supported CQL. A count-only MeasureReport cannot supply measurements, distributions or intervals. LIS vendor APIs likewise need to produce a supported file or mapped view. [MII/FDPG placement](mii-quality.md) · [CQL selection example](../examples/studies/LaboratorySelection.cql).
+Use TORCH/CRTDL or site-supported CQL to export selected resource versions and referenced Specimen resources. Optional `input.elements` selects supported scalar `Observation.*` paths; native components use the regular reader. To include formal validation, enable `validation`, select the pinned target guide and [prepare the local validator](validation.md).
 
 ## PostgreSQL and SQLite
 
@@ -174,11 +134,9 @@ For a PostgreSQL JSON/JSONB Observation column, map `resource_json="resource"` a
 
 For SQLite, use `input.type="sqlite"`, `input.path="local/lab.sqlite"`, the column mapping and `database.DB_TABLE="lab"`; omit PostgreSQL connection fields. It opens read-only. DuckDB is the aggregation engine for every input type, not an additional database server.
 
-## D. Clinical domain, profiles and terminology roles
+## Laboratory profile and terminology roles
 
-Choose the clinical domain with `general.RESOURCE_TYPE`; this is independent of CSV/DB/FHIR input. Lab uses the quantitative Observation adapter. Medication uses the selected resource-specific adapter and its full dosage context. The [profile recipes](index.html#profiles) supply MII Medication 2026.0.1 targets for all four medication resources. Diagnosis/procedure and other Observation domains remain future work.
-
-The starter explicitly pins FHIR R4 and MII Laboratory 2026.0.3. `STRUCTURE_DEFINITION` must be an installed resolved R4 Observation snapshot; `IG_PACKAGE`, `IG_VERSION` and `IG_CANONICAL` record its identity. Alternatively use `PROFILE_FILE` for a reviewed selected-element policy; never configure both. `VALUE_SETS` lists real versioned ValueSet JSON used to derive bound systems. [Pinned profile example](../examples/lab/mii-lis.toml).
+Keep `general.RESOURCE_TYPE="Observation"`. The starter pins FHIR R4 and MII Laboratory 2026.0.3 in `pipeline.toml`. `STRUCTURE_DEFINITION` is an installed resolved R4 Observation snapshot; `IG_PACKAGE`, `IG_VERSION` and `IG_CANONICAL` record its identity. Alternatively select a reviewed `PROFILE_FILE` policy. `VALUE_SETS` lists the real versioned definitions used to derive bound systems. Medication configuration is deferred; its existing adapters remain tested.
 
 Profiles define constraints/bindings, not API endpoint URLs or credentials. The MII snapshot fixes the quantitative unit system to UCUM and gives laboratory codes a **preferred** LOINC binding. ValueSet routing does not expand filters or prove membership. Unspecified selected rules fall back to international R4; explicit prohibitions remain effective. Set `validation.enabled=true` to run the selected local Matchbox/HL7 or MII service before grouping actual FHIR input. The complete guide and dependencies are pinned independently of the selected-element importer. [Validation configuration and examples](validation.md).
 
@@ -202,7 +160,7 @@ complete = false
 
 This references your actual file; the project does not generate local terminology. CSV catalogues require `system,code`, optionally `version,display,definition,expected_unit_code,expected_unit_system,specimen,method,ddd`. Set `complete=true` only for a complete edition.
 
-Supported types: `ucum`, `loinc`, `loinc_csv`, generic `fhir`, `csv`, `sqlite`, `fhir_artifacts`, `website`, `ols`, `who_icd`. Set `enabled=true` deliberately, one dedicated UCUM and LOINC service each. API adapters use `endpoint`; dedicated UCUM/LOINC also accept `endpoint_env`. Local adapters use `path` and declared `systems`. WHO ICD-11 is a standalone lookup, not a Condition batch check. [Adapter-specific fields, access and setup](lookups.md#choose-local-files-or-an-api) · [Optional terminology TOML](../terminology.example.toml).
+Supported types: `ucum`, `loinc`, `loinc_csv`, generic `fhir`, `csv`, `sqlite`, `fhir_artifacts`, `website`, `ols`, `who_icd`. Set `enabled=true` deliberately, one dedicated UCUM and LOINC service each. API adapters use `endpoint`; dedicated UCUM/LOINC also accept `endpoint_env`. Local adapters use `path` and declared `systems`. WHO ICD-11 is a standalone lookup, not a Condition batch check. [Adapter-specific fields, access and setup](lookups.md#use-the-configured-apis).
 
 ## Full FHIR validation
 
@@ -330,7 +288,7 @@ include_distribution = true
 
 `run-plausibility-check --out output/another-check.csv` selects a fresh prefix without editing TOML. Relative `--out` and `--report` paths resolve against the selected TOML. The effective output path and research scope are audited separately from the unchanged configuration hash.
 
-Only CSV is the batch data output format; HTML, summary, evidence and audit sidecars are always produced. Pick a fresh path to preserve prior reports; research needs a fresh output prefix too. [Artifact contents](data-contract.md#output-artifacts).
+Only CSV is the batch data output format; HTML, summary, evidence and audit sidecars are always produced. Pick a fresh path to preserve prior reports; research needs a fresh output prefix too. [Artifact contents](data-contract.md#output).
 
 For reviewed mappings, set a stable `input.source_namespace` before collecting feedback. After `review-import` creates the local registry, enable:
 
@@ -364,15 +322,7 @@ Links are for readers; they neither download nor substitute validation artifacts
 
 A GitHub branch can change; the guide edition and source-file hashes establish what was actually checked. Use HTTP(S) documentation URLs without embedded credentials or query strings. Endpoint credentials stay in `.env` or `local/secrets/`, not these links.
 
-## Medication configuration differences
-
-Start with `examples/medication/request.toml`, `administration.toml`, `statement.toml` or `product.toml` and run them **in place** with `--config`; their relative paths also work under `/app/examples/medication/` in Compose. These select MII Medication 2026.0.1 by `IG_PACKAGE`, `IG_VERSION` and `IG_CANONICAL`. Do not copy a laboratory `PROFILE`, `PROFILE_FILE` or column map into them.
-
-Use the [medication input contract](../examples/medication/README.md#input-contract) for product/ingredient/strength, full dosage JSON, route/timing and source duration. The same `database`, `lookups`, secrets and `output.mode` settings apply. Medication grouping always preserves the complete regimen; omit `aggregation.group_by`. `input.context.constant_rate=true` is optional for a full FHIR export **only if the source guarantees constant, uninterrupted infusion delivery for every selected event**; otherwise leave it absent/false. Scalar inputs support a per-row `constant_rate` column.
-
-Medication does not support laboratory `input.elements`, snapshots/context files/manifests, lookup-pack capture, study comparison, clinician mapping registries or research. Unsupported settings are rejected. Installed real terminology artifacts remain usable offline. Full FHIR input can additionally use the local Matchbox/HL7 or MII validator. The selected guide controls formal bindings; the medication semantic pass checks supplied systems, quantities and dose relationships, not every guide constraint.
-
-`validation.setup_directory` defaults to `local/validation` beside the TOML. Nested example configs explicitly use `../../local/validation` so generated files reach the repository Compose build directory. This setup path does not change the validator endpoint or the input data.
+`validation.setup_directory` defaults to `local/validation` beside `pipeline.toml`, matching the Compose build directory.
 
 ## Fallbacks and logging
 
@@ -385,7 +335,7 @@ strategy = "fallback"  # Local first; enabled APIs for the exact system if neede
 level = "INFO"        # DEBUG, INFO, WARNING, ERROR.
 ```
 
-The inventory never enables a service automatically. Missing code/system, uncovered systems, version mismatch, unavailability and source disagreement remain explicit. Laboratory `lookup_attempts_json` and medication `sources_json` show attempts, states, editions and available source hashes. The HTML includes these traces. A dedicated UCUM grammar service is configured separately; finite unit catalogues do not replace its grammar/conversion checks. Laboratory offline packs cover only queries actually captured.
+The catalogue never enables a service automatically. Missing code/system, uncovered systems, version mismatch, unavailability and source disagreement remain explicit. The laboratory evidence sidecar records lookup attempts, states, editions and available source hashes. The HTML includes these traces. A dedicated UCUM grammar service is configured separately; finite unit catalogues do not replace its grammar/conversion checks. Laboratory offline packs cover only queries actually captured.
 
 `--log-level DEBUG` overrides TOML for one command and adds source-attempt states. INFO shows phases/counts; WARNING/ERROR reduce console output. No credentials or clinical values are printed by the progress logger. Reports/trace files do contain source-derived data and must remain private. Audit recording is independent of console verbosity.
 
@@ -395,10 +345,14 @@ The inventory never enables a service automatically. Missing code/system, uncove
 
 `run_context` in the summary is a whitelist of effective settings: A–D choices, input column/element/table selection, defaults/context, profile, grouping, source aliases, credential mechanism (not its values), model/scope and output. URL credentials/query strings are omitted from this projection. It is not a copy of TOML or the process environment.
 
-Each CSV row's `assessment_context_json` references the configuration hash and records input accounting, method results, assumptions, actual lookup evidence, validation scope and the next improvement step. Individual mode retains IDs; distinct mode does not. Defaults are disclosed as configured source assertions; the adapter does not track which individual fields originally used each default. Research reads the audited A1 report, records its original input/configuration, and keeps its verdict separate from new candidates. New model/retrieval events are counted per item; cached results may be reused without a new call. Existing reports without these fields are never retroactively assigned today's settings.
+Each evidence record's `assessment_context` references the configuration hash and records input accounting, method results, assumptions, actual lookup evidence, validation scope and the next improvement step. Individual mode retains IDs; distinct mode does not. Defaults are disclosed as configured source assertions; the adapter does not track which individual fields originally used each default. Research reads the audited A1 report, records its original input/configuration, and keeps its verdict separate from new candidates. New model/retrieval events are counted per item; cached results may be reused without a new call. Existing reports without these fields are never retroactively assigned today's settings.
 
 ## Laboratory summary statistics
 
-Map `value_mean`, `value_sd`, `value_min`, `value_max` and optional corresponding `*_unit` roles in `[input.columns]`. Map `count` only when it is the actual number of contributing source observations. Missing statistic-unit mappings use the declared measurement unit. Mixed supplied units, nonfinite numbers, negative SD and contradictory mean/bounds fail preflight. SD is sample SD, not SE. Matching disjoint groups can be pooled with sufficient counts/SD; missing information is not inferred. [Working CSV/DB examples](../examples/lab/README.md).
+Map `value_mean`, `value_sd`, `value_min`, `value_max` to numeric columns and `unit_code` to their common measurement unit. Map `count` only when it is the actual number of contributing source observations. All these statistics use the declared measurement unit. Mixed supplied units, nonfinite numbers, negative SD and contradictory mean/bounds fail preflight. SD is sample SD, not SE. Matching disjoint groups can be pooled with sufficient counts/SD; missing information is not inferred. [Working CSV/DB examples](../examples/lab/README.md).
 
 `[terminology] check_updates=true` performs metadata-only version checks for enabled `[packages.*]` entries. Pins and files are never changed; defaults leave the check off. `package-check` runs it separately.
+
+## CSV report columns
+
+Each cell holds one scalar value. Repeated source elements use numbered dotted headers, such as `input.reference_ranges.1.high.value`. Field findings and proposal colours use `assessment.*` columns. Complete structures remain in the matching `.evidence.jsonl`; keep the audited file set together for AI research and review import. [Column contract](data-contract.md#output).

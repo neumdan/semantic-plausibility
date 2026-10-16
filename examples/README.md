@@ -1,21 +1,28 @@
-# Example inputs
+# Laboratory examples
 
-Measurements, bounds and dosage records are synthetic examples, not clinical recommendations. Terminology lookups use real configured services; these files contain no lookup verdicts.
+Use **one `pipeline.toml`**. The [input manual](lab/README.md) gives the exact input/column changes; all other settings stay in that file.
 
-| File | Shape | Current use |
+| Input | Intended check | Expected grouping |
 | --- | --- | --- |
-| [laboratory.csv](laboratory.csv) | 8 distinct scalar rows with real-in-example counts | Default runnable input: 7 guarded groups / 84 represented source occurrences |
-| [laboratory.bundle.json](laboratory.bundle.json) | Equivalent 84 individual Observations in a Bundle | Semantic grouping comparison; not a complete MII conformance example |
-| [laboratory-fhir.csv](laboratory-fhir.csv) | One CSV `resource_json` cell containing a complete synthetic Bundle | Runnable full validation + semantic check with [lab/fhir-csv.toml](lab/fhir-csv.toml) |
-| [laboratory-fhir-invalid.csv](laboratory-fhir-invalid.csv) | Same Bundle with its required MII identifier removed | Negative full-validation example; numeric set unchanged |
-| [laboratory-research.csv](laboratory-research.csv) | 6 local/name/unit cases | Map `analyte_name="analyte_name"`, then check before AI research |
-| [medication-request.csv](medication-request.csv) | 3 distinct product/strength/dose/timing sets | Executable terminology/dose check; see [recipes](medication/README.md) |
-| [medication-statement.csv](medication-statement.csv) | 2 distinct reported-use sets, including not-taken | German ATC catalogue required for membership; not an administration |
-| [medication-product.csv](medication-product.csv) | 2 product/strength sets | No dosage requirement; optional published ATC/DDD context |
-| [medication-administration.csv](medication-administration.csv) | 2 distinct dose/rate/duration sets | Executable terminology/dose check; see [recipes](medication/README.md) |
+| `laboratory.csv` | Starter frequency export; real UCUM/LOINC, spelling candidate, local-code review, reversed bounds | 8 rows → 7 groups; 84 occurrences |
+| `lab/individual.csv` | Individual Hb values; calculate and assess statistics together | 3 values → 1 group: mean 14, sample SD 2 g/dL |
+| `lab/aggregated.csv` | Pool compatible disjoint Hb summaries; retain incompatible contexts | 5 rows → 4 groups |
+| `fhir/laboratory-valid.bundle.json` | Complete Observation with Patient/Organization context and pinned MII guide | 1 laboratory Observation |
+| `fhir/laboratory-invalid.bundle.json` | Same numerical set, deliberately missing required MII identifier | Formal validation finding |
+| `laboratory-fhir.csv` | Complete Bundle in a CSV cell | Same Observation as the valid Bundle |
+| `lab/observation.json`, `lab/observations.ndjson` | Single-resource and line-delimited FHIR input | Group by complete laboratory context |
+| `laboratory.bundle.json` | FHIR export counterpart of the starter | 84 measurements → 7 groups |
+| SQLite / PostgreSQL | Same individual/aggregate columns read from a table | Same statistics as the CSV counterpart |
 
-The scalar laboratory cases show: documented same-unit fit; an out-of-reference value; `140 g/L → 14 g/dL` if a factor of 0.1 is verified; leukocyte `10*3/uL`; ambiguous bare `10*6`; a non-number; absent reference bounds; and a local LIS code needing source catalogue verification and a target coding proposal. The supplied reference intervals illustrate behavior only. AI findings depend on actual retrieved evidence and model responses.
+Inputs are illustrative. Lookup outcomes depend on the configured real services and are reported with source/version. Reference limits in the examples exercise the pipeline and are not clinical guidance.
 
-Use CSV `count` only for known frequencies. `input.granularity="individual"` permits `output.mode="items"` with source IDs; distinct mode produces guarded sets and eligible value distributions. JSON-in-CSV uses individual granularity and only a `resource_json` mapping: each cell may hold a complete resource, Bundle or resource array. Scalar rows cannot establish full resource conformance.
+## Four laboratory modes
 
-`lab/` contains executable source/profile recipes. `profiles/` preserves the attributed pinned MII snapshot and referenced ValueSet. `fhir/` contains the complete/invalid resource documents used by the CSV examples. `studies/` contains upstream SQL/CQL selection examples and export-selection manifests. The SQL names describe a **site-provided view**, not a universal CDS Hub schema; adapt selected tables/columns at your site. [Configuration](../docs/configuration.md) · [Medication field contract](medication/README.md).
+```sh
+bash tools/run-podman-examples.sh --dry-run
+bash tools/run-podman-examples.sh
+```
+
+The script uses test fixtures and writes separate folders for lookup, FHIR validation, AI suggestions and AI study evidence. It prints the report directory and creates `index.html`. `--lookup-only` runs just the first mode. Model/terminology volumes and image layers persist.
+
+Your own data uses `pipeline.toml` and `run-plausibility-check check`; the example script deliberately selects its own illustrative inputs. Medication source files and internal regression configurations are retained for later development under `examples/medication/` and `tests/configurations/medication/`.

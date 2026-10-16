@@ -22,19 +22,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def configuration(folder, stem="request", *, native=False, live=False, validate=False):
-    source = ROOT / "examples/medication" / (stem + ("-fhir" if native else "") + ".toml")
+    source = ROOT / "tests/configurations/medication" / (stem + ("-fhir" if native else "") + ".toml")
     text = source.read_text()
-    input_path = (
-        source.parent / (stem + "-bundle.json")
-        if native
-        else ROOT / "examples" / ("medication-" + stem + ".csv")
-    )
+    text = text.replace('"../../../', '"' + str(ROOT) + '/')
     text = text.replace(
-        'path = "' + (stem + "-bundle.json" if native else "../medication-" + stem + ".csv") + '"',
-        'path = "' + str(input_path) + '"',
-    )
-    text = text.replace(
-        'path = "../../output/medication-' + stem + ("-fhir" if native else "") + '.csv"',
+        'path = "' + str(ROOT / 'output' / ('medication-' + stem + ('-fhir' if native else '') + '.csv')) + '"',
         'path = "' + str(folder / "result.csv") + '"',
     )
     if not live:
@@ -49,6 +41,25 @@ def configuration(folder, stem="request", *, native=False, live=False, validate=
 def input_rows(stem):
     with (ROOT / "examples" / ("medication-" + stem + ".csv")).open() as f:
         return list(csv.DictReader(f))
+
+
+def json_input_rows():
+    # Synthetic input only: exercise the complete multi-instruction adapter separately.
+    from semantic_plausibility.medication_input import dosage_from_columns, DOSE_FIELDS, TIMING_FIELDS
+    from semantic_plausibility.fhir_validation import fhir_json
+    rows = input_rows("request")
+    for row in rows:
+        row["dosage_instructions_json"] = fhir_json([dosage_from_columns(row, "MedicationRequest")])
+        for key in DOSE_FIELDS | TIMING_FIELDS:
+            row.pop(key, None)
+    return rows
+
+
+def use_json_dosage(path):
+    from semantic_plausibility.medication_input import DOSE_FIELDS, TIMING_FIELDS
+    lines = [line for line in path.read_text().splitlines()
+             if line.split("=", 1)[0].strip() not in DOSE_FIELDS | TIMING_FIELDS]
+    path.write_text("\n".join(lines).replace("[input.columns]", '[input.columns]\ndosage_instructions_json="dosage_instructions_json"') + "\n")
 
 
 def details(result):
@@ -78,7 +89,8 @@ class MedicationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as name:
             folder = Path(name)
             path = configuration(folder)
-            row = deepcopy(input_rows("request")[0])
+            use_json_dosage(path)
+            row = deepcopy(json_input_rows()[0])
             row["product_name"] = '<img src=x onerror="alert(1)"> source name'
             dose = json.loads(row["dosage_instructions_json"])
             second = deepcopy(dose[0])
@@ -105,7 +117,7 @@ class MedicationTests(unittest.TestCase):
     def test_malformed_negative_and_string_quantities_and_all_instructions(self):
         with tempfile.TemporaryDirectory() as name:
             c = BatchConfiguration(configuration(Path(name)))
-            row = input_rows("request")[0]
+            row = json_input_rows()[0]
             original = json.loads(row["dosage_instructions_json"])
             bad = deepcopy(original[0])
             bad["doseAndRate"][0]["doseQuantity"]["value"] = -4
@@ -147,7 +159,8 @@ class MedicationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as name:
             folder = Path(name)
             path = configuration(folder)
-            rows = input_rows("request")
+            use_json_dosage(path)
+            rows = json_input_rows()
             a = rows[0]
             b = deepcopy(a)
             b["count"] = ""
@@ -176,7 +189,8 @@ class MedicationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as name:
             folder = Path(name)
             path = configuration(folder)
-            good = input_rows("request")[0]
+            use_json_dosage(path)
+            good = json_input_rows()[0]
             bad = deepcopy(good)
             dose = json.loads(bad["dosage_instructions_json"])
             dose[0]["doseAndRate"][0]["doseQuantity"]["value"] = "5"
@@ -344,7 +358,7 @@ class MedicationTests(unittest.TestCase):
             destination = (folder / "generated").resolve()
             path.write_text(
                 path.read_text().replace(
-                    'setup_directory = "../../local/validation"', 'setup_directory = "generated"'
+                    'setup_directory = "' + str(ROOT / 'local/validation') + '"', 'setup_directory = "generated"'
                 )
             )
             result = initialise_validator(path)

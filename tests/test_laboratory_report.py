@@ -7,6 +7,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from semantic_plausibility.review_feedback import report_details
 from semantic_plausibility import run_plausibility_check, verify_audit
 from semantic_plausibility.export_report import write_html
 from semantic_plausibility.laboratory_report_table import blocked_selection, field_table_html, laboratory_fields, set_decisions
@@ -74,8 +75,7 @@ class LaboratoryReportTests(unittest.TestCase):
     def test_field_table_escapes_input_and_does_not_invent_evidence(self):
         with tempfile.TemporaryDirectory() as name:
             result = run_plausibility_check(configuration(Path(name)))
-            with result.csv.open(encoding="utf-8-sig") as stream:
-                row = next(csv.DictReader(stream))
+            row = report_details(result.csv, hydrate=True)[0][0]
             data = json.loads(row["source_data_json"])
             data["name"] = '<script>alert("input")</script>'
             row["source_data_json"] = json.dumps(data)

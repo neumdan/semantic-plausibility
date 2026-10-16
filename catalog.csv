@@ -1,0 +1,23 @@
+id,type,systems,endpoint,container_endpoint,path,download_url,username_env,password_env,token_env,description
+loinc-api,loinc,http://loinc.org,https://fhir.loinc.org,,,https://loinc.org/kb/api/auth,LOINC_FHIR_USERNAME,LOINC_FHIR_PASSWORD,,Official LOINC API; account required; Basic Auth over HTTPS
+loinc-file,loinc_csv,http://loinc.org,,,local/terminologies/loinc/Loinc.csv,https://loinc.org/downloads/,,,,Manual full release CSV; set version and complete in TOML; preserves axes and example units
+loinc-local-server,loinc,http://loinc.org,http://127.0.0.1:8082/fhir,http://blaze:8080/fhir,,,,,,Your Blaze; import your full LOINC table with terminology-init first
+loinc-public-test,loinc,http://loinc.org,https://tx.fhir.org/r4,,,https://tx.fhir.org/,,,,Explicit public interoperability test alternative; record returned edition
+ucum-api,ucum,http://unitsofmeasure.org,https://ucum.nlm.nih.gov/ucum-service/v1,,,https://ucum.nlm.nih.gov/ucum-service.html,,,,NLM syntax and numeric conversion API; no credential
+ucum-local,ucum,http://unitsofmeasure.org,http://127.0.0.1:8084/ucum-service/v1,http://ucum:8080/ucum-service/v1,,https://github.com/LHNCBC/ucum-lhc,,,,Optional UCUM container; installs pinned official library at build; strict syntax and conversions
+bfarm-lab,fhir_artifacts,http://loinc.org;http://unitsofmeasure.org,,,local/terminologies/bfarm-lab,https://terminologien.bfarm.de/fhirpackages.html,,,,Manual BfArM German LOINC and UCUM supplements; labels only; match base edition
+atc-de-files,fhir_artifacts,http://fhir.de/CodeSystem/bfarm/atc,,,local/terminologies/atc-de,https://terminologien.bfarm.de/fhirpackages.html,,,,Manual complete FHIR CodeSystem/package: German ATC and DDD; DDD is utilization context
+ifa-pzn-files,fhir_artifacts,http://fhir.de/CodeSystem/ifa/pzn,,,local/terminologies/ifa-pzn,https://www.ifaffm.de/,,,,Manual complete FHIR CodeSystem/package: Authorised IFA PZN product catalogue; check licence and actual package coverage
+icd10-gm-files,fhir_artifacts,http://fhir.de/CodeSystem/bfarm/icd-10-gm,,,local/terminologies/icd10-gm,https://terminologien.bfarm.de/fhirpackages.html,,,,Manual complete FHIR CodeSystem/package: German ICD-10-GM edition
+ops-files,fhir_artifacts,http://fhir.de/CodeSystem/bfarm/ops,,,local/terminologies/ops,https://terminologien.bfarm.de/fhirpackages.html,,,,Manual complete FHIR CodeSystem/package: German OPS edition
+local-fhir,fhir,,http://127.0.0.1:8082/fhir,http://blaze:8080/fhir,,,,,,Local imported terminology; set systems explicitly in TOML
+own-fhir,fhir,,,,,,,,,Set your endpoint and systems in TOML; token_env/token_file or client_cert/client_key as required
+mii-termserv,fhir,,https://ontoserver.mii-termserv.de/fhir,,,https://www.ontoserver.mii-termserv.de/,,,,Institutional access; set systems and client_cert/client_key in TOML
+local-csv,csv,,,,local/terminologies/codes.csv,,,,,Operator vocabulary: system/code/version/display columns; specify systems and completeness
+local-sqlite,sqlite,,,,local/terminologies/codes.sqlite,,,,,"Operator vocabulary: codes(system,code,version,display); specify systems"
+semlook,ols,http://loinc.org,https://semanticlookup.zbmed.de/ols/api,,,https://semanticlookup.zbmed.de/about/api,,,,Optional candidate search; configure ontology=loinc and limit in TOML
+who-icd11,who_icd,http://id.who.int/icd/release/11/mms,https://id.who.int,,,https://icd.who.int/icdapi,,,,Configure release/language/token_endpoint and client_id_env/client_secret_env; OAuth credentials required
+snomed-server,fhir,http://snomed.info/sct,,,,https://www.bfarm.de/DE/Kodiersysteme/Terminologien/SNOMED-CT/_node.html,,,,Licensed edition; authorised FHIR export/server; set endpoint and credential references
+rxnorm-server,fhir,http://www.nlm.nih.gov/research/umls/rxnorm,,,,https://www.nlm.nih.gov/research/umls/rxnorm/docs/rxnormfiles.html,,,,Use a covering FHIR server or convert official release explicitly; set endpoint and credential references
+unii-server,fhir,http://fdasis.nlm.nih.gov,,,,https://precision.fda.gov/uniisearch,,,,Use a covering FHIR server or map official export columns; set endpoint and credential references
+edqm-server,fhir,http://standardterms.edqm.eu,,,,https://standardterms.edqm.eu/,,,,Authorised form/route catalogue; licensed edition; set endpoint and credential references

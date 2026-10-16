@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import csv
 import hashlib
 import json
 import os
@@ -24,6 +23,18 @@ from .report_sources import review_set_fields
 from .research_summary import counts, write_studies
 from .report_context import run_context, item_context, execution_position, execution_since
 from .study_sources import provider_query
+from .tabular_report import ColumnWriter, project
+
+
+def require_grouped_report(summary):
+    """Use the audited A1 grouping contract, even if the operator later edits TOML."""
+    grouping = summary.get("run_context", {}).get("grouping", {})
+    if summary.get("mode") != "distinct" or "value" in grouping.get("group_by", []):
+        raise ValueError(
+            'Prepare the evidence input with output.mode="distinct" and omit "value" '
+            'from aggregation.group_by; run check again into a fresh report, then research-evidence. '
+            'This combines individual measurements before researching each semantic set.'
+        )
 
 
 def research_plan(config_path, report=None, *, scope=None):
@@ -33,7 +44,9 @@ def research_plan(config_path, report=None, *, scope=None):
     scope = config.data.get("research", {}).get("scope", "studies")
     report = config.path_value(report or config.output.get("path", "output/laboratory-review.csv"))
     rows, details = report_details(report)
-    verify_report_profile(config, json.loads(report.with_suffix(".summary.json").read_text()))
+    summary = json.loads(report.with_suffix(".summary.json").read_text())
+    require_grouped_report(summary)
+    verify_report_profile(config, summary)
     targets = {}
     for row in rows:
         detail = details[row["tuple_id"]]
@@ -54,6 +67,8 @@ def research_plan(config_path, report=None, *, scope=None):
                 for provider in config.data.get("research", {}).get("sources", ["pubmed"])} if queries else {}}
     return {"goal": "Evidence of reported practice supports clinician semantic adjudication",
         "scope": scope,
+        "checked_groups": len(rows),
+        "input_basis": "Aggregated semantic sets with local count, distribution and reference context",
         "query_plan_note": "Preliminary labels from the audited report; execution refreshes verified terminology aliases. Actual queries and source-specific filters are recorded in the trace.",
         "terminology_plan": terminology_plan(config), "targets": list(targets.values()),
         "study_sources": config.data.get("research", {}).get("sources", ["pubmed"]) if scope == "studies" else [],
@@ -74,7 +89,9 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
         raise ValueError("Evidence retrieval needs explicitly enabled connected lookups")
     local_model_only(config)
     source = config.path_value(report or config.output.get("path", "output/laboratory-review.csv"))
-    original, details = report_details(source)
+    original, details = report_details(source, hydrate=True)
+    source_summary = json.loads(source.with_suffix(".summary.json").read_text())
+    require_grouped_report(source_summary)
     if progress:
         progress(f"Researching {len(original)} checked groups; scope={scope}; source values stay local.")
     suffix = ".recommendations.csv" if scope == "lookup" else ".research.csv"
@@ -93,7 +110,6 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
     protected += [row.get("path") for row in config.data.get("lookups", {}).values()]
     if any(config.path_value(name) in paths.values() for name in protected if name):
         raise ValueError("Research output must not replace source data, lookups or clinician decisions")
-    source_summary = json.loads(source.with_suffix(".summary.json").read_text())
     profile = verify_report_profile(config, source_summary)
     for detail in details.values():
         checked = detail["report"]["profile"]
@@ -199,7 +215,8 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
                                 if progress:
                                     progress(f"Completed {len(reviewed)}/{len(original)} groups; study retrieval/extraction: {counts(item['study_candidates'])}")
                                 evidence_file.write(encoded({"tuple_id": row["tuple_id"], "metadata": payload,
-                                    "observed_values": detail["observed_values"], **assessment}) + "\n")
+                                    "observed_values": detail["observed_values"], **assessment,
+                                    "report_row": {key: val for key, val in row.items() if key != "evidence_json"}}) + "\n")
                         evidence = checker.evidence
                         llm = getattr(evidence, "llm", None)
                         trace = [{"kind": "query", **row} for row in getattr(evidence, "query_log", [])]
@@ -231,12 +248,9 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
                     finally:
                         if checker.terminology:
                             checker.terminology.close()
-                fields = list(dict.fromkeys(key for row in reviewed for key in row))
-                from .support import _csv_text
-                with (folder / paths["csv"].name).open("w", encoding="utf-8-sig", newline="") as handle:
-                    writer = csv.DictWriter(handle, fieldnames=fields)
-                    writer.writeheader()
-                    writer.writerows({key: _csv_text(value) if isinstance(value, str) else value for key, value in row.items()} for row in reviewed)
+                with (folder / paths["csv"].name).open("w", encoding="utf-8-sig", newline="") as handle, ColumnWriter(handle) as writer:
+                    for row in reviewed:
+                        writer.writerow(project(row, {}, operation="research-evidence"))
                 summary["source_check_elapsed_seconds"] = source_summary.get("elapsed_seconds")
                 summary["elapsed_seconds"] = round(time.monotonic() - started, 4)
                 write_html(folder / paths["html"].name, reviewed[:2000], summary, paths["csv"].name, paths["audit"].name)

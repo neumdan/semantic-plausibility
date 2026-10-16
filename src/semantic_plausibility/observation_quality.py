@@ -9,14 +9,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Protocol
-import re
 
 
 LOINC_URI = "http://loinc.org"
 UCUM_URI = "http://unitsofmeasure.org"
-PHASES = {"pre_fhir", "at_fhir", "post_fhir"}
-AMBIGUOUS_NOTATION = re.compile(r"(\.\.\.|…|\b10\s*\^\s*[+-]?\d+\s*$|\b10e[+-]?\d+\b)", re.I)
 
 
 @dataclass(frozen=True)
@@ -71,23 +67,6 @@ class ResearchCandidate:
     unit_validation_state: str = "not_checked"
     unit_validation_source: str = ""
     source_text_rendering: str = ""
-
-
-class UnitAuthority(Protocol):
-    def is_valid(self, unit: str) -> bool: ...
-    def factor(self, source: str, target: str) -> Decimal | None: ...
-
-
-class LoincAuthority(Protocol):
-    def lookup(self, code: str) -> LoincTerm | None: ...
-
-
-class EvidenceResearch(Protocol):
-    def website_units(self, code: str, term: LoincTerm) -> list[UnitEvidence]: ...
-    def suggest_units(
-        self, source_unit: str, term: LoincTerm, examples: list[UnitEvidence]
-    ) -> list[UnitEvidence]: ...
-    def search_studies(self, term: LoincTerm) -> list[ResearchCandidate]: ...
 
 
 @dataclass(frozen=True)

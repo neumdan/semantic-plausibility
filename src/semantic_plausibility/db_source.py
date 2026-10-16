@@ -137,6 +137,8 @@ def resource_from_row(row: dict[str, Any], mapping: dict[str, Any]) -> tuple[dic
         resource = json.loads(payload, parse_float=Decimal) if isinstance(payload, str) else payload
         if not isinstance(resource, dict) or resource.get("resourceType") != kind:
             raise ValueError("JSONB source has the wrong FHIR resource type")
+        from .fhir_validation import fhir_json
+        fhir_json(resource)  # Apply the same finite-number/type guard to native DB JSONB.
         from .export_review import encoding_issues
         resource = dict(resource)
         resource["_plausibility_input_issues"] = encoding_issues(resource)

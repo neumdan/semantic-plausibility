@@ -8,8 +8,6 @@ ROLES = ('value_mean', 'value_sd', 'value_min', 'value_max')
 
 def supplied_statistics(values, quantity):
     present = {key: values.get(key) for key in ROLES if values.get(key) not in (None, '')}
-    if not (set(present) & {"value_mean", "value_sd"}):
-        return {}
     parsed = {key: number(value) for key, value in present.items()}
     if any(value is None for value in parsed.values()):
         raise ValueError('Aggregate statistics must be finite numbers')
@@ -25,6 +23,8 @@ def supplied_statistics(values, quantity):
         raise ValueError('Aggregate minimum exceeds maximum')
     if mean is not None and (low is not None and mean < low or high is not None and mean > high):
         raise ValueError('Aggregate mean lies outside supplied minimum/maximum')
+    if not (set(present) & {"value_mean", "value_sd"}):
+        return {}
     return {key.removeprefix('value_'): serial(value) for key, value in parsed.items()}
 
 

@@ -11,7 +11,6 @@ from typing import Any
 
 
 LOINC = "http://loinc.org"
-SNOMED = "http://snomed.info/sct"
 UCUM = "http://unitsofmeasure.org"
 
 

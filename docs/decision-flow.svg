@@ -1,93 +1,54 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1680" viewBox="0 0 1100 1680" role="img" aria-labelledby="title desc">
-<title id="title">Check the source set, select evidence scope, review the proposal</title><desc id="desc">1. Select D (domain/profile) and check the B (input) contract; 2. Formal validation requested?; 3. Verify the declared code/system and unit/system using configured sources; Confirmed invalid; Verified identity / syntax; Unverified / unavailable; 4. Assess unit fit and transformation; 5. Check quantities and context; write the checked CSV; A1: laboratory check; A2: lab · scope=lookup; A3: lab · scope=studies; 6. Review the whole proposal with its evidence; 7. Optional laboratory mapping reuse</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1160" viewBox="0 0 1100 1160" role="img" aria-labelledby="title desc">
+<title id="title">Processing decisions and review</title><desc id="desc">1. Select laboratory source and mapped fields; 2. Full FHIR validation selected?; 3. Aggregate the complete semantic set; 4. A1: check source meaning, then cross-field plausibility; 5a. Optional A2: lookup proposals; 5b. Optional A3: study evidence; 6. Review the complete set</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#537487"/></marker></defs>
 <style>text{font-family:Arial,sans-serif;fill:#142d42}.heading{font-size:19px;font-weight:700}.body{font-size:17px}.label{font-size:14px;fill:#526978}</style><rect width="1100" height="100%" fill="white"/>
-<g data-node="CONTRACT"><rect x="130" y="20" width="840" height="106" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="146" y="49" class="heading">1. Select D (domain/profile) and check the B (input) contract</text>
-<text x="146" y="77" class="body">Laboratory Observation: code + name + value/statistics + unit + reference context</text>
-<text x="146" y="102" class="body">Malformed input fails; preserve every reference interval and its qualifiers</text>
+<g data-node="CONTRACT"><rect x="20" y="20" width="1060" height="125" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="36" y="49" class="heading">1. Select laboratory source and mapped fields</text>
+<text x="36" y="77" class="body">Laboratory: code/system + name + specimen/method + value/statistics + unit/system + references</text>
+<text x="36" y="102" class="body">One pipeline.toml selects sources from catalog.csv; downloads stay under local/</text>
+<text x="36" y="127" class="body">Preflight checks roles, types, paths, count semantics, source/profile editions and configured services</text>
 </g>
-<g data-node="VALIDATION"><rect x="130" y="185" width="840" height="106" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="146" y="214" class="heading">2. Formal validation requested?</text>
-<text x="146" y="242" class="body">Full FHIR file or CSV resource_json → local Matchbox/HL7 + pinned guide</text>
-<text x="146" y="267" class="body">Scalar sets → not_applicable; unavailable/invalid validation remains explicit</text>
+<g data-node="FHIR"><rect x="20" y="195" width="1060" height="100" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="36" y="224" class="heading">2. Full FHIR validation selected?</text>
+<text x="36" y="252" class="body">Complete resource export → local validator + pinned profile → separate OperationOutcome</text>
+<text x="36" y="277" class="body">Then use the same semantic adapter for scalar or native FHIR data</text>
 </g>
-<g data-node="LOOKUP"><rect x="130" y="350" width="840" height="106" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="146" y="379" class="heading">3. Verify the declared code/system and unit/system using configured sources</text>
-<text x="146" y="407" class="body">Local first → enabled APIs for the exact system; retain every attempt and edition</text>
-<text x="146" y="432" class="body">LOINC component, property, specimen/system, timing, scale and method</text>
+<g data-node="GROUP"><rect x="20" y="345" width="1060" height="100" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="36" y="374" class="heading">3. Aggregate the complete semantic set</text>
+<text x="36" y="402" class="body">distinct: individual CSV / FHIR / DB values → n, mean, sample SD / SE, min / max, median / IQR</text>
+<text x="36" y="427" class="body">Pool supplied disjoint summaries; keep reference context. Optional items mode serves A1 inspection.</text>
 </g>
-<g data-node="INVALID"><rect x="20" y="515" width="330" height="106" rx="9" fill="#fcf1f3" stroke="#ecc7cf"/>
-<text x="36" y="544" class="heading">Confirmed invalid</text>
-<text x="36" y="572" class="body" style="font-size:16px">Record deterministic error</text>
-<text x="36" y="597" class="body" style="font-size:16px">Continue other independent checks</text>
+<g data-node="A1"><rect x="20" y="495" width="1060" height="125" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="36" y="524" class="heading">4. A1: check source meaning, then cross-field plausibility</text>
+<text x="36" y="552" class="body">Exact code/system and unit evidence → name/axes/specimen fit → code–unit compatibility</text>
+<text x="36" y="577" class="body">Check finite values, reference order/context and supported whole-set transformations</text>
+<text x="36" y="602" class="body">Write original A1 CSV + evidence/audit; valid, inconsistent and unresolved findings remain explicit</text>
 </g>
-<g data-node="VERIFIED"><rect x="385" y="515" width="330" height="106" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="401" y="544" class="heading">Verified identity / syntax</text>
-<text x="401" y="572" class="body" style="font-size:16px">Check code-unit-context fit</text>
-<text x="401" y="597" class="body" style="font-size:16px">Membership alone is insufficient</text>
+<g data-node="A2"><rect x="20" y="680" width="510" height="125" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="36" y="709" class="heading">5a. Optional A2: lookup proposals</text>
+<text x="36" y="737" class="body">Grouped A1 report → candidates/pages → local model</text>
+<text x="36" y="762" class="body">Verify selected code/name/unit against actual terminology</text>
+<text x="36" y="787" class="body">Record proposal, sources and unresolved context</text>
 </g>
-<g data-node="UNKNOWN"><rect x="750" y="515" width="330" height="106" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="766" y="544" class="heading">Unverified / unavailable</text>
-<text x="766" y="572" class="body" style="font-size:16px">Keep evidence gap visible</text>
-<text x="766" y="597" class="body" style="font-size:16px">Do not call absence invalid</text>
+<g data-node="A3"><rect x="570" y="680" width="510" height="125" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="586" y="709" class="heading">5b. Optional A3: study evidence</text>
+<text x="586" y="737" class="body">Grouped A1 report → screened Europe PMC / PubMed</text>
+<text x="586" y="762" class="body">Local extraction → exact quote/analyte/number/unit guards</text>
+<text x="586" y="787" class="body">Retain statistic, interval, context and source</text>
 </g>
-<g data-node="FIT"><rect x="130" y="685" width="840" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="146" y="714" class="heading">4. Assess unit fit and transformation</text>
-<text x="146" y="742" class="body">Documented code–unit fit; verified conversion → factor for values and bounds</text>
-<text x="146" y="767" class="body">Positive linear factor also scales mean, sample SD, minimum and maximum</text>
-<text x="146" y="792" class="body">Missing evidence or ambiguous count denominator → expert review, no forced map</text>
+<g data-node="REVIEW"><rect x="20" y="920" width="1060" height="170" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="36" y="949" class="heading">6. Review the complete set</text>
+<text x="36" y="977" class="body">HTML field table / scalar CSV: source → finding → recommendation, with sources and status</text>
+<text x="36" y="1002" class="body">Verify specimen, assay, population, unit conversion and each reference interval</text>
+<text x="36" y="1027" class="body">Clinician approves / rejects / defers; source data is retained</text>
+<text x="36" y="1052" class="body">Reuse compatible approved laboratory mappings after rechecking targets and factors</text>
 </g>
-<g data-node="NUMERIC"><rect x="130" y="880" width="840" height="106" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="146" y="909" class="heading">5. Check quantities and context; write the checked CSV</text>
-<text x="146" y="937" class="body">Numeric values, supplied sample statistics, units, specimen/method and reference bounds</text>
-<text x="146" y="962" class="body">Observed extremes and mean ± SD do not define a reference interval</text>
-</g>
-<g data-node="NO_AI"><rect x="20" y="1050" width="330" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="36" y="1079" class="heading">A1: laboratory check</text>
-<text x="36" y="1107" class="body" style="font-size:16px">Deterministic findings + sources</text>
-<text x="36" y="1132" class="body" style="font-size:16px">Optional full FHIR outcome</text>
-<text x="36" y="1157" class="body" style="font-size:16px">No model calls</text>
-</g>
-<g data-node="AI"><rect x="385" y="1050" width="330" height="132" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="401" y="1079" class="heading">A2: lab · scope=lookup</text>
-<text x="401" y="1107" class="body" style="font-size:16px">Local AI suggests code/name/unit</text>
-<text x="401" y="1132" class="body" style="font-size:16px">Real candidate retrieval + recheck</text>
-<text x="401" y="1157" class="body" style="font-size:16px">No literature retrieval</text>
-</g>
-<g data-node="EVIDENCE"><rect x="750" y="1050" width="330" height="132" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="766" y="1079" class="heading">A3: lab · scope=studies</text>
-<text x="766" y="1107" class="body" style="font-size:16px">Same AI + configured study APIs</text>
-<text x="766" y="1132" class="body" style="font-size:16px">Quote statistics / units / intervals</text>
-<text x="766" y="1157" class="body" style="font-size:16px">Keep gaps and failures visible</text>
-</g>
-<g data-node="REVIEW"><rect x="130" y="1255" width="840" height="132" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="146" y="1284" class="heading">6. Review the whole proposal with its evidence</text>
-<text x="146" y="1312" class="body">Original set → linked code/analyte/name/units → proposal with transformations</text>
-<text x="146" y="1337" class="body">Physician records decision, reviewer, time and rationale; source remains unchanged</text>
-<text x="146" y="1362" class="body">Numeric readiness, FHIR conformance and clinical correctness stay distinct</text>
-</g>
-<g data-node="REUSE"><rect x="130" y="1460" width="840" height="157" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="146" y="1489" class="heading">7. Optional laboratory mapping reuse</text>
-<text x="146" y="1517" class="body">Import clinician decisions; recheck target code, unit, factor and reference bounds</text>
-<text x="146" y="1542" class="body">Source, catalogue, profile or context changes require renewed review</text>
-<text x="146" y="1567" class="body">Apply approved transformations in institutional ETL and validate the resulting FHIR</text>
-<text x="146" y="1592" class="body">No automated resource rewrite or model retraining</text>
-</g>
-<path data-edge="CONTRACT-VALIDATION" d="M550 126 V182" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="VALIDATION-LOOKUP" d="M550 291 V347" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="LOOKUP-INVALID" d="M550 456 V485 H185 V512" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="LOOKUP-VERIFIED" d="M550 456 V512" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="LOOKUP-UNKNOWN" d="M550 456 V485 H915 V512" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="INVALID-FIT" d="M185 621 V650 H450 V682" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="VERIFIED-FIT" d="M550 621 V682" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="UNKNOWN-FIT" d="M915 621 V650 H650 V682" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="FIT-NUMERIC" d="M550 817 V877" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="NUMERIC-NO_AI" d="M550 986 V1018 H185 V1047" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="NUMERIC-AI" d="M550 986 V1047" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
-<path data-edge="NUMERIC-EVIDENCE" d="M550 986 V1018 H915 V1047" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
-<path data-edge="NO_AI-REVIEW" d="M185 1182 V1220 H450 V1252" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="AI-REVIEW" d="M550 1182 V1252" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="EVIDENCE-REVIEW" d="M915 1182 V1220 H650 V1252" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="REVIEW-REUSE" d="M550 1387 V1457" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="CONTRACT-FHIR" d="M550 145 V195" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="FHIR-GROUP" d="M550 295 V345" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="GROUP-A1" d="M550 445 V495" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="A1-A2" d="M275 620 V680" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="A1-A3" d="M825 620 V680" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="A1-REVIEW" d="M550 620 V920" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="A2-REVIEW" d="M275 805 V920" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="A3-REVIEW" d="M825 805 V920" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
 </svg>

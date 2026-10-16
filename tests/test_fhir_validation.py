@@ -16,7 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def config_file(folder, endpoint=None):
-    text = (ROOT / "pipeline.fhir.example.toml").read_text().replace('"examples/', '"' + str(ROOT / "examples") + '/')
+    text = (ROOT / "tests/configurations/lab/fhir.toml").read_text().replace('"../../../', '"' + str(ROOT) + '/')
+    text = text.replace(str(ROOT / "local/validation"), str(folder / "local/validation"))
     if endpoint:
         text = text.replace('http://127.0.0.1:8081/matchboxv3/fhir', endpoint)
     path = folder / "pipeline.toml"

@@ -129,6 +129,27 @@ class LoincCsvSource:
         ]
 
 
+def loinc_code_system(path, *, version, complete):
+    """Project a real full LOINC table for the operator's local FHIR server."""
+    if complete is not True:
+        raise ValueError("Local server import requires the complete LOINC release; set complete=true after checking your download")
+    source = LoincCsvSource(path, version=version, complete=True)
+    properties = {"component": "COMPONENT", "property": "PROPERTY", "system": "SYSTEM",
+                  "time_aspect": "TIME_ASPCT", "scale": "SCALE_TYP", "method": "METHOD_TYP",
+                  "status": "STATUS"}
+    concepts = []
+    for term in source.terms.values():
+        values = [{"code": key, "valueString": getattr(term, attr)} for attr, key in properties.items()
+                  if getattr(term, attr)]
+        values += [{"code": "EXAMPLE_UCUM_UNITS", "valueString": unit} for unit in term.example_ucum_units]
+        concepts.append({"code": term.code, "display": term.display, "property": values,
+                         "designation": [{"language": "en", "value": name} for name in term.synonyms]})
+    return {"resourceType": "CodeSystem", "url": LOINC_URI, "version": version,
+            "name": "LOINC", "status": "active", "content": "complete", "caseSensitive": True,
+            "count": len(concepts), "property": [{"code": code, "type": "string"}
+                for code in [*properties.values(), "EXAMPLE_UCUM_UNITS"]], "concept": concepts}, source.sha256
+
+
 class LoincApiSource:
     """Expose the existing guarded client through the same traceable router."""
 

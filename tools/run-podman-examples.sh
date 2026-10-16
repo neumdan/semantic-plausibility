@@ -7,20 +7,21 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 DRY_RUN=false
 REBUILD=false
 LOOKUP_ONLY=false
-LAB_ONLY=false
+LAB_ONLY=true
 for argument in "$@"; do
 case "$argument" in
   --dry-run) DRY_RUN=true ;;
   --rebuild) REBUILD=true ;;
   --lookup-only) LOOKUP_ONLY=true ;;
-  --lab-only) LAB_ONLY=true ;;
+  --lab-only) LAB_ONLY=true ;; # Compatibility with previously documented command.
+  --include-medication) LAB_ONLY=false ;;
   -h|--help)
-    printf '%s\n' 'Usage: bash tools/run-podman-examples.sh [--lab-only] [--lookup-only] [--dry-run] [--rebuild]' \
-      'Runs four laboratory modes, four medication types and a medication terminology example.' \
+    printf '%s\n' 'Usage: bash tools/run-podman-examples.sh [--lookup-only] [--include-medication] [--dry-run] [--rebuild]' \
+      'Runs four laboratory modes using the shipped input and real services.' \
       'Uses real APIs, local Matchbox/Blaze and Ollama; first use downloads images/model.' \
       'Writes separate reports under output/podman-examples-<timestamp>-<unique suffix>/.' \
-      '--lab-only runs four laboratory modes; omit it to also run five medication A1 examples.' \
-      '--lookup-only runs six A1 reports (one with --lab-only), without Ollama or the FHIR validator.' \
+      '--include-medication adds five developer regression examples for later medication work.' \
+      '--lookup-only runs the laboratory A1 check, without Ollama or the FHIR validator.' \
       '--dry-run prints the plan without creating files, downloading or running containers.' \
       '--rebuild explicitly rebuilds the runner and validator, retaining cached layers/volumes.'
     exit 0 ;;
@@ -44,10 +45,10 @@ pc() {
   # Only these public test settings override the operator's Compose selection.
   # Secrets remain in .env; no environment dump or shell tracing is used.
   env SQC_CONFIG_FILE=pipeline.example.toml SQC_INPUT_DIR="$STATE/empty-input" \
-    SQC_LOCAL_DIR="$STATE" SQC_OLLAMA_PORT= SQC_MATCHBOX_PORT= SQC_BLAZE_PORT= \
+    SQC_LOCAL_DIR="$STATE" SQC_BLAZE_LOINC=true SQC_OLLAMA_PORT= SQC_MATCHBOX_PORT= SQC_BLAZE_PORT= \
     SQC_RUNNER_BUILD_INPUTS="$RUNNER_SHA" SQC_MATCHBOX_BUILD_INPUTS="$MATCHBOX_SHA" \
     podman-compose -f "$ROOT/compose.yaml" --env-file "$ROOT/.env" \
-    -p "$PROJECT" --profile validation --profile research "$@"
+    -p "$PROJECT" --profile setup --profile validation --profile research "$@"
 }
 
 step() {
@@ -154,15 +155,16 @@ report() {
   return "$code"
 }
 
-SQC_CONFIGURATION_SUMMARY='pipeline.example.toml'
-if ! "$LOOKUP_ONLY"; then SQC_CONFIGURATION_SUMMARY+='; examples/lab/fhir-csv.toml'; fi
-if ! "$LAB_ONLY"; then SQC_CONFIGURATION_SUMMARY+='; examples/medication/{request,administration,product,statement,terminology}.toml'; fi
-printf '%s\n' 'Example inputs; real terminology APIs; selected local services.' \
-  "Configuration: $SQC_CONFIGURATION_SUMMARY" \
+SQC_CONFIGURATION_SUMMARY='tests/configurations/lab/aggregated.toml (explicit public test APIs)'
+if ! "$LOOKUP_ONLY"; then SQC_CONFIGURATION_SUMMARY+='; tests/configurations/lab/fhir-csv.toml'; fi
+if ! "$LAB_ONLY"; then SQC_CONFIGURATION_SUMMARY+='; tests/configurations/medication/{request,administration,product,statement,terminology}.toml'; fi
+printf '%s\n' 'Example inputs; real terminology APIs; explicit Blaze built-in LOINC for FHIR validation.' \
+  "Example test fixtures: $SQC_CONFIGURATION_SUMMARY" \
+  "Your own data: edit pipeline.toml and run run-plausibility-check check." \
   "Private test caches: $STATE" "Compose project: $PROJECT" \
   'Host ports are assigned dynamically on localhost; services communicate inside the stack.'
 if ! "$DRY_RUN"; then
-  RUNNER_SHA="$(sqc_fingerprint "$ROOT" compose.yaml .dockerignore deploy/Dockerfile pyproject.toml uv.lock README.md LICENSE NOTICE src examples terminology.example.toml)"
+  RUNNER_SHA="$(sqc_fingerprint "$ROOT" compose.yaml .dockerignore deploy/Dockerfile pyproject.toml uv.lock README.md LICENSE NOTICE catalog.csv src examples tests/configurations)"
 fi
 sqc_ensure_image run-plausibility-check semantic-plausibility-stack:local "$RUNNER_SHA"
 
@@ -174,17 +176,21 @@ prepare_matchbox() {
     && step 'Start cached Matchbox/HL7' pc up -d matchbox && wait_healthy matchbox
 }
 
+# Profile artifacts are downloaded explicitly into this run's persistent local cache.
+step 'Install pinned MII profile and selected HL7 binding (local/profiles)' pc run --rm profile-init profile-init \
+  --config /app/tests/configurations/lab/aggregated.toml
+
 lookup_ready=false
-if report 01-lab-lookup run-plausibility-check check --config /app/pipeline.toml; then lookup_ready=true; fi
+if report 01-lab-lookup run-plausibility-check check --config /app/tests/configurations/lab/aggregated.toml; then lookup_ready=true; fi
 
 if ! "$LOOKUP_ONLY"; then
 if step 'Prepare pinned MII laboratory validator' pc run --rm validator-init validator-init \
-     --config /app/examples/lab/fhir-csv.toml --overwrite \
+     --config /app/tests/configurations/lab/fhir-csv.toml --overwrite \
    && step 'Start local terminology service' pc up -d blaze && wait_healthy blaze \
    && step 'Install real guide terminology' pc run --rm terminology-init terminology-init \
-     --config /app/examples/lab/fhir-csv.toml \
+     --config /app/tests/configurations/lab/fhir-csv.toml \
    && prepare_matchbox; then
-  report 02-lab-fhir-validation run-plausibility-check check --config /app/examples/lab/fhir-csv.toml || true
+  report 02-lab-fhir-validation run-plausibility-check check --config /app/tests/configurations/lab/fhir-csv.toml || true
 else
   record 02-lab-fhir-validation - setup_failed
 fi
@@ -192,11 +198,11 @@ step 'Release validator memory before model inference' stop_services matchbox bl
 
 if "$lookup_ready" \
    && step 'Start local Ollama' pc up -d ollama && wait_healthy ollama \
-   && step 'Provision configured model' pc run --rm model-init \
-   && step 'Download real UCUM catalogue' pc run --rm catalog-init; then
-  report 03-lab-ai-recommendations research-evidence research-evidence --config /app/pipeline.toml \
+   && step 'Provision configured model' pc run --rm model-init model-init --config /app/tests/configurations/lab/aggregated.toml \
+   && step 'Download real UCUM catalogue' pc run --rm catalog-init catalog-init --config /app/tests/configurations/lab/aggregated.toml; then
+  report 03-lab-ai-recommendations research-evidence research-evidence --config /app/tests/configurations/lab/aggregated.toml \
     --scope lookup --report "$CONTAINER_RUN/01-lab-lookup/report.csv" || true
-  report 04-lab-ai-evidence research-evidence research-evidence --config /app/pipeline.toml \
+  report 04-lab-ai-evidence research-evidence research-evidence --config /app/tests/configurations/lab/aggregated.toml \
     --scope studies --report "$CONTAINER_RUN/01-lab-lookup/report.csv" || true
 else
   record 03-lab-ai-recommendations - dependency_failed
@@ -206,12 +212,12 @@ fi
 fi # Full lab workflow; --lookup-only skips validator and model services.
 
 if ! "$LAB_ONLY"; then
-report 05-medication-request run-plausibility-check check --config /app/examples/medication/request.toml || true
-report 06-medication-administration run-plausibility-check check --config /app/examples/medication/administration.toml || true
+report 05-medication-request run-plausibility-check check --config /app/tests/configurations/medication/request.toml || true
+report 06-medication-administration run-plausibility-check check --config /app/tests/configurations/medication/administration.toml || true
 
-report 07-medication-product run-plausibility-check check --config /app/examples/medication/product.toml || true
-report 08-medication-statement run-plausibility-check check --config /app/examples/medication/statement.toml || true
-report 09-medication-terminology run-plausibility-check check --config /app/examples/medication/terminology.toml || true
+report 07-medication-product run-plausibility-check check --config /app/tests/configurations/medication/product.toml || true
+report 08-medication-statement run-plausibility-check check --config /app/tests/configurations/medication/statement.toml || true
+report 09-medication-terminology run-plausibility-check check --config /app/tests/configurations/medication/terminology.toml || true
 fi
 
 if ! "$DRY_RUN"; then

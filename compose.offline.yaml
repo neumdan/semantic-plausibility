@@ -1,5 +1,0 @@
-# Optional network isolation for prebuilt, offline laboratory reviews.
-# Build/pull first while connected. Local packs must already be supplied.
-services:
-  run-plausibility-check:
-    network_mode: none

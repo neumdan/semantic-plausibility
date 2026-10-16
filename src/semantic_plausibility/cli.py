@@ -9,17 +9,36 @@ import sys
 import tomllib
 
 
+def log_configuration(configuration):
+    """Explain the selected workflow without logging credentials or source values."""
+    from .progress import LOGGER
+
+    LOGGER.info("Configuration file: %s", configuration.path)
+    LOGGER.info("Input: %s; resource: %s; mapped columns: %s", configuration.input_type,
+                configuration.kind, len(configuration.input.get("columns", {})))
+    LOGGER.info("Input granularity: %s -> output: %s; network: %s",
+                configuration.input.get("granularity", "individual"),
+                configuration.output.get("mode", "distinct"), configuration.network_mode)
+    LOGGER.info("Target profile: %s; full-resource validation: %s", configuration.profile,
+                "enabled" if configuration.validation.get("enabled") else "disabled")
+    for alias, lookup in configuration.data.get("lookups", {}).items():
+        if lookup.get("enabled", False):
+            LOGGER.info("Terminology %s: %s (%s); %s", alias, lookup.get("type"), lookup.get("role", "primary"),
+                        lookup.get("path") or lookup.get("endpoint") or "configured endpoint")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Local laboratory/medication review; proposals for expert assessment"
+        description="Read CSV, FHIR or database data; group laboratory values; check terminology and plausibility.",
+        epilog="Start: config-check → check → research-evidence --scope studies. Configure pipeline.toml; see examples/lab/README.md."
     )
     sub = parser.add_subparsers(dest="command", required=True)
     batch = sub.add_parser("batch", help="Review an export and write CSV, HTML, evidence and an audit log")
     batch.add_argument("--config", type=Path, default=Path("pipeline.toml"))
-    check = sub.add_parser("check", help="Check source sets and target profile; reuse approved mappings, no model research")
+    check = sub.add_parser("check", help="Read and group source data; check code/name/value/unit/reference context; write CSV + HTML")
     check.add_argument("--config", type=Path, default=Path("pipeline.toml"))
     check.add_argument("--out", type=Path, help="Fresh CSV output prefix; relative to the selected TOML")
-    research = sub.add_parser("research-evidence", help="Research real evidence from a completed check report")
+    research = sub.add_parser("research-evidence", help="Add sourced AI proposals to a checked, aggregated laboratory report")
     research.add_argument("--config", type=Path, default=Path("pipeline.toml"))
     research.add_argument("--report", type=Path)
     research.add_argument("--out", type=Path)
@@ -41,6 +60,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     profile.add_argument("structure_definition", type=Path)
     profile.add_argument("--out", type=Path, required=True)
+    acquire = sub.add_parser("profile-init", help="Download the pinned profile and bindings into local runtime files")
+    acquire.add_argument("--config", type=Path, default=Path("pipeline.toml"))
     config = sub.add_parser("config-check", help="Check TOML setup; optional explicit connection probes")
     config.add_argument("--config", type=Path, default=Path("pipeline.toml"))
     config.add_argument("--connections", action="store_true")
@@ -86,13 +107,8 @@ def main(argv: list[str] | None = None) -> int:
 
             configuration = BatchConfiguration(args.config, research=False if args.command == "check" else None,
                                                output_path=getattr(args, "out", None))
-            LOGGER.info("Input type: %s; resource: %s", configuration.input_type, configuration.kind)
-            LOGGER.info("Grouping: %s; network: %s", configuration.output.get('mode', 'distinct'), configuration.network_mode)
-            for name, lookup in configuration.data.get("lookups", {}).items():
-                if lookup.get("enabled", False):
-                    LOGGER.info("Lookup %s: %s", name, lookup.get('type'))
-            LOGGER.info("Full FHIR input: %s", configuration.full_fhir_input)
-            LOGGER.info("Processing: read -> group -> terminology -> consistency checks -> report")
+            log_configuration(configuration)
+            LOGGER.info("Processing: read input -> group complete semantic sets -> check terminology and field consistency -> CSV + HTML")
             result = run_plausibility_check(args.config, output=args.out) if args.command == "check" else run_batch(args.config)
             print(f"{result.input_records} source records -> {result.distinct_tuples} {configuration.kind} review rows.")
             print("Status counts: " + json.dumps(result.statuses, sort_keys=True))
@@ -113,6 +129,9 @@ def main(argv: list[str] | None = None) -> int:
             result = research_plan(args.config, args.report, scope=args.scope) if args.plan else research_evidence(args.config, args.report, args.out,
                 scope=args.scope, progress=lambda message: print(message, flush=True))
             print(json.dumps(result, ensure_ascii=False, indent=2))
+        elif args.command == "profile-init":
+            from .profile_setup import initialise_profile
+            print(json.dumps(initialise_profile(args.config), indent=2))
         elif args.command == "validator-init":
             from .fhir_validation import initialise_validator
             print(json.dumps(initialise_validator(args.config, overwrite=args.overwrite), indent=2))
@@ -150,8 +169,10 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(f"Selected laboratory policy: {args.out}")
         elif args.command == "config-check":
+            from .batch import BatchConfiguration
             from .deployment_checks import check_configuration
 
+            log_configuration(BatchConfiguration(args.config))
             report = check_configuration(args.config, connections=args.connections)
             target = args.out or args.config.resolve().parent / "output/config-check.json"
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -192,7 +213,7 @@ def run_main(argv=None):
     """The named runner defaults to the deterministic check; legacy CLI stays available."""
     arguments = list(sys.argv[1:] if argv is None else argv)
     commands = {"batch", "check", "research-evidence", "review-import", "compare", "verify", "lookup",
-                "profile-import", "config-check", "model-init", "catalog-init", "package-init", "package-check", "validator-init", "terminology-init", "validate-fhir"}
+                "profile-import", "profile-init", "config-check", "model-init", "catalog-init", "package-init", "package-check", "validator-init", "terminology-init", "validate-fhir"}
     if not arguments or arguments[0] not in commands and arguments[0] not in {"-h", "--help"}:
         arguments.insert(0, "check")
     return main(arguments)

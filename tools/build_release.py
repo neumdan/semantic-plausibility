@@ -19,19 +19,13 @@ ROOT_FILES = {
     "uv.lock",
     ".python-version",
     "compose.yaml",
-    "compose.examples.yaml",
     ".env.example",
     ".dockerignore",
     ".gitignore",
     "LICENSE",
     "NOTICE",
-    "compose.offline.yaml",
-    "compose.gpu.yaml",
-    "compose.mii.yaml",
     "pipeline.example.toml",
-    "pipeline.research.example.toml",
-    "pipeline.fhir.example.toml",
-    "terminology.example.toml",
+    "catalog.csv",
 }
 FOLDERS = {"src", "tests", "examples", "docs", "deploy", "tools", ".github"}
 
@@ -45,7 +39,7 @@ def public_file(path: Path, root: Path) -> bool:
         return False
     return (
         not any(
-            part in {"__pycache__", ".venv", "local", "output", "dist", "build", ".git"}
+            part in {"__pycache__", "node_modules", ".venv", "local", "output", "dist", "build", ".git"}
             for part in relative.parts
         )
         and not (path.name.startswith(".env") and path.name != ".env.example")

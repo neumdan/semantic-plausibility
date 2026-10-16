@@ -15,13 +15,16 @@ from .db_source import _identifier_parts, scan
 from .export_review import InputContractError, _file_payloads, _resources, csv_rows, reject_json_constant
 from .fhir_validation import fhir_json
 
-KINDS = {"Medication", "MedicationRequest", "MedicationAdministration", "MedicationStatement"}
 REGIMEN_KINDS = {"MedicationRequest", "MedicationStatement"}
 FIELDS = {"resource_json", "id", "resource_type", "count", "product_code", "product_system", "product_version",
           "product_name", "form_text", "ingredient_text", "medication_json", "status", "intent",
           "dosage_instructions_json", "dosage_json", "do_not_perform", "duration_value", "duration_code",
           "duration_system", "constant_rate", "source_note"}
 FIELDS |= {f"strength_{side}_{field}" for side in ("numerator", "denominator") for field in ("value", "code", "system")}
+DOSE_FIELDS = {"dosage_text", "route_code", "route_system", "route_text"}
+DOSE_FIELDS |= {f"{prefix}_{field}" for prefix in ("dose", "rate") for field in ("value", "unit", "code", "system")}
+TIMING_FIELDS = {"frequency", "period", "period_unit", "as_needed"}
+FIELDS |= DOSE_FIELDS | TIMING_FIELDS
 UCUM = "http://unitsofmeasure.org"
 
 
@@ -53,6 +56,12 @@ def validate_fields(mapping):
         raise ValueError("Medication columns need medication_json OR product_code/product_system; events also need status, requests intent")
     if "medication_json" in fields and any(f.startswith(("product_", "strength_")) or f in {"form_text", "ingredient_text"} for f in fields):
         raise ValueError("Choose medication_json OR flat product/strength columns; do not mix competing product definitions")
+    if fields & (DOSE_FIELDS | TIMING_FIELDS) and fields & {"dosage_json", "dosage_instructions_json"}:
+        raise ValueError("Choose dosage columns OR a complete dosage JSON column")
+    if kind == "Medication" and fields & (DOSE_FIELDS | TIMING_FIELDS):
+        raise ValueError("Select MedicationRequest, MedicationStatement or MedicationAdministration for dosage columns")
+    if kind == "MedicationAdministration" and fields & TIMING_FIELDS:
+        raise ValueError("Administration uses dose/rate/duration; prescription timing belongs to Request or Statement")
     administration_only = {"dosage_json", "duration_value", "duration_code", "duration_system", "constant_rate"}
     request_only = {"intent", "do_not_perform"}
     wrong = administration_only if kind in REGIMEN_KINDS else {"dosage_instructions_json"}
@@ -99,7 +108,37 @@ def decimal(value):
 def quantity(row, prefix):
     value = row.get(prefix + "value")
     return {k: v for k, v in {"value": decimal(value) if decimal(value) is not None else value,
-                              "code": row.get(prefix + "code"), "system": row.get(prefix + "system")}.items() if v not in (None, "")}
+                              "unit": row.get(prefix + "unit"), "code": row.get(prefix + "code"),
+                              "system": row.get(prefix + "system")}.items() if v not in (None, "")}
+
+
+def dosage_from_columns(row, kind):
+    """One explicit instruction per row. Native FHIR/DB JSON preserves complex regimens."""
+    result = {}
+    if row.get("dosage_text"):
+        result["text"] = row["dosage_text"]
+    route = {k: row["route_" + k] for k in ("code", "system") if row.get("route_" + k)}
+    if route or row.get("route_text"):
+        result["route"] = {"coding": [route]} if route else {}
+        if row.get("route_text"):
+            result["route"]["text"] = row["route_text"]
+    dose, rate = quantity(row, "dose_"), quantity(row, "rate_")
+    if kind in REGIMEN_KINDS:
+        repeat = {field: decimal(row[field]) if decimal(row[field]) is not None else row[field]
+                  for field in ("frequency", "period") if row.get(field) not in (None, "")}
+        if row.get("period_unit"):
+            repeat["periodUnit"] = row["period_unit"]
+        if repeat:
+            result["timing"] = {"repeat": repeat}
+        needed = boolean(row.get("as_needed"), "as_needed")
+        if needed is not None:
+            result["asNeededBoolean"] = needed
+        quantities = {key: value for key, value in (("doseQuantity", dose), ("rateQuantity", rate)) if value}
+        if quantities:
+            result["doseAndRate"] = [quantities]
+    else:
+        result.update({key: value for key, value in (("dose", dose), ("rateQuantity", rate)) if value})
+    return result
 
 
 def from_row(row, config):
@@ -120,14 +159,17 @@ def from_row(row, config):
     resource = {"resourceType": kind, "status": row.get("status", ""), "id": row.get("id", "")}
     if kind in REGIMEN_KINDS:
         field = "dosageInstruction" if kind == "MedicationRequest" else "dosage"
-        resource[field] = decode(row.get("dosage_instructions_json") or "[]", list, "dosage instructions")
+        scalar = dosage_from_columns(row, kind)
+        resource[field] = (decode(row["dosage_instructions_json"], list, "dosage instructions")
+                           if row.get("dosage_instructions_json") else [scalar] if scalar else [])
     if kind == "MedicationRequest":
         resource["intent"] = row.get("intent", "")
         flag = boolean(row.get("do_not_perform"), "do_not_perform")
         if flag is not None:
             resource["doNotPerform"] = flag
     elif kind == "MedicationAdministration":
-        resource["dosage"] = decode(row.get("dosage_json") or "{}", dict, "dosage")
+        resource["dosage"] = (decode(row["dosage_json"], dict, "dosage") if row.get("dosage_json")
+                               else dosage_from_columns(row, kind))
     elif kind == "Medication":
         if "status" not in row and "status" in medication:
             resource["status"] = medication["status"]

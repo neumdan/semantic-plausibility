@@ -11,30 +11,30 @@ from semantic_plausibility.batch import BatchConfiguration
 from semantic_plausibility.deployment_checks import check_configuration
 
 ROOT = Path(__file__).resolve().parents[1]
-CONFIG = ROOT / 'terminology.example.toml'
+CONFIG = ROOT / 'tests/configurations/terminology.toml'
 
 
 class DomainConfigurationTests(unittest.TestCase):
     def test_all_medication_recipes_select_an_actual_resource_and_pinned_guide(self):
-        for path in (ROOT / 'examples/medication').glob('*.toml'):
+        for path in (ROOT / 'tests/configurations/medication').glob('*.toml'):
             with self.subTest(path=path.name):
                 config = BatchConfiguration(path)
                 self.assertIn(config.kind, {'Medication', 'MedicationRequest', 'MedicationAdministration', 'MedicationStatement'})
                 self.assertEqual(config.data['specification']['IG_VERSION'], '2026.0.1')
                 self.assertTrue(config.path_value(config.input['path']).is_file())
-        self.assertFalse(BatchConfiguration(ROOT / 'examples/medication/terminology.toml').validation['enabled'])
+        self.assertFalse(BatchConfiguration(ROOT / 'tests/configurations/medication/terminology.toml').validation['enabled'])
 
     def test_mtls_configuration_preserves_relative_paths_and_rejects_partial_credentials(self):
         base = BatchConfiguration(CONFIG)
         row = dict(base.data['lookups']['mii_termserv'], enabled=True)
         transformed = base.lookup_settings({'mii': row})['sources'][0]
-        self.assertEqual(transformed['client_key'], 'local/secrets/mii-client.key')
+        self.assertEqual(transformed['client_key'], '../../local/secrets/mii-client.key')
         for override in ({'client_key': ''}, {'client_cert': ''}, {'type': 'csv'}):
             with self.subTest(override=override), self.assertRaisesRegex(ValueError, 'mTLS requires both'):
                 base.lookup_settings({'mii': {**row, **override}})
         with tempfile.TemporaryDirectory() as name:
             path = Path(name) / 'pipeline.toml'
-            text = (ROOT / 'pipeline.example.toml').read_text().replace('"examples/', '"' + str(ROOT / 'examples') + '/')
+            text = (ROOT / "pipeline.example.toml").read_text().replace('path = "catalog.csv"', 'path = "' + str(ROOT / "catalog.csv") + '"').replace('"local/profiles/', '"' + str(ROOT / "local/profiles") + '/').replace('"examples/', '"' + str(ROOT / 'examples') + '/')
             text += '\n[lookups.mii]\nenabled=true\ntype="fhir"\nendpoint="https://ontoserver.mii-termserv.de/fhir"\nsystems=["http://snomed.info/sct"]\nclient_cert="local/secrets/missing.crt"\nclient_key="local/secrets/missing.key"\n'
             path.write_text(text)
             # Readiness fails locally. No network call and no invented certificate.
@@ -68,12 +68,12 @@ class PublicDomainTerminologyTests(unittest.TestCase):
 
     def test_complete_medication_example_keeps_sources_in_csv_and_html(self):
         with tempfile.TemporaryDirectory() as name:
-            result = run_plausibility_check(ROOT / 'examples/medication/terminology.toml', output=Path(name) / 'report.csv')
+            result = run_plausibility_check(ROOT / 'tests/configurations/medication/terminology.toml', output=Path(name) / 'report.csv')
             self.assertEqual(result.distinct_tuples, 2)
             with result.csv.open(newline='') as f:
                 rows = list(csv.DictReader(f))
             for row in rows:
-                self.assertIn('https://tx.fhir.org/r4', row['sources_json'])
+                self.assertTrue(any('https://tx.fhir.org/r4' in value for key, value in row.items() if '.source.' in key))
             evidence = [json.loads(line) for line in result.csv.with_suffix('.evidence.jsonl').read_text().splitlines()]
             verified = {(item['system'], item['code']) for row in evidence for item in row['terminology'] if item['state'] == 'valid'}
             for alias, code in [('atc_who', 'N02BE01'), ('snomed', '387517004'), ('rxnorm', '161'), ('unii', '362O9ITL9D'), ('edqm', '10219000')]:

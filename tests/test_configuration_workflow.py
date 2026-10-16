@@ -34,7 +34,7 @@ class ConfigurationWorkflowTests(unittest.TestCase):
             folder = Path(name)
             bad = folder / "bad.csv"
             bad.write_text("unrelated_column\n")
-            text = (ROOT / "pipeline.example.toml").read_text()
+            text = (ROOT / "pipeline.example.toml").read_text().replace('path = "catalog.csv"', 'path = "' + str(ROOT / "catalog.csv") + '"').replace('"local/profiles/', '"' + str(ROOT / "local/profiles") + '/')
             text = text.replace('"examples/', '"' + str(ROOT / "examples") + "/")
             text = text.replace('mode = "lookups"', 'mode = "offline"')
             text += '\n[lookups.local_loinc]\nenabled=true\ntype="loinc_csv"\nsystems=["http://loinc.org"]\nversion="2.83"\npath="bad.csv"\n'
@@ -52,7 +52,7 @@ class ConfigurationWorkflowTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as name:
             path = Path(name) / "pipeline.toml"
-            path.write_text((ROOT / "pipeline.example.toml").read_text().replace('mode = "lookups"', 'mode = "offline"'))
+            path.write_text((ROOT / "pipeline.example.toml").read_text().replace('path = "catalog.csv"', 'path = "' + str(ROOT / "catalog.csv") + '"').replace('"local/profiles/', '"' + str(ROOT / "local/profiles") + '/').replace('mode = "lookups"', 'mode = "offline"'))
             with redirect_stdout(io.StringIO()) as output:
                 self.assertEqual(run_main(["package-check", "--config", str(path)]), 0)
             result = json.loads(output.getvalue())
@@ -73,7 +73,7 @@ class ConfigurationWorkflowTests(unittest.TestCase):
                 ('level = "INFO"', 'level="VERBOSE"'),
                 ('strategy = "fallback"', 'strategy="internet-everywhere"'),
             ]:
-                path.write_text((ROOT / "pipeline.example.toml").read_text().replace(original, bad))
+                path.write_text((ROOT / "pipeline.example.toml").read_text().replace('path = "catalog.csv"', 'path = "' + str(ROOT / "catalog.csv") + '"').replace('"local/profiles/', '"' + str(ROOT / "local/profiles") + '/').replace(original, bad))
                 with self.assertRaises(ValueError):
                     BatchConfiguration(path)
 
@@ -107,6 +107,13 @@ class OfficialLocalLoincTests(unittest.TestCase):
         self.assertEqual(source.check("http://loinc.org", "718-7", "not-this-edition")["state"], "unknown")
         self.assertEqual(source.check("http://loinc.org", "not-a-code", version)["state"], "invalid")
         self.assertEqual(len(result["source_sha256"]), 64)
+        from semantic_plausibility.local_terminology import loinc_code_system
+        resource, digest = loinc_code_system(path, version=version, complete=True)
+        self.assertEqual(digest, result["source_sha256"])
+        self.assertEqual(resource["count"], len(source.terms))
+        concept = next(row for row in resource["concept"] if row["code"] == "718-7")
+        self.assertEqual(concept["display"], result["metadata"]["display"])
+        self.assertTrue(any(row["code"] == "EXAMPLE_UCUM_UNITS" for row in concept["property"]))
 
 
 @unittest.skipUnless(os.getenv("SQC_TEST_ATC_DIR"), "Supply an already downloaded real BfArM ATC/DDD package")

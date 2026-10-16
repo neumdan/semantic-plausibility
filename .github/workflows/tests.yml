@@ -12,11 +12,12 @@ jobs:
           enable-cache: true
       - run: uv sync --locked --no-editable --extra postgres --group dev
       - run: uv run --no-sync ruff check src tests tools run-plausibility-check.py
+      - run: uv run --no-sync run-plausibility-check profile-init --config pipeline.example.toml
       - run: uv run --no-sync python -m unittest discover -s tests -v
         env:
           SQC_LIVE_TESTS: "1"
-      - run: uv run --no-sync run-plausibility-check config-check --config pipeline.example.toml --out output/config-check.json
-      - run: uv run --no-sync run-plausibility-check --config pipeline.example.toml
-      - run: uv run --no-sync run-plausibility-check verify output/laboratory-review.audit.jsonl
+      - run: uv run --no-sync run-plausibility-check config-check --config tests/configurations/lab/aggregated.toml --out output/config-check.json
+      - run: uv run --no-sync run-plausibility-check --config tests/configurations/lab/aggregated.toml
+      - run: uv run --no-sync run-plausibility-check verify output/lab-summary.audit.jsonl
       - run: uv build --wheel
       - run: uv run --no-sync python tools/build_release.py

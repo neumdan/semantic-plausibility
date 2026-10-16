@@ -17,9 +17,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def configuration(folder, *, connected=False, name="review.csv"):
     text = (ROOT / "pipeline.example.toml").read_text()
-    text = text.replace('"examples/', '"' + str(ROOT / "examples") + '/')
+    text = text.replace('path = "catalog.csv"', 'path = ' + json.dumps(str(ROOT / 'catalog.csv')))
+    text = text.replace('"local/profiles/', '"' + str(ROOT / 'local/profiles') + '/')
+    if not (ROOT / 'local/profiles/ObservationLab-2026.0.3.json').is_file():
+        raise unittest.SkipTest('Run profile-init --config pipeline.example.toml for tests using the real MII profile')
+    text = text.replace('"examples/',  '"' + str(ROOT / "examples") + '/')
     text = text.replace('path = "examples/laboratory.csv"', 'path = ' + json.dumps(str(ROOT / "examples/laboratory.csv")))
     text = text.replace('path = "output/laboratory-review.csv"', 'path = ' + json.dumps(str(folder / name)))
+    # Regression tests select the real public test service explicitly.
+    text = text.replace('source = "loinc-api"', 'source = "loinc-public-test"')
     if not connected:
         text = text.replace('mode = "lookups"', 'mode = "offline"')
     path = folder / "pipeline.toml"
@@ -105,7 +111,7 @@ class BatchTests(unittest.TestCase):
                     BatchConfiguration(self.config)
 
     def test_optional_package_configuration_is_pinned_and_does_not_activate_sources(self):
-        source = ROOT / 'terminology.example.toml'
+        source = ROOT / 'tests/configurations/terminology.toml'
         config = BatchConfiguration(source)
         self.assertFalse(config.data['packages']['loinc_de']['enabled'])
         self.assertFalse(config.data['lookups']['icd11']['enabled'])
@@ -137,7 +143,7 @@ class BatchTests(unittest.TestCase):
             verify_audit(result.log)
 
     def test_published_mii_profile_imports_real_rules(self):
-        policy = import_structure_definition(ROOT / 'examples/profiles/ObservationLab-2026.0.3.json')
+        policy = import_structure_definition(ROOT / 'local/profiles/ObservationLab-2026.0.3.json')
         self.assertIn('medizininformatik-initiative', policy['canonical'])
         self.assertEqual(policy['guide_version'], '2026.0.3')
 

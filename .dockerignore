@@ -21,3 +21,9 @@ deploy/.env
 dist
 build
 *.sqlite*
+
+!tests/configurations/terminology.toml
+!tests/configurations/medication/terminology.toml
+
+**/node_modules
+input

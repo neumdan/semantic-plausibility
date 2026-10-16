@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .export_report import ratio
 from .fhir_quality_pipeline import number
-from .support import _csv_text
+from .tabular_report import ColumnWriter, flatten
 
 
 def read_report(path):
@@ -77,20 +77,26 @@ def compare_reports(baseline, targets, output):
                     unknown += 1
                     value_comparison = "summaries_only_no_exact_congruence_proof"
             row = b or a
-            table.append({"target": label, "semantic_signature": key, "code": row["code"], "unit_code": row["unit_code"],
+            comparison = {"target": label, "semantic_signature": key, "code": row["code"], "unit_code": row["unit_code"],
                 "comparison": state, "value_comparison": value_comparison, "target_minus_baseline_count": count_difference,
-                "baseline_reference_ranges": a.get("reference_ranges_json", "") if a else "",
-                "target_reference_ranges": b.get("reference_ranges_json", "") if b else ""})
+            }
+            for side, item in (("baseline", a), ("target", b)):
+                if not item:
+                    continue
+                # Scalar columns from current reports; parse the original array for older reports.
+                comparison.update({side + "." + field.removeprefix("input."): value
+                                   for field, value in item.items() if field.startswith("input.reference_ranges.")})
+                if item.get("reference_ranges_json"):
+                    flatten(json.loads(item["reference_ranges_json"]), side + ".reference_ranges", comparison)
+            table.append(comparison)
         comparisons.append({"target": label, "baseline_groups": len(source), "target_groups": len(rows),
             "shared_groups": len(shared), "missing_or_changed_context": len(missing), "added_or_changed_context": len(added),
             "baseline_group_coverage": ratio(len(shared), len(source)), "changed_value_distributions": changed_values,
             "changed_known_frequencies": changed_frequency, "exact_value_comparison_unavailable": unknown,
             "target_readiness": summary["metrics"]["mii_numeric_set_ready"]})
-    fields = list(table[0]) if table else ["target", "comparison"]
-    with files[0].open("w", encoding="utf-8-sig", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields)
-        writer.writeheader()
-        writer.writerows({key: _csv_text(str(value)) for key,value in row.items()} for row in table)
+    with files[0].open("w", encoding="utf-8-sig", newline="") as handle, ColumnWriter(handle) as writer:
+        for row in table:
+            writer.writerow(row)
     report = {"scope": "matched_export_group_and_value_frequency_comparison", "study": study,
         "cohort_equivalence": "operator_declared_not_independently_proven", "comparisons": comparisons,
         "limitations": ["No patient/event linkage is reconstructed from distinct exports",

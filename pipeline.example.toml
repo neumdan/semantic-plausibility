@@ -1,8 +1,14 @@
-# Input: illustrative laboratory measurements, not clinical reference evidence.
-# Lookups: real public services. Paths are relative to this configuration.
-# Copy to pipeline.toml: the default for Python, Docker Compose and podman-compose.
-# Setup: docs/shipped-stack.md. Configuration reference: docs/configuration.md.
+# LABORATORY SETUP: copy once to pipeline.toml and edit that file.
+# All commands and Python/Docker/Podman use it by default.
+# Choose your LOINC source in section 4; run profile-init once for section 3.
+# Source files are illustrative; terminology services are real.
 config_version = 3
+
+[catalog]
+path = "catalog.csv" # Service/download metadata only; extend this CSV with your sources.
+
+# 1. INPUT — change this block for your CSV, FHIR file or database.
+# Left = pipeline field; right = your column. Recipes: examples/lab/README.md.
 
 [general]
 PROJECT_NAME = "laboratory-review"
@@ -16,7 +22,7 @@ path = "examples/laboratory.csv"      # Your export: local/laboratory.csv
 granularity = "distinct"             # count contains the source frequency
 
 [input.columns]
-analyte_name = "source_test"          # In this example source_test contains the analyte name.
+analyte_name = "analyte_name"          # Explicit source analyte/test label.
 code = "code"
 code_system = "code_system"
 value = "value"
@@ -24,16 +30,32 @@ unit = "unit"
 unit_code = "unit_code"
 unit_system = "unit_system"
 count = "count"
-reference_ranges_json = "reference_ranges_json"
+reference_low = "reference_low"
+reference_high = "reference_high"
+reference_unit = "reference_unit"
+reference_unit_system = "reference_unit_system"
+range_text = "range_text"
 specimen = "specimen"
 source_test = "source_test"
 status = "status"
 
+# 2. OUTPUT — distinct aggregates individual values before evidence research.
+# Use a fresh --out filename for each run; mode="items" retains IDs for A1 review.
+
+[output]
+mode = "distinct"                   # Aggregate each semantic set before evidence research.
+path = "output/laboratory-review.csv" # Optional per-run override: run-plausibility-check --out output/01-lookup.csv
+
+# 3. LABORATORY TARGET — pinned MII profile; optional full-resource validation.
+
 [specification]
 FHIR_VERSION = "4.0.1"
 PROFILE = "mii-kds-lab"
-STRUCTURE_DEFINITION = "examples/profiles/ObservationLab-2026.0.3.json"
-VALUE_SETS = ["examples/profiles/results-laboratory-observations-uv-ips.json"]
+STRUCTURE_DEFINITION = "local/profiles/ObservationLab-2026.0.3.json"
+VALUE_SETS = ["local/profiles/results-laboratory-observations-uv-ips.json"]
+# profile-init downloads this exact profile package and selected binding; checks only read local files.
+BINDING_URLS = ["https://hl7.org/fhir/uv/ips/ValueSet-results-laboratory-observations-uv-ips.json"]
+BINDING_VERSIONS = ["1.1.0"]
 IG_PACKAGE = "de.medizininformatikinitiative.kerndatensatz.laborbefund"
 IG_VERSION = "2026.0.3"
 IG_CANONICAL = "https://www.medizininformatik-initiative.de/fhir/core/modul-labor/StructureDefinition/ObservationLab"
@@ -43,24 +65,47 @@ resource = "https://hl7.org/fhir/R4/observation.html"
 guide = "https://www.medizininformatik-initiative.de/Kerndatensatz/KDS_Laborbefund_2026/MIIIGModulLaborbefund.html"
 source = "https://github.com/medizininformatik-initiative/kerndatensatzmodul-labor"
 
+[validation]
+# Enable for complete FHIR resources after following docs/validation.md.
+enabled = false
+backend = "matchbox"
+endpoint = "http://127.0.0.1:8081/matchboxv3/fhir"
+container_endpoint = "http://matchbox:8080/matchboxv3/fhir"
+terminology_server = "http://blaze:8080/fhir"
+terminology_endpoint = "http://127.0.0.1:8082/fhir"
+timeout_seconds = 180
+fail_on_error = true
+
+# 4. TERMINOLOGY — choose one LOINC route; catalog.csv supplies the defaults.
+# A. loinc-api: put LOINC_FHIR_USERNAME and LOINC_FHIR_PASSWORD in .env.
+# B. loinc-file: download full Loinc.csv to local/terminologies/loinc/;
+#    change source below, add version="2.83" (your edition) and complete=true.
+# Optional local server: see docs/lookups.md. BfArM translation files add labels.
+
 [network]
 mode = "lookups"
-allowed_http_hosts = ["ollama", "host.containers.internal", "host.docker.internal"]
+allowed_http_hosts = ["ollama", "ucum", "blaze", "host.containers.internal", "host.docker.internal"]
 
-[lookups.ucum]
-role = "primary"
-enabled = true
-type = "ucum"
-endpoint = "https://ucum.nlm.nih.gov/ucum-service/v1"
+[terminology]
+strategy = "fallback" # Local files first, then enabled APIs; "all" records every configured source.
 
 [lookups.loinc]
-role = "primary"
 enabled = true
-type = "loinc"
-endpoint = "https://tx.fhir.org/r4"   # Public test service; observed release is recorded.
-# Official alternative: https://fhir.loinc.org requires these credentials.
-# username_env = "LOINC_FHIR_USERNAME"
-# password_env = "LOINC_FHIR_PASSWORD"
+role = "primary"
+source = "loinc-api"
+
+[lookups.ucum]
+enabled = true
+role = "primary"
+source = "ucum-api" # Or ucum-local after starting the optional ucum container.
+
+[lookups.bfarm_lab]
+enabled = false
+role = "optional"
+source = "bfarm-lab" # Manual downloads under local/terminologies/bfarm-lab/.
+
+# 5. OPTIONAL AI — used by research-evidence, after check.
+# --scope lookup: suggestions; --scope studies: suggestions + literature.
 
 [models.local]
 container_base_url = "http://ollama:11434/v1" # Compose Ollama; native inference uses base_url(_env) below.
@@ -80,49 +125,6 @@ max_articles_per_loinc = 4           # Model extraction budget after relevance s
 unit_catalog = "local/unit-catalog.json"
 loinc_website_base_url = "https://loinc.org"
 
-[output]
-mode = "distinct"                   # items requires individual input and retains IDs.
-path = "output/laboratory-review.csv" # Optional per-run override: run-plausibility-check --out output/01-lookup.csv
-# Existing reports are protected; use a new filename or explicitly overwrite=true.
-# lookup_pack = "output/lookups.json" # Optional capture of actual service responses.
-
-# Add your REAL site catalogue before interpreting local LIS codes/units.
-# No site-specific catalogue is generated by this project.
-# [lookups.lis_catalogue]
-# enabled = true
-# role = "source"
-# type = "csv"                    # fhir_artifacts / sqlite / fhir also supported
-# path = "local/terminologies/lis-catalogue.csv"
-# systems = ["https://your-site.example/lis/tests", "https://your-site.example/lis/units"]
-# complete = false                # true only for a complete edition
-
-[quality]
-# Create this registry with review-import after checking and clinician review.
-# review_registry = "local/clinician-mappings.json"
-
-[lookups.bfarm_lab]
-# Real BfArM FHIR JSON supplements, installed by the operator.
-enabled = false
-role = "optional"
-type = "fhir_artifacts"
-path = "local/terminologies/bfarm-lab"
-systems = ["http://loinc.org", "http://unitsofmeasure.org"]
-
-[validation]
-# Matchbox uses the official HL7 validator: fhir_file or CSV resource_json input.
-# Mode-2 recipe: examples/lab/fhir-csv.toml; scalar tuples remain not_applicable.
-enabled = false
-backend = "matchbox"
-endpoint = "http://127.0.0.1:8081/matchboxv3/fhir"
-container_endpoint = "http://matchbox:8080/matchboxv3/fhir"
-terminology_server = "http://blaze:8080/fhir"
-terminology_endpoint = "http://127.0.0.1:8082/fhir"
-timeout_seconds = 180
-fail_on_error = true
-# additional_packages = [] # Extra real guides use pinned package#version entries.
-# token_env = "FHIR_VALIDATOR_TOKEN" # Only for a protected local validator.
-
-
 [research.europe_pmc]
 BASE_URL = "https://www.ebi.ac.uk/europepmc/webservices/rest"
 MAX_RESULTS = 6                     # Candidates per search, screened before model calls
@@ -132,29 +134,8 @@ QUERY_FILTER = '(human OR humans OR patients OR volunteers OR healthy OR populat
 [research.pubmed]
 BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 MAX_RESULTS = 3
-# API_KEY_ENV = "PUBMED_API_KEY"      # Optional credential reference, never a literal secret.
 
-[lookups.semlook]
-role = "optional"
-enabled = true
-type = "ols"
-systems = ["http://loinc.org"]
-endpoint = "https://semanticlookup.zbmed.de/ols/api"
-ontology = "loinc"
-limit = 5
-
-[terminology]
-strategy = "fallback" # Local first; then enabled sources for the exact system. "all" cross-checks them all.
+# RUN LOG — INFO explains phases and counts; DEBUG adds diagnostic detail.
 
 [logging]
 level = "INFO" # Override per run with --log-level DEBUG; values and credentials are not console-logged.
-
-# Optional full official LOINC table; local membership, names, axes and example units.
-# [lookups.loinc_local]
-# enabled = true
-# role = "primary"
-# type = "loinc_csv"
-# systems = ["http://loinc.org"]
-# path = "../input/terminologies/loinc/Loinc.csv"
-# version = "2.83"               # Actual downloaded edition.
-# complete = true                # Full release only.

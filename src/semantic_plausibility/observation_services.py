@@ -563,7 +563,6 @@ class OpenAICompatibleJsonClient:
         return result
 
 
-GptOssClient = OpenAICompatibleJsonClient  # compatibility with earlier imports
 
 
 class PublicEvidenceClient:

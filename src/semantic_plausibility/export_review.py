@@ -34,11 +34,12 @@ from .export_report import (
     versions,
     write_html,
 )
-from .support import _csv_text, _input_hash, read_contexts
+from .support import _input_hash, read_contexts
 from .observation_quality import LoincTerm
 from .terminology_router import TerminologyRouter, artifact_files, load_sources
 from .review_feedback import REVIEW_FIELDS, ReviewRegistry
 from .report_sources import SET_FIELDS, review_set_fields
+from .tabular_report import ColumnWriter, project
 from .report_context import run_context, item_context, execution_position, execution_since
 
 _CSV_LOCK = RLock()
@@ -446,6 +447,7 @@ def mapping_proposal(row, evidence, proposals):
 
 def reference_artifacts(config):
     paths = {
+        "source_catalog": str(config.catalog_path) if config.catalog_path else None,
         "reference_pack": config.input.get("snapshot"),
         "context": config.input.get("context_file"),
         "profile": config.data.get("specification", {}).get("STRUCTURE_DEFINITION")
@@ -622,6 +624,7 @@ def _review_export(config):
         raise ValueError("Output paths must not collide")
     protected = {
         config.path,
+        *([config.catalog_path] if config.catalog_path else []),
         *[
             config.path_value(value)
             for value in (
@@ -837,10 +840,13 @@ def _review_export(config):
                 with (
                     csv_file.open("w", encoding="utf-8-sig", newline="") as output,
                     evidence_file.open("w", encoding="utf-8") as evidence_out,
+                    ColumnWriter(output) as writer,
                 ):
-                    writer = csv.DictWriter(output, fieldnames=all_fields)
-                    writer.writeheader()
-                    for key, payload, stats, metadata in groups.groups():
+                    for group_number, (key, payload, stats, metadata) in enumerate(groups.groups(), 1):
+                        if group_number == 1 or group_number == accounting["groups"] or group_number % 100 == 0:
+                            from .progress import LOGGER
+                            LOGGER.info("Check group %s/%s: terminology, code/unit fit and value/reference consistency",
+                                        group_number, accounting["groups"])
                         execution_start = execution_position(checker)
                         raw_row, detail = checker.assess(payload, stats)
                         detail = {
@@ -969,13 +975,9 @@ def _review_export(config):
                         detail["assessment_context"] = item_context(assessment_run, row, detail)
                         detail["assessment_context"]["execution"] = execution_since(checker, execution_start)
                         row["assessment_context_json"] = encoded(detail["assessment_context"])
-                        selected = {
-                            field: _csv_text(str(row[field]))
-                            if isinstance(row.get(field), str)
-                            else row.get(field, "")
-                            for field in all_fields
-                        }
-                        writer.writerow(selected)
+                        selected = {field: row.get(field, "") for field in all_fields}
+                        writer.writerow(project(selected, detail, operation=config.operation))
+                        detail["report_row"] = {field: value for field, value in selected.items() if field != "evidence_json"}
                         evidence_out.write(encoded(detail) + "\n")
                         if len(preview) < 2000:
                             preview.append(selected)

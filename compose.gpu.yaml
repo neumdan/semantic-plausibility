@@ -1,5 +1,0 @@
-# Linux + NVIDIA drivers + configured CDI. Not for macOS VM GPU passthrough.
-# podman-compose -f compose.yaml -f compose.gpu.yaml --profile research up -d ollama
-services:
-  ollama:
-    devices: ["nvidia.com/gpu=all"]

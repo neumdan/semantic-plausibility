@@ -62,7 +62,7 @@ def run_context(config, prepared, *, output_path=None, source_report=None, sourc
             "configuration_file": str(config.path), "configuration_sha256": config.deployment.sha256,
             "operation": config.operation, "level": "A3" if scope == "studies" else "A2" if scope == "lookup" else "A1",
             "resource_type": config.kind, "network_mode": config.network_mode,
-            "input": source, "output": {"mode": config.output.get("mode", "distinct"), "path": str(output_path or config.output.get("path", ""))},
+            "input": source, "output": {"csv_layout": "scalar-columns-v1", "mode": config.output.get("mode", "distinct"), "path": str(output_path or config.output.get("path", ""))},
             "grouping": {"engine": "duckdb", "group_by": sorted(config.group_by) if config.kind == "Observation" else "Complete medication, dosage, status and context set"},
             "target": select(config.data.get("specification", {}), ("FHIR_VERSION", "PROFILE", "PROFILE_VERSION", "IG_PACKAGE", "IG_VERSION", "IG_CANONICAL", "STRUCTURE_DEFINITION", "PROFILE_FILE", "VALUE_SETS")),
             "lookup_strategy": config.lookup_strategy, "configured_lookups": lookups,

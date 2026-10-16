@@ -10,7 +10,8 @@ pipeline.toml
 pipeline.research.toml
 pipeline.fhir.toml
 terminology.toml
-!examples/medication/terminology.toml
+!tests/configurations/**/terminology.toml
+!tests/configurations/terminology.toml
 .env.*
 !.env.example
 deploy/.env
@@ -24,3 +25,9 @@ build/
 *.duckdb
 *.duckdb.wal
 *.run.lock
+
+# Operator data and downloaded artifacts always stay outside Git.
+input/
+**/node_modules/
+*.tgz
+*.zip

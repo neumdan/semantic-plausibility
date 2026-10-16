@@ -1,6 +1,5 @@
 """One-shot medication review: bounded DuckDB grouping, sourced reports and audit."""
 from contextlib import closing
-import csv
 from decimal import Decimal
 import hashlib
 from html import escape
@@ -14,24 +13,17 @@ import uuid
 import duckdb
 
 from .audit import encoded
-from .support import _csv_text
 from .batch import BatchResult
 from .deployment import environment
 from .export_report import AuditLog, ratio, versions
 from .export_review import InputContractError, _input_hash, reference_artifacts
+from .tabular_report import ColumnWriter, project
 from .fhir_validation import fhir_json, validate_input
 from .medication_checks import MedicationChecker, SCOPE, terminology_plan
 from .medication_input import records
 from .report_context import run_context, item_context, run_context_html, item_context_html
 from .report_comparison import CSS as comparison_css, legend_html, field_table_html, field_details_html
 from .medication_report_table import medication_fields
-
-FIELDS = ["tuple_id", "resource_type", "source_rows", "occurrence_count", "frequency_known", "status",
-          "medication_status", "intent", "product_name", "product_codings_json", "medication_json",
-          "dosage_json", "duration_json", "constant_rate_asserted", "source_set_json",
-          "code_check", "unit_check", "dose_check", "canonical_names_json", "findings_json",
-          "recommendations_json", "sources_json", "ddd_references_json", "clinical_dose_safety", "fhir_validation_state", "assessment_context_json"]
-
 
 def quantity_text(value):
     """Display the supplied quantity, without converting or approving it."""
@@ -214,10 +206,7 @@ def review_medication(config):
                 assessment_run = run_context(config, prepared, output_path=target)
                 checker = MedicationChecker(config, prepared)
                 preview, statuses, total, ready, known_occurrences, unknown_groups = [], {}, 0, 0, 0, 0
-                fields = FIELDS + (["source_id", "source_ref"] if mode == "items" else [])
-                with (folder / paths["csv"].name).open("w", encoding="utf-8-sig", newline="") as out, (folder / paths["evidence"].name).open("w", encoding="utf-8") as evidence:
-                    writer = csv.DictWriter(out, fieldnames=fields)
-                    writer.writeheader()
+                with (folder / paths["csv"].name).open("w", encoding="utf-8-sig", newline="") as out, (folder / paths["evidence"].name).open("w", encoding="utf-8") as evidence, ColumnWriter(out) as writer:
                     cursor = db.execute("SELECT * FROM groups ORDER BY key")
                     while batch := cursor.fetchmany(100):
                         for key, text, nrows, occurrences, known, identifier, ref in batch:
@@ -243,7 +232,8 @@ def review_medication(config):
                                 row.update(source_id=identifier, source_ref=ref)
                             detail["assessment_context"] = item_context(assessment_run, row, detail)
                             row["assessment_context_json"] = encoded(detail["assessment_context"])
-                            writer.writerow({k: _csv_text(v) if isinstance(v, str) else v for k, v in row.items()})
+                            writer.writerow(project(row, detail, operation=config.operation))
+                            detail["report_row"] = row
                             evidence.write(fhir_json(detail) + "\n")
                             if len(preview) < 2000:
                                 preview.append((row, detail))

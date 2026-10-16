@@ -1,10 +1,10 @@
 """Text-processing contracts; no simulated terminology or model responses."""
-import csv
 import json
 import os
 from pathlib import Path
 import unittest
 
+from semantic_plausibility.review_feedback import report_details
 from semantic_plausibility.study_sources import study_text, unit_key, unit_tokens, source_unit, ucum_spelling, quantity_exclusion, provider_query, ambiguous_analyte_clause
 from semantic_plausibility.model_schemas import _analyte_guard, validate_grounding, guard_study_parts, resolve_sentences, ground_study_units
 
@@ -89,26 +89,25 @@ class RecordedStudyTests(unittest.TestCase):
                     accepted, rejected = guard_study_parts(grounded, call['evidence'])
                     self.assertEqual(accepted, call['response'])
                     self.assertEqual(rejected, call['extraction_rejections'])
-        with path.open(encoding='utf-8-sig') as stream:
-            for row in csv.DictReader(stream):
-                self.assertEqual(row['approved_mapping_ready'], 'False')
-                fields = {f.name: f for f in laboratory_fields(row, summary)}
-                if row.get('value_numeric_ready') == 'False':
-                    self.assertEqual(fields['Value / statistics'].source_state, 'red')
-                    self.assertEqual(fields['Value / statistics'].proposal_state, 'red')
-                records = json.loads(row['study_evidence_json'])
-                for record in records:
-                    if record.get('status') != 'candidate':
-                        continue
-                    self.assertTrue(record['source'].startswith('https://'))
-                    self.assertEqual(len(record['source_sha256']), 64)
-                    self.assertTrue(record['excerpt'])
-                    if record.get('unit_ucum'):
-                        self.assertEqual(record['unit_validation_state'], 'valid')
-                        self.assertEqual(record['unit_ucum'], ucum_spelling(record['unit']))
-                        self.assertTrue(record['unit_validation_source'])
-                if any(r.get('status') == 'candidate' and r.get('evidence_type') == 'reference_interval' for r in records):
-                    self.assertEqual(fields['Reference ranges'].proposal_state, 'yellow')
+        for row in report_details(path, hydrate=True)[0]:
+            self.assertIn(row['approved_mapping_ready'], (False, 'False'))
+            fields = {f.name: f for f in laboratory_fields(row, summary)}
+            if row.get('value_numeric_ready') in (False, 'False'):
+                self.assertEqual(fields['Value / statistics'].source_state, 'red')
+                self.assertEqual(fields['Value / statistics'].proposal_state, 'red')
+            records = json.loads(row['study_evidence_json'])
+            for record in records:
+                if record.get('status') != 'candidate':
+                    continue
+                self.assertTrue(record['source'].startswith('https://'))
+                self.assertEqual(len(record['source_sha256']), 64)
+                self.assertTrue(record['excerpt'])
+                if record.get('unit_ucum'):
+                    self.assertEqual(record['unit_validation_state'], 'valid')
+                    self.assertEqual(record['unit_ucum'], ucum_spelling(record['unit']))
+                    self.assertTrue(record['unit_validation_source'])
+            if any(r.get('status') == 'candidate' and r.get('evidence_type') == 'reference_interval' for r in records):
+                self.assertEqual(fields['Reference ranges'].proposal_state, 'yellow')
 
 
 @unittest.skipUnless(os.getenv('SQC_STUDY_REGRESSION_TRACE'), 'Provide the actual earlier Ollama diagnostic trace')

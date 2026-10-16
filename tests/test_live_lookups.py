@@ -7,6 +7,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from semantic_plausibility.review_feedback import report_details
 from semantic_plausibility import run_batch, verify_audit
 from semantic_plausibility.observation_services import NlmUcumClient, LoincFhirClient
 from semantic_plausibility.name_checks import check_name
@@ -87,15 +88,14 @@ class LiveLookupTests(unittest.TestCase):
             input_file = root / 'named.csv'
             row['analyte_name'] = 'Hämoglobin'
             with input_file.open('w', newline='') as handle:
-                writer = csv.DictWriter(handle, fieldnames=[*fields, 'analyte_name'])
+                writer = csv.DictWriter(handle, fieldnames=list(dict.fromkeys([*fields, 'analyte_name'])))
                 writer.writeheader()
                 writer.writerow(row)
             text = config.read_text().replace(str(ROOT / 'examples/laboratory.csv'), str(input_file))
             text = text.replace('analyte_name = "source_test"', 'analyte_name = "analyte_name"')
             config.write_text(text)
             result = run_batch(config)
-            with result.csv.open(newline='') as handle:
-                report = next(csv.DictReader(handle))
+            report = report_details(result.csv, hydrate=True)[0][0]
             self.assertEqual(report['analyte_name'], 'Hämoglobin')
             self.assertEqual(report['name_check'], 'exact_alias')
             context = json.loads(report['assessment_context_json'])
@@ -116,7 +116,7 @@ class LiveLookupTests(unittest.TestCase):
             self.assertEqual(proposal['code']['code'], '718-7')
             self.assertTrue(proposal['code']['version'])
             self.assertFalse(proposal['automatic_changes'])
-            self.assertIn('Source set', result.report.read_text())
+            self.assertIn('Original source fields and statistics', result.report.read_text())
             self.assertIn('Linked terminology', result.report.read_text())
             self.assertIn('Target profile and resources', result.report.read_text())
             self.assertEqual(verify_audit(result.log)['status'], 'verified')

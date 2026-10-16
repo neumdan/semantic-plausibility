@@ -400,8 +400,8 @@ class Deployment:
                     with environment({"SQC_ALLOWED_HTTP_HOSTS": updates["SQC_ALLOWED_HTTP_HOSTS"]}):
                         updates[prefix + "_BASE_URL"] = self.url(section, default=fallback)
                 if live and credentials_needed and section_name == "loinc":
-                    updates["LOINC_FHIR_USERNAME"] = self.secret(section, "username")
-                    updates["LOINC_FHIR_PASSWORD"] = self.secret(section, "password")
+                    updates["LOINC_FHIR_USERNAME"] = self.secret(section, "username", required=bool(section.get("username_env") or section.get("username_file")))
+                    updates["LOINC_FHIR_PASSWORD"] = self.secret(section, "password", required=bool(section.get("password_env") or section.get("password_file")))
                 elif live and credentials_needed and section_name == "fhir":
                     updates["TX_FHIR_BEARER_TOKEN"] = self.secret(section, "token")
             if source_access and source["kind"] == "postgres" and action in {"execute", "connections"}:

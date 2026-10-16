@@ -133,6 +133,7 @@ class ExportGroups:
           FROM stage WHERE point IS NOT NULL AND known='1' GROUP BY key,point""")
         self.db.execute("CREATE INDEX stage_key ON stage(key)")
         self.db.execute("CREATE INDEX distribution_key ON distribution(key)")
+        self.accounting["groups"] = self.db.execute("SELECT count(*) FROM groups").fetchone()[0]
         staging.unlink()
         return self.accounting
 

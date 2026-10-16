@@ -1,93 +1,180 @@
-# Working laboratory inputs
+# Laboratory input: one configuration
 
-This workflow covers **quantitative laboratory results**, including summary statistics; other uses of FHIR Observation are outside its scope. All input values here are synthetic. All lookup responses come from real configured services. Medication is outside this walkthrough. The source is never rewritten.
+**Edit `pipeline.toml` in the repository root for every source.** Keep its output, profile, terminology and model settings. Replace its existing `[input]` and `[input.columns]` tables with one recipe below; remove old `[input.defaults]`, `[input.context]` and `[input.elements]` if they no longer describe the source. Add `[database]` only for a database. Edit existing tables in place.
 
-## 1. Choose one input
+First setup: [Podman / Docker / Python](../../docs/shipped-stack.md). Every example uses illustrative input and real terminology services. Keep hospital exports in `../input/` or `local/`; secrets go in `.env`.
 
-Paths in a TOML are relative to that TOML. Run these recipes in place; when copying one, adjust its paths. `config-check` reports missing files/columns before the check.
-
-| Input / intended check | Configuration | Expected input accounting / report |
+| Your source | Input recipe | Evidence preparation |
 | --- | --- | --- |
-| Individual CSV: numeric values → group statistics | `individual.toml` | 3 Hb values → 1 set; mean 14, sample SD 2 g/dL; `output/lab-individual.html` |
-| Distinct CSV: supplied mean, SD, min/max with units | `aggregated.toml` | 5 rows → 4 sets / 90 source occurrences; `output/lab-summary.html` |
-| SQLite view/table: same distinct contract | `sqlite.toml` | Same sets/statistics as aggregate CSV; `output/lab-sqlite.html` |
-| PostgreSQL / LIS / CDS Hub view: same contract | `postgres.toml` | Same sets/statistics; `output/lab-postgres.html` |
-| One complete FHIR Observation | `single-fhir.toml` | 1 resource; `output/single-fhir.html` |
-| FHIR Bundle | `fhir.toml` | Reads `../laboratory.bundle.json`; `output/fhir.review.html` |
-| FHIR NDJSON | `ndjson.toml` | Same Observations as Bundle; `output/ndjson.html` |
-| Complete FHIR Bundle in a CSV cell + MII validation | `fhir-csv.toml` | Reads `../laboratory-fhir.csv`; `output/laboratory-fhir-review.html` |
-| CSV against local Blaze + manually installed BfArM labels | `local-terminology.toml` | Aggregate CSV; `output/lab-local-terminology.html` |
+| One measurement per CSV row | [Individual CSV](#individual-csv) | Aggregate equivalent measurements |
+| Frequencies/statistics already exported | [Aggregated CSV](#aggregated-csv) | Preserve counts and pool compatible, disjoint summaries |
+| R4 resource, Bundle or NDJSON | [FHIR](#fhir) | Read native fields, then aggregate |
+| SQLite file | [SQLite](#sqlite) | Read the selected table and mapped columns |
+| PostgreSQL / CDS Hub | [PostgreSQL](#postgresql) | Read the selected view/table and mapped columns |
 
-A target IG does not infer vendor column meanings. `lis.toml` / `mii-lis.toml` retain the older minimal CSV recipes. Single FHIR/Bundle/NDJSON examples select base R4; the aggregate and full-validation examples select pinned MII Laboratory 2026.0.3. Change `[specification]` deliberately for your target.
+The source adapter always feeds the same laboratory set: **code + system + name + specimen/method + value or statistics + unit/system + reference context**. The target profile supplies field requirements; your column map supplies the actual data. Select `output.mode="distinct"` for the evidence pipeline; `"items"` retains individual IDs for A1 inspection.
 
-## 2. Run CSV or FHIR
+## Individual CSV
 
-After the [root setup](../../README.md#first-test--podman), replace the recipe name as needed:
+Replace the input tables with this complete example:
 
-```sh
-podman-compose run --rm run-plausibility-check config-check --config /app/examples/lab/aggregated.toml
-podman-compose run --rm run-plausibility-check check --config /app/examples/lab/aggregated.toml
+```toml
+[input]
+type = "csv"
+path = "examples/lab/individual.csv"
+origin = "lis"
+source_namespace = "example-laboratory"
+granularity = "individual"
+
+[input.columns]
+id = "id"
+code = "code"
+code_system = "code_system"
+analyte_name = "name"
+value = "value"
+unit = "unit"
+unit_code = "unit_code"
+unit_system = "unit_system"
+reference_low = "reference_low"
+reference_high = "reference_high"
+specimen = "specimen"
+status = "status"
 ```
 
-Docker: replace `podman-compose` with `docker compose`. Python:
+**Expected arithmetic:** three Hb values, 12, 14 and 16 g/dL, become one group: n=3, mean=14, sample SD=2, min=12, max=16. The source name, code, unit, specimen and reference context stay together. Different context creates separate groups. The example's reference-bound units are inferred from its measurement unit and reported as an assumption; map `reference_unit` and `reference_unit_system` when supplied.
 
-```sh
-uv run --no-sync --env-file .env run-plausibility-check check --config examples/lab/aggregated.toml
+For your export, change `path` and the **right-hand column names**. Keep the source code-system and unit-system values. Map available context and source IDs using the [field reference](../../docs/data-contract.md#minimum-export).
+
+## Aggregated CSV
+
+Replace the input tables with:
+
+```toml
+[input]
+type = "csv"
+path = "examples/lab/aggregated.csv"
+origin = "lis"
+source_namespace = "example-laboratory"
+granularity = "distinct"
+
+[input.columns]
+code = "code"
+code_system = "code_system"
+analyte_name = "name"
+unit = "unit"
+unit_code = "unit_code"
+unit_system = "unit_system"
+count = "count"
+value_mean = "mean"
+value_sd = "sd"
+value_min = "min"
+value_max = "max" # All statistics are numbers in the row's common unit_code.
+reference_low = "reference_low"
+reference_high = "reference_high"
+specimen = "specimen"
+status = "status"
 ```
 
-Use a fresh output for repetitions, for example `--out /app/output/lab-summary-repeat.csv` in a container. For individual IDs, copy `individual.toml` and set `output.mode="items"`; aggregated rows cannot recover original IDs.
+**Expected:** five input rows become four groups. Two compatible Hb summaries combine to n=30 and mean=13.3333… g/dL. `sd` means sample SD (n−1). Pool summaries only when their underlying measurements are disjoint. All statistics are numbers in the common `unit_code`; no separate mean/SD/min/max unit columns are needed. Omit unavailable statistic/count mappings. For exact-value frequency rows, map `value` and `count` instead of summary statistics; the starter `examples/laboratory.csv` demonstrates this (8 rows → 7 groups, 84 occurrences).
 
-**What is checked:** source membership/syntax, numeric data, LOINC axes/example-unit fit, reference-bound consistency and verified conversions. Being outside a local reference interval does not itself mean semantic error. Formal FHIR validation is only for complete resources; [prepare Matchbox first](../../docs/index.html#validation) for `fhir-csv.toml`.
+## FHIR
 
-## 3. Understand the aggregate example
+Replace the input tables with this block; native FHIR provides the field mapping:
 
-`aggregated.csv` has mean, sample SD, min, max and a unit column for each, plus count and reference context. `[input.columns]` maps them to `value_mean`, `value_sd`, `value_min`, `value_max` and the corresponding `*_unit` roles. If a statistic's unit column is omitted, the declared measurement unit is used. Supplied mixed units are rejected: normalise the export first, preserving provenance.
+```toml
+[input]
+type = "fhir_file"
+path = "examples/fhir/laboratory-valid.bundle.json"
+origin = "fhir"
+source_namespace = "example-laboratory"
+granularity = "individual"
+```
 
-Two Hb rows share the exact same semantic context: n=10, mean=14, SD=1 and n=20, mean=13, SD=2 g/dL. They represent **disjoint** groups and pool to n=30, mean=13.3333, sample SD≈1.77790 g/dL; observed bounds are 9–17 g/dL. Their local reference remains 12–16 g/dL. Neither pooled statistics nor observed extremes become a new reference interval.
+**Expected:** one Observation is checked; its Patient and Organization are retained as document context. `Observation.code.coding`, `code.text`, `valueQuantity`, `referenceRange`, `status`, `method`, components and referenced Specimen information supply the semantic set. Set `path="examples/lab/observation.json"` for a single resource, `"examples/lab/observations.ndjson"` for NDJSON, or `"examples/laboratory.bundle.json"` for the 84-measurement Bundle.
 
-The g/L Hb row remains a separate source set. If NLM verifies factor 0.1 to g/dL, its mean 140, SD 12 and min/max 120–160 become mean 14, SD 1.2 and min/max 12–16 g/dL in the **proposal**, alongside transformed reference bounds. The report retains the original values. MCHC `786-4` is a different analyte/property context from Hb `718-7`; a shared unit does not merge them.
+For a FHIR server, export the selected current resources using TORCH/CQL or your site's export process, retain referenced context and set `path` to that export. [CQL example](../studies/LaboratorySelection.cql). Enable `validation.enabled=true` and follow the [local validator setup](../../docs/validation.md) to validate complete resources against the pinned MII guide before grouping.
 
-For multiple summary rows, weighted means require counts; sample SD additionally requires enough within-group information. Missing counts/SD remain missing. SD is not SE. Median/IQR are only calculated from individual values; they are never reconstructed from mean/SD. Overlapping cohorts must not be pooled.
+For complete FHIR JSON stored in CSV, use this input block instead:
 
-## 4. SQLite
+```toml
+[input]
+type = "csv"
+path = "examples/laboratory-fhir.csv"
+origin = "fhir"
+source_namespace = "example-laboratory"
+granularity = "individual"
 
-Create the small synthetic source locally; this does not download terminology:
+[input.columns]
+resource_json = "resource_json"
+```
+
+The CSV cell contains a complete document. Its original resource structure and reference context reach the same validator and semantic adapter.
+
+## SQLite
+
+Prepare the illustrative database once:
 
 ```sh
+podman-compose --profile examples run --rm prepare-examples
+# Python alternative
 uv run --no-sync python tools/prepare-lab-examples.py
-podman-compose run --rm run-plausibility-check check --config /app/examples/lab/sqlite.toml
 ```
 
-The helper reuses only an identical existing example database; it refuses to overwrite different data. The checker opens SQLite read-only. For a real export, change its path, table and column map.
+Use the **individual CSV column mapping** above. Replace `[input]` and add `[database]`:
 
-## 5. PostgreSQL (also the LIS / CDS Hub pattern)
+```toml
+[input]
+type = "sqlite"
+path = "local/examples/lab.sqlite"
+origin = "lis"
+source_namespace = "example-laboratory"
+granularity = "individual"
 
-Add `EXAMPLE_DB_USER` and a chosen `EXAMPLE_DB_PASSWORD` to your ignored `.env`. Then:
+[database]
+DB_TABLE = "laboratory_values"
+```
+
+The read-only query produces the same 3 → 1 result as the individual CSV. For aggregate input, select `laboratory_summary`, `granularity="distinct"` and the aggregate column map. This produces the same 5 → 4 result as the aggregate CSV.
+
+## PostgreSQL
+
+For the included local database exercise, set `EXAMPLE_DB_USER` and `EXAMPLE_DB_PASSWORD` in `.env`, then start:
 
 ```sh
-podman-compose -f compose.yaml -f compose.examples.yaml --profile laboratory-inputs up -d example-postgres
-podman-compose -f compose.yaml -f compose.examples.yaml --profile laboratory-inputs run --rm run-plausibility-check config-check --connections --config /app/examples/lab/postgres.toml
-podman-compose -f compose.yaml -f compose.examples.yaml --profile laboratory-inputs run --rm run-plausibility-check check --config /app/examples/lab/postgres.toml
-podman-compose -f compose.yaml -f compose.examples.yaml --profile laboratory-inputs stop example-postgres
+podman-compose --profile laboratory-inputs up -d example-postgres
 ```
 
-The separate example database has no host port and seeds the supplied aggregate CSV on first start. Its named volume persists. Credentials are required even for this local example. PostgreSQL support is included in the container image. Production: use an IT-approved read-only role/view, actual host/schema/table/column mapping and TLS `verify-full`; the isolated demo alone uses `disable`. Do not reuse hospital credentials for the demo. No CDS Hub schema or joins are guessed.
+Use the **aggregate CSV column mapping** above. Replace `[input]` and add `[database]`:
 
-## 6. FHIR server / TORCH / CQL exports
+```toml
+[input]
+type = "postgres"
+origin = "cds_hub"
+source_namespace = "example-laboratory"
+granularity = "distinct"
 
-Direct server querying is upstream. A working local representation is `fhir.toml` or `ndjson.toml`: place the authorised export next to the repo and change `[input].path`. Retain complete Observations, resource IDs, every reference interval and context. TORCH selection/CRTDL and CQL depend on the site's data and permissions; this project does not provide a universal server query. [MII placement](../../docs/mii-quality.md).
+[database]
+DB_HOST = "example-postgres"
+DB_PORT = 5432
+DB_NAME = "laboratory"
+DB_USER_ENV = "EXAMPLE_DB_USER"
+DB_PASSWORD_ENV = "EXAMPLE_DB_PASSWORD"
+DB_SCHEMA = "public"
+DB_TABLE = "laboratory_summary"
+DB_SSLMODE = "disable" # Only the isolated local example; use verify-full for the hospital connection.
+```
 
-## 7. Add AI/evidence to the aggregate report
+Run the normal check with compose.yaml, e.g. `podman-compose run --rm run-plausibility-check check --out output/postgres-01.csv`. Expected: 5 → 4 groups, matching the aggregate CSV. Stop the exercise with `stop example-postgres`; its volume persists.
 
-Provision Ollama and the UCUM catalogue as in the root README. Then:
+For a hospital/CDS Hub connection, select a read-only account, host/database, schema, table/view and actual columns. Use `granularity="individual"` for raw measurements. A curated view handles joins/current-version selection. For JSONB Observations, map only `resource_json="resource"` and use individual granularity. For full-document validation, export the resources to FHIR files. [DSN, TLS and secret-file settings](../../docs/configuration.md#postgresql-and-sqlite).
+
+## Run every source the same way
 
 ```sh
-podman-compose --profile research run --rm research-evidence research-evidence --config /app/examples/lab/aggregated.toml --scope lookup --out /app/output/lab-summary-ai.csv
-podman-compose --profile research run --rm research-evidence research-evidence --config /app/examples/lab/aggregated.toml --scope studies --out /app/output/lab-summary-evidence.csv
+podman-compose run --rm run-plausibility-check config-check
+podman-compose run --rm run-plausibility-check check --out output/lab-01.csv
 ```
 
-Both use the original checked `output/lab-summary.csv` and its sidecars. Inspect `lab-summary-evidence.html`, `.studies.csv` and `.trace.jsonl`. Published mean/SD/min/max or intervals need an exact quotation/unit; unsupported extracts are rejected. Comparability of population, method and specimen remains a clinician task. Local values and reference bounds are not sent to public search/model requests.
+Open `output/lab-01.html`. Change the output filename on the next run. Docker uses `docker compose`. Python uses `uv run --no-sync --env-file .env run-plausibility-check` in place of the Compose prefix (install `--extra postgres` for PostgreSQL).
 
-## 8. Optional local terminology service
-
-Follow the [manual BfArM download and Blaze instructions](../../docs/index.html#local-server). The recipe requires actual downloaded files at `local/terminologies/bfarm-lab/`. It never substitutes example terms for a missing catalogue. The metadata-only `package-check` announces newer releases without downloading or changing any pinned edition.
+Then use the **same configuration** and grouped report for `research-evidence --scope lookup` or `--scope studies`. [Ollama setup and exact commands](../../docs/shipped-stack.md#four-run-modes). Inputs and values stay local; configured APIs provide terminology and study evidence. A missing source remains visibly unverified.

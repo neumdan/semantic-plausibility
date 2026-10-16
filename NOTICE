@@ -7,8 +7,13 @@ No INTERPOLAR runtime, private data, access credentials or patient extracts
 are included. The original license is retained in LICENSE.
 Terminology catalogs and implementation guides retain their own licenses.
 
-The unchanged public MII ObservationLab 2026.0.3 profile snapshot in
-examples/profiles is attributed to Medizininformatik-Initiative and its authors,
-under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).
+Runtime profile setup obtains MII ObservationLab from the publisher's pinned
+package, attributed to Medizininformatik-Initiative and its authors under
+CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).
 Source: https://github.com/medizininformatik-initiative/kerndatensatzmodul-labor
-Package: de.medizininformatikinitiative.kerndatensatz.laborbefund#2026.0.3
+Downloaded profiles, ValueSets and CodeSystems remain operator-owned runtime
+files and are not distributed in this repository.
+
+The optional local UCUM service installs the official NLM ucum-lhc package
+at image-build time. Its upstream licence and notices remain with the installed
+dependency: https://github.com/LHNCBC/ucum-lhc

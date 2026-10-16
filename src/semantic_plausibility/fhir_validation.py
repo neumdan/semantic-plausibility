@@ -324,20 +324,46 @@ def initialise_terminology(config_path):
     endpoint = settings.get("terminology_server", "http://blaze:8080/fhir") if os.getenv("SQC_IN_CONTAINER") == "1" else settings.get("terminology_endpoint", "http://127.0.0.1:8082/fhir")
     endpoint = local_endpoint(endpoint)
     paths = [config.path_value(value) for value in config.data.get("specification", {}).get("VALUE_SETS", [])]
-    paths += [config.path_value(row["path"]) for row in config.data.get("lookups", {}).values()
-              if row.get("enabled") and row.get("type") == "fhir_artifacts"]
-    files = list(dict.fromkeys(file for path in paths for file in artifact_files(path)))
+    imports = config.data.get("terminology", {}).get("import_lookups")
+    lookups = config.data.get("lookups", {})
+    selected = [(name, row) for name, row in lookups.items()
+                if name in imports] if imports is not None else [(name, row) for name, row in lookups.items() if row.get("enabled")]
+    resources = []
+    for path in paths:
+        for file in artifact_files(path):
+            raw = file.read_bytes()
+            resources.append((file, json.loads(raw), hashlib.sha256(raw).hexdigest()))
+    for alias, row in selected:
+        if row.get("type") == "fhir_artifacts":
+            for file in artifact_files(config.path_value(row["path"])):
+                raw = file.read_bytes()
+                resource = json.loads(raw)
+                if resource.get("url") in row.get("systems", []) or resource.get("supplements", "").split("|")[0] in row.get("systems", []):
+                    resources.append((file, resource, hashlib.sha256(raw).hexdigest()))
+        elif row.get("type") == "loinc_csv":
+            from .local_terminology import loinc_code_system
+            file = config.path_value(row["path"])
+            resource, digest = loinc_code_system(file, version=row.get("version", ""), complete=row.get("complete", False))
+            resources.append((file, resource, digest))
+        elif imports is not None:
+            raise ValueError(f"Import {alias} must use loinc_csv or fhir_artifacts")
     opener = build_opener(ProxyHandler({}), _NoModelRedirects())
-    installed = []
-    for path in files:
-        raw = path.read_bytes()
-        resource = json.loads(raw)
+    installed, skipped = [], []
+    identities = set()
+    for path, resource, digest in resources:
         kind = resource.get("resourceType")
         if kind not in {"ValueSet", "CodeSystem"} or kind == "CodeSystem" and resource.get("content") != "complete":
+            skipped.append({"source": str(path), "reason": "Requires a complete base CodeSystem; supplements remain local label sources"})
             continue
         canonical, version = resource.get("url"), resource.get("version", "")
         if not canonical:
             raise ValueError("Terminology resources need their actual canonical URL")
+        identity = (kind, canonical, version)
+        if identity in identities:
+            raise ValueError("Select each terminology canonical/version only once for server import")
+        identities.add(identity)
+        from .progress import LOGGER
+        LOGGER.info("Import %s %s | %s from %s into %s", kind, canonical, version, path, endpoint)
         identifier = "sqc-" + hashlib.sha256((canonical + "|" + version).encode()).hexdigest()[:48]
         resource["id"] = identifier
         body = fhir_json(resource).encode()
@@ -347,14 +373,14 @@ def initialise_terminology(config_path):
             if response.status not in {200, 201}:
                 raise ValueError("Terminology installation was not confirmed")
         installed.append({"resource_type": kind, "canonical": canonical, "version": version,
-            "source": str(path), "source_sha256": hashlib.sha256(raw).hexdigest(),
+            "source": str(path), "source_sha256": digest,
             "submitted_sha256": hashlib.sha256(body).hexdigest(), "id": identifier})
     if not installed:
         raise ValueError("No real ValueSets or complete CodeSystems were explicitly supplied")
     receipt = config.path_value(settings.get("setup_directory", "local/validation")) / "terminology-installation.json"
     receipt.parent.mkdir(parents=True, exist_ok=True)
     result = {"state": "installed", "endpoint": endpoint, "retrieved_at": datetime.now(timezone.utc).isoformat(),
-        "configuration_sha256": config.deployment.sha256, "resources": installed,
+        "configuration_sha256": config.deployment.sha256, "resources": installed, "skipped": skipped,
         "scope": "Definition installation, not proof of membership or clinical correctness"}
     receipt.write_text(json.dumps(result, indent=2) + "\n")
     receipt.chmod(0o600)

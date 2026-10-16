@@ -44,74 +44,30 @@ def write(name, title, height, nodes, edges, labels=()):
     (D / (name + ".mmd")).write_text("\n".join(mmd) + "\n")
 
 
-write('architecture', 'Laboratory semantic review architecture', 1250, [
- ('SCALAR',20,20,330,132,['B · Scalar exports','LIS / CDS Hub CSV or DB view','Individual rows or distinct sets','Explicit columns and real counts'],'normal'),
- ('FHIR',385,20,330,132,['B · Complete FHIR exports','Bundle / resource array / NDJSON','or CSV resource_json cells','TORCH / CQL selection upstream'],'normal'),
- ('CONFIG',750,20,330,132,['Four choices in one TOML','A: check level · B: input','C: sources · D: domain + profile','Credentials in .env / secret files'],'normal'),
- ('VALIDATE',385,220,330,132,['Independent: FHIR validation','Full resources → local Matchbox','HL7 validator + pinned MII guide','Outcome stays separate from fit'],'teal'),
- ('DOMAIN',750,220,330,132,['D · Laboratory target guide','Quantitative Observation','MII Laboratory 2026.0.3','Base FHIR R4 also selectable'],'normal'),
- ('NORMAL',385,420,330,132,['Standardise and group','Code + name + unit + context','Values or mean / SD / min / max','Distinct sets or items with IDs'],'normal'),
- ('SOURCES',20,620,330,157,['C · Real terminology evidence','LOINC API / local Blaze','NLM UCUM syntax + conversion','BfArM labels: manual download','Retain editions, hashes, failures'],'normal'),
- ('CHECK',385,620,330,157,['A1 · Lookup-only check','Source identity + target profile rules','Code / name / unit fit and numbers','Reference contexts + summary units','Supported unit transformations'],'teal'),
- ('MODEL',750,420,330,132,['Optional local model','Ollama: ministral-3:3b starter','or local compatible endpoint','Guarded JSON; sources required'],'normal'),
- ('AI',750,620,330,157,['A2 · AI-supported lookup','Checked report → candidates','Real names, codes and unit lists','LOINC pages; no study queries','Exact rechecks; may abstain'],'teal'),
- ('OUTPUT',385,850,330,157,['CSV + HTML review report','Source → linked data → proposal','Checks and citations beside each set','Summary + evidence + audit hashes','Input remains unchanged'],'teal'),
- ('STUDIES',750,850,330,157,['A3 · AI-supported evidence','Original report → same AI pass','Plus Europe PMC / PubMed','Quoted statistics / units / intervals','Study CSV + extraction states'],'teal'),
- ('REGISTRY',20,1080,330,132,['Laboratory review registry','Approved / rejected / revoked','Source + profile + context scope','Reverify target and factor on reuse'],'normal'),
- ('EXPERT',385,1080,330,132,['Clinician review','Decide semantic correctness','Apply approved mappings in ETL','Validate resulting FHIR resources'],'teal'),
- ('MII',20,850,330,132,['Complementary MII checks','FHIR conformance: validator','Availability / completeness: FDE','This tool: semantic-set review'],'normal')], [
- ('SCALAR','NORMAL','M185 152 V486 H382','scalar path',False),
- ('FHIR','VALIDATE','M550 152 V217','if enabled',False),
- ('FHIR','NORMAL','M715 125 H732 V486 H718','otherwise',True),
- ('CONFIG','DOMAIN','M915 152 V217','',True),
- ('DOMAIN','VALIDATE','M750 285 H718','profile',True),
- ('DOMAIN','CHECK','M750 320 H735 V590 H650 V617','domain rules',True),
- ('VALIDATE','NORMAL','M550 352 V417','outcomes retained',False),
- ('NORMAL','CHECK','M550 552 V617','',False),
- ('SOURCES','CHECK','M350 693 H382','lookups',False),
- ('CHECK','OUTPUT','M550 777 V847','',False),
- ('MODEL','AI','M915 552 V617','local inference',True),
- ('OUTPUT','AI','M715 905 H737 V715 H747','scope=lookup',True),
- ('OUTPUT','STUDIES','M715 970 H747','scope=studies',True),
- ('OUTPUT','EXPERT','M550 1007 V1077','',False),
- ('AI','EXPERT','M1080 695 H1090 V1040 H650 V1077','candidates',True),
- ('STUDIES','EXPERT','M915 1007 V1040 H650 V1077','evidence',True),
- ('EXPERT','REGISTRY','M385 1145 H353','review-import',False),
- ('REGISTRY','CHECK','M185 1080 V1030 H370 V750 H382','scoped reuse',True)], [])
+write('architecture', 'Containers and data flow', 925, [
+ ('INPUT',20,20,510,135,['Input: selected laboratory data','CSV columns or read-only SQLite / PostgreSQL view','FHIR JSON / Bundle / NDJSON / DB resource column','TORCH / CQL creates the selected FHIR export'],'normal'),
+ ('CONFIG',570,20,510,135,['pipeline.toml + catalog.csv + separate secrets','Input/columns, item / distinct output','profile-init downloads pinned profile / bindings to local/','Terminology endpoints/files; local model + research'],'normal'),
+ ('RUN',20,220,650,195,['Python runner: one-shot container or uv command','Read and check input contract; optional full FHIR validation','Preserve code + name + value + unit + reference context','Aggregate complete sets and statistics with embedded DuckDB','A1 checks; separate A2 / A3 research from audited A1 output','CSV + HTML + evidence + hash-chained audit'],'teal'),
+ ('TX',740,220,340,157,['Terminology evidence','Direct local files OR API','Optional Blaze: explicit imports','UCUM: NLM API OR local service','Sources / editions / hashes'],'normal'),
+ ('AI',740,445,340,157,['Optional Ollama service','Local inference; shared weights','A2: real lookup candidates','A3: Europe PMC / PubMed','Quotes + numbers + unit guards'],'teal'),
+ ('VALIDATE',20,490,650,137,['Optional local validation services','Matchbox: HL7 validator + acquired FHIR / MII packages','Blaze: terminology, persistent database, internal network','Complete documents checked before semantic grouping'],'normal'),
+ ('OUT',20,735,1060,135,['Output and clinical review','One item/group per CSV row; one value per cell; numbered columns for repeated elements','HTML: source value → method/finding → proposal → source/proposal status and citations','Original structures in evidence JSONL; clinician decisions in a versioned local registry'],'teal')], [
+ ('INPUT','RUN','M275 155 V220','',False),('CONFIG','RUN','M825 155 V185 H520 V220','',False),
+ ('RUN','TX','M670 275 H740','lookups',False),('RUN','AI','M670 340 H705 V520 H740','A2 / A3',True),
+ ('RUN','VALIDATE','M250 415 V490','selected validation',True),
+ ('RUN','OUT','M20 335 H5 V690 H300 V735','reports',False),
+ ('VALIDATE','OUT','M350 627 V735','outcomes',False)],
+ [(32,710,'Read-only inputs/configuration · writable output · retained model and terminology volumes')])
 
-write('decision-flow', 'Check the source set, select evidence scope, review the proposal', 1680, [
- ('CONTRACT',130,20,840,106,['1. Select D (domain/profile) and check the B (input) contract','Laboratory Observation: code + name + value/statistics + unit + reference context','Malformed input fails; preserve every reference interval and its qualifiers'],'normal'),
- ('VALIDATION',130,185,840,106,['2. Formal validation requested?','Full FHIR file or CSV resource_json → local Matchbox/HL7 + pinned guide','Scalar sets → not_applicable; unavailable/invalid validation remains explicit'],'normal'),
- ('LOOKUP',130,350,840,106,['3. Verify the declared code/system and unit/system using configured sources','Local first → enabled APIs for the exact system; retain every attempt and edition','LOINC component, property, specimen/system, timing, scale and method'],'normal'),
- ('INVALID',20,515,330,106,['Confirmed invalid','Record deterministic error','Continue other independent checks'],'error'),
- ('VERIFIED',385,515,330,106,['Verified identity / syntax','Check code-unit-context fit','Membership alone is insufficient'],'teal'),
- ('UNKNOWN',750,515,330,106,['Unverified / unavailable','Keep evidence gap visible','Do not call absence invalid'],'normal'),
- ('FIT',130,685,840,132,['4. Assess unit fit and transformation','Documented code–unit fit; verified conversion → factor for values and bounds','Positive linear factor also scales mean, sample SD, minimum and maximum','Missing evidence or ambiguous count denominator → expert review, no forced map'],'normal'),
- ('NUMERIC',130,880,840,106,['5. Check quantities and context; write the checked CSV','Numeric values, supplied sample statistics, units, specimen/method and reference bounds','Observed extremes and mean ± SD do not define a reference interval'],'teal'),
- ('NO_AI',20,1050,330,132,['A1: laboratory check','Deterministic findings + sources','Optional full FHIR outcome','No model calls'],'normal'),
- ('AI',385,1050,330,132,['A2: lab · scope=lookup','Local AI suggests code/name/unit','Real candidate retrieval + recheck','No literature retrieval'],'teal'),
- ('EVIDENCE',750,1050,330,132,['A3: lab · scope=studies','Same AI + configured study APIs','Quote statistics / units / intervals','Keep gaps and failures visible'],'teal'),
- ('REVIEW',130,1255,840,132,['6. Review the whole proposal with its evidence','Original set → linked code/analyte/name/units → proposal with transformations','Physician records decision, reviewer, time and rationale; source remains unchanged','Numeric readiness, FHIR conformance and clinical correctness stay distinct'],'normal'),
- ('REUSE',130,1460,840,157,['7. Optional laboratory mapping reuse','Import clinician decisions; recheck target code, unit, factor and reference bounds','Source, catalogue, profile or context changes require renewed review','Apply approved transformations in institutional ETL and validate the resulting FHIR','No automated resource rewrite or model retraining'],'teal')], [
- ('CONTRACT','VALIDATION','M550 126 V182','',False),('VALIDATION','LOOKUP','M550 291 V347','',False),
- ('LOOKUP','INVALID','M550 456 V485 H185 V512','',False),('LOOKUP','VERIFIED','M550 456 V512','',False),('LOOKUP','UNKNOWN','M550 456 V485 H915 V512','',False),
- ('INVALID','FIT','M185 621 V650 H450 V682','',False),('VERIFIED','FIT','M550 621 V682','',False),('UNKNOWN','FIT','M915 621 V650 H650 V682','',False),
- ('FIT','NUMERIC','M550 817 V877','',False),
- ('NUMERIC','NO_AI','M550 986 V1018 H185 V1047','',False),('NUMERIC','AI','M550 986 V1047','explicit second pass',True),('NUMERIC','EVIDENCE','M550 986 V1018 H915 V1047','explicit second pass',True),
- ('NO_AI','REVIEW','M185 1182 V1220 H450 V1252','',False),('AI','REVIEW','M550 1182 V1252','',False),('EVIDENCE','REVIEW','M915 1182 V1220 H650 V1252','',False),
- ('REVIEW','REUSE','M550 1387 V1457','',False)])
-
-write('batch-flow', 'Laboratory inputs, summaries and review output', 1080, [
- ('CSV',20,20,330,132,['CSV / LIS / CDS Hub DB','Individual or distinct source rows','Column map + actual source counts','Read-only site-specific view'],'normal'),
- ('FHIR',385,20,330,132,['Complete FHIR documents','Bundle / array / NDJSON / JSON','or resource_json in a CSV cell','Preserve every reference context'],'normal'),
- ('CONFIG',750,20,330,132,['D · Laboratory Observation','MII guide or base FHIR R4','Explicit mapping and editions','TOML; secrets in separate files'],'normal'),
- ('LAB',20,245,515,182,['Laboratory semantic set','code + system/edition + analyte/name','value or observed bounds + unit/system','Every reference range and its qualifiers','Specimen, method, comparator and modifiers'],'normal'),
- ('STATS',565,245,515,182,['Supplied aggregate statistics','Same laboratory semantic context as the source set','Count + mean + sample SD + minimum + maximum','Each statistic has its declared measurement unit','Pool only disjoint groups with sufficient information'],'normal'),
- ('GROUP',130,515,840,132,['Choose output representation','distinct: complete guarded sets + known counts; laboratory numeric distributions','items: individual inputs with original resource/database ID and source locator','Missing counts and unresolved references remain explicit; no missing context is invented'],'normal'),
- ('CHECK',130,710,840,106,['Laboratory checks → CSV + HTML with sources','Lookups, code–unit–context fit; optional local AI and literature evidence','Study CSV: quotations, statistic roles, units, sources and extraction failures'],'teal'),
- ('REVIEW',130,885,840,132,['Clinician review of the complete set','Each source set → linked definitions → explanations, transformations and sources','FHIR validation is separate and applies only to full resources; input stays unchanged','Terminology validity, numerical readiness and clinical correctness stay separate'],'normal')], [
- ('CSV','LAB','M185 152 V242','',False),('CSV','STATS','M185 152 V198 H730 V242','summary rows',False),
- ('FHIR','LAB','M550 152 V220 H450 V242','',False),('FHIR','STATS','M550 152 V220 H650 V242','',False),
- ('CONFIG','STATS','M915 152 V242','',True),
- ('LAB','GROUP','M280 427 V470 H450 V512','',False),('STATS','GROUP','M825 427 V470 H650 V512','',False),
- ('GROUP','CHECK','M550 647 V707','',False),('CHECK','REVIEW','M550 816 V882','',False)])
+write('decision-flow', 'Processing decisions and review', 1160, [
+ ('CONTRACT',20,20,1060,125,['1. Select laboratory source and mapped fields','Laboratory: code/system + name + specimen/method + value/statistics + unit/system + references','One pipeline.toml selects sources from catalog.csv; downloads stay under local/','Preflight checks roles, types, paths, count semantics, source/profile editions and configured services'],'normal'),
+ ('FHIR',20,195,1060,100,['2. Full FHIR validation selected?','Complete resource export → local validator + pinned profile → separate OperationOutcome','Then use the same semantic adapter for scalar or native FHIR data'],'normal'),
+ ('GROUP',20,345,1060,100,['3. Aggregate the complete semantic set','distinct: individual CSV / FHIR / DB values → n, mean, sample SD / SE, min / max, median / IQR','Pool supplied disjoint summaries; keep reference context. Optional items mode serves A1 inspection.'],'normal'),
+ ('A1',20,495,1060,125,['4. A1: check source meaning, then cross-field plausibility','Exact code/system and unit evidence → name/axes/specimen fit → code–unit compatibility','Check finite values, reference order/context and supported whole-set transformations','Write original A1 CSV + evidence/audit; valid, inconsistent and unresolved findings remain explicit'],'teal'),
+ ('A2',20,680,510,125,['5a. Optional A2: lookup proposals','Grouped A1 report → candidates/pages → local model','Verify selected code/name/unit against actual terminology','Record proposal, sources and unresolved context'],'normal'),
+ ('A3',570,680,510,125,['5b. Optional A3: study evidence','Grouped A1 report → screened Europe PMC / PubMed','Local extraction → exact quote/analyte/number/unit guards','Retain statistic, interval, context and source'],'normal'),
+ ('REVIEW',20,920,1060,170,['6. Review the complete set','HTML field table / scalar CSV: source → finding → recommendation, with sources and status','Verify specimen, assay, population, unit conversion and each reference interval','Clinician approves / rejects / defers; source data is retained','Reuse compatible approved laboratory mappings after rechecking targets and factors'],'teal')], [
+ ('CONTRACT','FHIR','M550 145 V195','',False),('FHIR','GROUP','M550 295 V345','',False),
+ ('GROUP','A1','M550 445 V495','',False),('A1','A2','M275 620 V680','lookup',True),
+ ('A1','A3','M825 620 V680','studies',True),('A1','REVIEW','M550 620 V920','A1 review',False),
+ ('A2','REVIEW','M275 805 V920','',False),('A3','REVIEW','M825 805 V920','',False)])

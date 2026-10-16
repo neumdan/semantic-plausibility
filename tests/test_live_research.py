@@ -9,6 +9,7 @@ import tempfile
 import time
 import unittest
 
+from semantic_plausibility.review_feedback import report_details
 from semantic_plausibility.fhir_quality_pipeline import FhirQualityPipeline
 from semantic_plausibility.laboratory_suggestions import LaboratorySuggestions
 from semantic_plausibility.observation_services import (
@@ -113,8 +114,7 @@ class ResearchRetrievalTests(unittest.TestCase):
             self.assertGreater(dossier["evidence_counts"]["articles_retrieved"], 0)
             self.assertEqual(dossier["evidence_counts"]["extracted_measurements"], 0)
             self.assertTrue(Path(dossier["studies"]).is_file())
-            with Path(dossier["csv"]).open(encoding="utf-8-sig", newline="") as handle:
-                result = next(csv.DictReader(handle))
+            result = report_details(dossier["csv"], hydrate=True)[0][0]
             assessment = json.loads(result["assessment_context_json"])
             self.assertEqual(assessment["check_result_basis"], "original_A1_report")
             self.assertGreater(assessment["execution"]["new_model_calls"], 0)

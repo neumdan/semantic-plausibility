@@ -1,7 +1,7 @@
-code,code_system,value,unit,unit_code,unit_system,count,reference_ranges_json,specimen,source_test,status,analyte_name,method
-718-7,http://loinc.org,14,g/dL,g/dL,http://unitsofmeasure.org,1,"[{""low"": {""value"": 12, ""code"": ""g/dL"", ""system"": ""http://unitsofmeasure.org""}, ""high"": {""value"": 16, ""code"": ""g/dL"", ""system"": ""http://unitsofmeasure.org""}}]",Bld,Hemoglobin,final,Hämoglobim,
-LIS-HB,https://example.org/lis/test,14,g/dL,g/dL,http://unitsofmeasure.org,1,"[{""low"": {""value"": 12, ""code"": ""g/dL"", ""system"": ""http://unitsofmeasure.org""}, ""high"": {""value"": 16, ""code"": ""g/dL"", ""system"": ""http://unitsofmeasure.org""}}]",Bld,Hemoglobin,final,Hemoglobin,
-718-7,http://loinc.org,5.2,mmol/L,mmol/L,http://unitsofmeasure.org,1,"[{""low"": {""value"": 3.9, ""code"": ""mmol/L"", ""system"": ""http://unitsofmeasure.org""}, ""high"": {""value"": 6.1, ""code"": ""mmol/L"", ""system"": ""http://unitsofmeasure.org""}}]",Ser/Plas,Hemoglobin,final,Glucose,
-718-7,http://loinc.org,14,g/dll,g/dll,http://unitsofmeasure.org,1,"[{""low"": {""value"": 12, ""code"": ""g/dll"", ""system"": ""http://unitsofmeasure.org""}, ""high"": {""value"": 16, ""code"": ""g/dll"", ""system"": ""http://unitsofmeasure.org""}}]",Bld,Hemoglobin,final,Hämoglobin,
-6690-2,http://loinc.org,5.6,10*6,10*6,http://unitsofmeasure.org,1,[],Bld,Hemoglobin,final,Leukocytes,
-LIS-HB,https://example.org/lis/test,14,g/dL,GDL,https://example.org/lis/units,1,"[{""low"": {""value"": 12, ""code"": ""GDL"", ""system"": ""https://example.org/lis/units""}, ""high"": {""value"": 16, ""code"": ""GDL"", ""system"": ""https://example.org/lis/units""}}]",Bld,Hemoglobin,final,Hemoglobin,
+code,code_system,value,unit,unit_code,unit_system,count,specimen,source_test,status,analyte_name,method,reference_low,reference_high,reference_unit,reference_unit_system,range_text
+718-7,http://loinc.org,14,g/dL,g/dL,http://unitsofmeasure.org,1,Bld,Hemoglobin,final,Hämoglobim,,12,16,g/dL,http://unitsofmeasure.org,
+LIS-HB,https://example.org/lis/test,14,g/dL,g/dL,http://unitsofmeasure.org,1,Bld,Hemoglobin,final,Hemoglobin,,12,16,g/dL,http://unitsofmeasure.org,
+718-7,http://loinc.org,5.2,mmol/L,mmol/L,http://unitsofmeasure.org,1,Ser/Plas,Hemoglobin,final,Glucose,,3.9,6.1,mmol/L,http://unitsofmeasure.org,
+718-7,http://loinc.org,14,g/dll,g/dll,http://unitsofmeasure.org,1,Bld,Hemoglobin,final,Hämoglobin,,12,16,g/dll,http://unitsofmeasure.org,
+6690-2,http://loinc.org,5.6,10*6,10*6,http://unitsofmeasure.org,1,Bld,Hemoglobin,final,Leukocytes,,,,,,
+LIS-HB,https://example.org/lis/test,14,g/dL,GDL,https://example.org/lis/units,1,Bld,Hemoglobin,final,Hemoglobin,,12,16,GDL,https://example.org/lis/units,

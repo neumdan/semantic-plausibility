@@ -47,17 +47,16 @@ def http_json(url, *, data=None, token="", timeout=15, tls_context=None):
 
 
 def check_configuration(path, *, source_alias=None, connections=False, research=None, model_alias=None):
-    import tomllib
+    from .batch import BatchConfiguration
 
-    raw_config = tomllib.loads(Path(path).read_text())
+    configuration = BatchConfiguration(path)
+    raw_config = configuration.data
     offline = raw_config.get("network", {}).get("mode", "offline") == "offline"
     active_lookups = {
         row.get("type") for row in raw_config.get("lookups", {}).values() if row.get("enabled", False)
     }
     deployment = load_deployment(path)
-    from .batch import BatchConfiguration
     from .profile_lookups import terminology_plan
-    configuration = BatchConfiguration(path)
     report = {
         "configuration_sha256": deployment.sha256,
         "created_at": datetime.now(timezone.utc).isoformat(),

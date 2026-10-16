@@ -62,8 +62,8 @@ def _configured_lookup(config, alias, *, system, code, version, name):
                 {"base_url": row.get("endpoint", ""), "base_url_env": row.get("endpoint_env", "")},
                 default="https://fhir.loinc.org",
             ),
-            username=config.deployment.secret(row, "username"),
-            password=config.deployment.secret(row, "password"),
+            username=config.deployment.secret(row, "username", required=bool(row.get("username_env") or row.get("username_file"))),
+            password=config.deployment.secret(row, "password", required=bool(row.get("password_env") or row.get("password_file"))),
         )
         term = client.lookup(code, version)
         return {

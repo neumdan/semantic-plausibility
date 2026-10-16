@@ -11,7 +11,14 @@ from pathlib import Path
 
 
 def import_structure_definition(path: Path) -> dict:
+    if not path.is_file():
+        raise ValueError(f"Install the selected profile with profile-init, or set STRUCTURE_DEFINITION to your downloaded snapshot: {path}")
     raw = path.read_bytes()
+    return parse_structure_definition(raw)
+
+
+def parse_structure_definition(raw: bytes) -> dict:
+    """Validate and project a real downloaded snapshot before storing it."""
     data = json.loads(raw)
     if data.get("resourceType") != "StructureDefinition" or data.get("type") != "Observation":
         raise ValueError("Selected profile must be an Observation StructureDefinition")

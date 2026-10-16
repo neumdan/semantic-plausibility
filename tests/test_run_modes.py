@@ -21,7 +21,7 @@ from test_batch import ROOT, configuration
 
 
 def fhir_csv_config(folder, *, validate=False):
-    text = (ROOT / "examples/lab/fhir-csv.toml").read_text().replace('"../../', '"' + str(ROOT) + '/')
+    text = (ROOT / "tests/configurations/lab/fhir-csv.toml").read_text().replace('"../../../', '"' + str(ROOT) + '/')
     text = text.replace('path = "' + str(ROOT / 'output/laboratory-fhir-review.csv') + '"',
                         'path = "' + str(folder / 'fhir.csv') + '"')
     text = text.replace('mode = "lookups"', 'mode = "offline"')

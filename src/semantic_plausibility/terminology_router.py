@@ -529,11 +529,11 @@ def router_from_environment(*, llm: Any = None, path: Path | None = None) -> Ter
     entries = load_sources(source_file) if source_file else []
     base = os.getenv("TX_FHIR_BASE_URL", "")
     if base:
-        # A dedicated source file can narrow or extend the systems. The
-        # environment-only default routes the bundled registered systems.
-        with (Path(__file__).parent / "terminologies/generated/systems.csv").open(encoding="utf-8") as handle:
-            systems = [row["system"] for row in csv.DictReader(handle)]
-        systems += [system for row in entries for system in row.get("systems") or []]
+        # Environment-only routes require explicit system coverage.
+        systems = [system for row in entries for system in row.get("systems") or []]
+        systems += [value.strip() for value in os.getenv("TX_FHIR_SYSTEMS", "").split(",") if value.strip()]
+        if not systems:
+            raise ValueError("Configure explicit lookup systems in pipeline.toml (or TX_FHIR_SYSTEMS)")
         entries.append(
             {
                 "kind": "fhir",

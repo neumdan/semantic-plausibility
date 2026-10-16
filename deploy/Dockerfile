@@ -10,7 +10,7 @@ RUN if [ "$INSTALL_POSTGRES" = "1" ]; then \
     else \
       uv sync --locked --no-dev --no-install-project; \
     fi
-COPY README.md LICENSE NOTICE ./
+COPY README.md LICENSE NOTICE catalog.csv ./
 COPY src ./src
 RUN if [ "$INSTALL_POSTGRES" = "1" ]; then \
       uv sync --locked --no-dev --extra postgres --no-editable; \
@@ -18,7 +18,7 @@ RUN if [ "$INSTALL_POSTGRES" = "1" ]; then \
       uv sync --locked --no-dev --no-editable; \
     fi
 COPY examples ./examples
-COPY terminology.example.toml ./
+COPY tests/configurations ./tests/configurations
 ENV PATH="/app/.venv/bin:$PATH"
 ENTRYPOINT ["run-plausibility-check"]
 CMD ["--help"]

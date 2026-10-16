@@ -1,10 +1,10 @@
 """Report provenance and secret handling using real input adapters, without lookup doubles."""
-import csv
 import json
 from pathlib import Path
 import tempfile
 import unittest
 
+from semantic_plausibility.review_feedback import report_details
 from semantic_plausibility import run_plausibility_check, verify_audit
 from semantic_plausibility.batch import BatchConfiguration
 from semantic_plausibility.deployment import environment
@@ -27,8 +27,7 @@ class ReportContextTests(unittest.TestCase):
             self.assertEqual(context['level'], 'A1')
             self.assertIsNone(context['research']['model'])
             self.assertEqual(context['input']['granularity'], 'distinct')
-            with result.csv.open(encoding='utf-8-sig', newline='') as f:
-                rows = list(csv.DictReader(f))
+            rows, _ = report_details(result.csv, hydrate=True)
             for row in rows:
                 item = json.loads(row['assessment_context_json'])
                 self.assertEqual(item['configuration_sha256'], summary['configuration_sha256'])
@@ -52,8 +51,7 @@ class ReportContextTests(unittest.TestCase):
             summary = json.loads(result.summary.read_text())
             self.assertEqual(summary['run_context']['resource_type'], 'MedicationAdministration')
             self.assertEqual(summary['run_context']['target']['IG_VERSION'], '2026.0.1')
-            with result.csv.open(encoding='utf-8-sig', newline='') as f:
-                rows = list(csv.DictReader(f))
+            rows, _ = report_details(result.csv, hydrate=True)
             for row in rows:
                 item = json.loads(row['assessment_context_json'])
                 self.assertIn('Constant uninterrupted delivery is explicitly asserted by the source.', item['assumptions_and_limits'])
@@ -78,8 +76,7 @@ class ReportContextTests(unittest.TestCase):
             self.assertFalse(context['input']['hospital_data_requeried'])
             self.assertTrue(context['output']['path'].endswith('/research.csv'))
             self.assertIn('europe_pmc', context['research']['study_providers'])
-            with result.csv.open(encoding='utf-8-sig', newline='') as f:
-                row = next(csv.DictReader(f))
+            row = report_details(result.csv, hydrate=True)[0][0]
             detail = json.loads(result.csv.with_suffix('.evidence.jsonl').read_text().splitlines()[0])
             item = item_context(context, row, detail)
             self.assertEqual(item['check_result_basis'], 'original_A1_report')
@@ -90,8 +87,7 @@ class ReportContextTests(unittest.TestCase):
         self.assertEqual(safe_location('https://user:secret@example.org/fhir?api_key=hidden#fragment'), 'https://example.org/fhir')
         with tempfile.TemporaryDirectory() as name:
             result = run_plausibility_check(configuration(Path(name)))
-            with result.csv.open(encoding='utf-8-sig', newline='') as f:
-                row = next(csv.DictReader(f))
+            row = report_details(result.csv, hydrate=True)[0][0]
             item = json.loads(row['assessment_context_json'])
             item['assumptions_and_limits'].append('<script>unexpected-source-text</script>')
             row['assessment_context_json'] = json.dumps(item)
