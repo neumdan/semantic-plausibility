@@ -249,28 +249,71 @@ The starter defines the native address directly in TOML. For an environment refe
 
 `response_mode` supports `json_schema` or `json_object` with the same application guards. Optional controls include `reasoning_effort`, `enable_thinking`, `expected_digest` and `pull_timeout_seconds`; use only controls supported by the selected server/model. [Provisioning and native URLs](shipped-stack.md#ollama).
 
+### Use your own model or service
+
+Keep the input/profile/output settings. Change the relevant tables:
+
+| Choice | Configuration | Setup |
+| --- | --- | --- |
+| Another model in Compose Ollama | Change `models.local.model` to its actual Ollama ID | Start Ollama, then run `model-init`; the selected weights use the persistent volume |
+| Native Ollama | Native `base_url`; Podman `container_base_url="http://host.containers.internal:11434/v1"` | Start your native Ollama server and model |
+| LM Studio, llama.cpp or vLLM | `runtime="external"`, actual served model ID and OpenAI-compatible `/v1` URL | Start your server; it must support chat completions and the selected JSON response mode |
+| Your terminology server | `lookups.NAME.endpoint`, supported `systems`, optional `token_env`/`token_file` | The server must implement the selected adapter's operations |
+| Literature API proxy | `research.europe_pmc.BASE_URL` or `research.pubmed.BASE_URL` | Compatible API; arbitrary search engines require an adapter |
+
+Example: **replace** `[models.local]` for LM Studio, using the model ID shown by your server:
+
+```toml
+[models.local]
+runtime = "external"
+base_url = "http://127.0.0.1:1234/v1"
+container_base_url = "http://host.containers.internal:1234/v1"
+model = "your-served-model-id"
+temperature = 0
+max_tokens = 2048
+timeout_seconds = 600
+response_mode = "json_schema"
+# api_key_env = "LOCAL_MODEL_API_KEY"
+```
+
+Docker Desktop uses `host.docker.internal`. Keep the HTTP hostname in `network.allowed_http_hosts`. For a LAN server use its private IP and add it to that allowlist. Models must remain local/LAN; public cloud endpoints are rejected. The API dialect does not select a vendor.
+
+If authentication is needed, uncomment `api_key_env` and put `LOCAL_MODEL_API_KEY=...` in the ignored `.env`, or use `api_key_file` with a mounted secret. Secrets never belong in URLs/TOML. Multiple models use named `[models.NAME]` tables; set `MODEL_ALIAS="NAME"` in the existing `[general]` table. One alias serves the whole run.
+
+Run against an audited lookup report, with a fresh output:
+
+```sh
+# Native Python/uv
+uv run --no-sync --env-file .env research-evidence --config pipeline.toml --scope studies --report output/01-lookup.csv --out output/my-model-research.csv
+
+# Podman (Docker: replace podman-compose with docker compose)
+podman-compose --profile research run --rm research-evidence research-evidence --config /app/pipeline.toml --scope studies --report /app/output/01-lookup.csv --out /app/output/my-model-research.csv
+```
+
+These are alternative commands. Add `--plan` to inspect queries/prompts. External runtimes need no Compose Ollama service or `model-init` download. All models face the same quotation, number, analyte and unit guards; a model change is not a clinical validation.
+
 ```toml
 [research]
 enabled = false # research-evidence activates research explicitly
 scope = "studies"                 # lookup uses pages/catalogues without study databases.
 sources = ["pubmed", "europe_pmc"]
-max_articles_per_loinc = 3         # 1–12 total unique articles per exact code/edition.
+max_articles_per_loinc = 4         # 1–12 selected articles sent to the model per exact code/edition.
 unit_catalog = "local/unit-catalog.json"
 loinc_website_base_url = "https://loinc.org"
 
 [research.pubmed]
 BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
-MAX_RESULTS = 1
+MAX_RESULTS = 3                    # Candidates per query, screened before model calls.
 # EMAIL = "study-contact@example.org"
 # API_KEY_ENV = "PUBMED_API_KEY"
 
 [research.europe_pmc]
 BASE_URL = "https://www.ebi.ac.uk/europepmc/webservices/rest"
-MAX_RESULTS = 1
+MAX_RESULTS = 6
 # QUERY_FILTER = '(human OR humans OR patients OR volunteers) NOT (feline OR cats OR canine OR dogs OR rats OR mice OR veterinary)'
 ```
 
-Prepare the real catalogue with `catalog-init` and the model with `model-init` or native setup. Provider limits bound query results; the unique-article cap is separate and retrieval is cached per code/edition. `--plan` exposes tasks/schemas/searches; executed `.trace.jsonl` records actual prompts, queries and guarded responses. Public evidence supports clinician adjudication, not an automatic semantic-correctness judgment. [Research and feedback](research.md).
+Prepare the real catalogue with `catalog-init` and the model with `model-init` or native setup. Provider limits bound query results; the selected-article cap is separate and retrieval is cached per code/edition. `--plan` exposes tasks/schemas/searches; executed `.trace.jsonl` records actual prompts, queries and guarded responses. Public evidence supports clinician adjudication, not an automatic semantic-correctness judgment. [Research and feedback](research.md).
 
 ## Output and clinician feedback
 

@@ -67,6 +67,10 @@ class ResearchCandidate:
     source_sha256: str = ""
     retrieved_at: str = ""
     doi: str = ""
+    unit_ucum: str = ""
+    unit_validation_state: str = "not_checked"
+    unit_validation_source: str = ""
+    source_text_rendering: str = ""
 
 
 class UnitAuthority(Protocol):

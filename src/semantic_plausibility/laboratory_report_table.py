@@ -333,8 +333,14 @@ def laboratory_fields(row, summary):
             for record in extracted:
                 quantity = str(record["reported_value"]) if number(record.get("reported_value")) is not None else f"{record.get('low')} … {record.get('high')}"
                 fields[name].findings.append(str(record.get("value_kind") or record["evidence_type"]).replace("_", " ") + ": " + quantity + " " + str(record.get("unit") or "(unit missing)") + "; applicability unverified.")
+                if record.get("unit_ucum"):
+                    fields[name].findings.append("Source unit " + record["unit"] + " → UCUM " + record["unit_ucum"] + "; syntax validated, numbers unchanged.")
+                    if record.get("unit_validation_source"):
+                        fields[name].sources.append({"source": record["unit_validation_source"], "title": "Study unit: UCUM syntax validation"})
+                if record.get("population"):
+                    fields[name].findings.append("Study population: " + record["population"])
             fields[name].sources += extracted
-            if extracted and fields[name].proposal_state != "yellow":
+            if extracted and fields[name].source_state != "red" and fields[name].proposal_state != "yellow":
                 fields[name].proposal_state = "yellow"
                 fields[name].action = "Review published evidence"
                 fields[name].recommendation = "Retain source pending context review; no automatic replacement"

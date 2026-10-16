@@ -728,7 +728,7 @@ class FhirQualityPipeline:
     ) -> list[dict[str, Any]]:
         results = []
         for study in studies:
-            source_unit = study.get("unit")
+            source_unit = study.get("unit_ucum") if study.get("unit_validation_state") == "valid" else study.get("unit")
             low, high = number(study.get("low")), number(study.get("high"))
             if not source_unit or (low is None and high is None):
                 continue

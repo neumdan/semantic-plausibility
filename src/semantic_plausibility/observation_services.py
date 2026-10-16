@@ -8,6 +8,7 @@ the model and PubMed; patient values and identifiers are never sent by these ada
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
+from dataclasses import replace
 from datetime import datetime, timezone
 import hashlib
 from html.parser import HTMLParser
@@ -31,9 +32,10 @@ from .catalog_evidence import ObservationDefinitionCatalog
 from .observation_quality import LoincTerm, ResearchCandidate, UnitEvidence
 from .model_config import ModelEndpoint, allowed_endpoint, select_model
 from .model_schemas import explicit_token as _explicit_token
-from .model_schemas import evidence_schema, model_evidence, resolve_sentences, response_schema, validate_grounding, validate_response, supports_evidence_type
+from .model_schemas import evidence_schema, model_evidence, resolve_sentences, ground_study_units, guard_study_parts, response_schema, validate_grounding, validate_response, supports_evidence_type
 from . import research_prompts as prompts
 from .progress import LOGGER, activity
+from .study_sources import TEXT_RENDERING, study_text, study_queries, analyte_aliases, screen_record, ucum_spelling, provider_query
 
 
 class _Response:
@@ -541,7 +543,15 @@ class OpenAICompatibleJsonClient:
         if instruction == prompts.STUDY_EXTRACT:
             self.trace[-1]["model_response"] = result
             result = resolve_sentences(result, evidence)
+            result, changes = ground_study_units(result)
+            self.trace[-1]["unit_grounding"] = changes
             validate_response(result, response_schema(instruction))
+            result, rejected = guard_study_parts(result, evidence)
+            self.trace[-1]["extraction_rejections"] = rejected
+            for part in rejected:
+                LOGGER.warning("Study source guard rejected %s: %s", part["part"], part["reason"])
+            if rejected and not result["measurements"] and result["bounds"]["low"] is None and result["bounds"]["high"] is None:
+                raise ValueError("Study evidence has no supported claims after individual source guards")
         validate_grounding(instruction, result, evidence)
         self.audit_records.append({
             "model": self.model, "endpoint": self.base_url,
@@ -578,6 +588,7 @@ class PublicEvidenceClient:
         europe_pmc_retmax: int = 3,
         max_articles_per_loinc: int = 3,
         europe_pmc_query_filter: str = "",
+        ucum: Any | None = None,
     ):
         if scope not in {"lookup", "studies"}:
             raise ValueError("Evidence scope must be lookup or studies")
@@ -598,6 +609,7 @@ class PublicEvidenceClient:
         if type(max_articles_per_loinc) is not int or not 1 <= max_articles_per_loinc <= 12:
             raise ValueError("max_articles_per_loinc must be 1..12")
         self.max_articles_per_loinc = max_articles_per_loinc
+        self.ucum = ucum
         self.llm = llm
         self.session = session or _HttpSession()
         self.timeout = timeout
@@ -818,18 +830,7 @@ class PublicEvidenceClient:
                 )
         return result
 
-    @staticmethod
-    def study_queries(term):
-        # LOINC display brackets are not PubMed field tags.
-        analyte = term.display.split("[", 1)[0] or term.component
-        topic = re.sub(r"[^\w -]", " ", analyte, flags=re.UNICODE).strip()[:240]
-        return {
-            "reference_interval": f'({topic}) AND ("reference interval" OR "reference intervals" OR "reference range" OR "reference ranges")',
-            "summary_statistics": f'({topic}) AND ("mean" OR "standard deviation" OR "minimum" OR "maximum")',
-            "analytical_interval": f'({topic}) AND ("analytical measuring interval" OR "reportable range")',
-            "documented_extreme": f'({topic}) AND ("extreme value" OR "case report")',
-            "reported_measurement": f'({topic}) AND (measurement OR concentration OR units)',
-        }
+    study_queries = staticmethod(study_queries)
 
     @staticmethod
     def _abstract_payload(record):
@@ -846,35 +847,47 @@ class PublicEvidenceClient:
             return list(self._study_cache[key])
         LOGGER.info("LOINC %s: retrieve up to %s distinct articles from %s", term.code, self.max_articles_per_loinc, ", ".join(self.research_sources))
         records = {}
-        # Provider queries are interleaved; retrieval is bounded, not systematic evidence grading.
+        aliases = analyte_aliases(term)
+        # Screen a bounded result pool before spending the model article budget.
+        # Omitted articles remain in the trace with deterministic reasons.
         for category, query in self.study_queries(term).items():
-            if len(records) >= self.max_articles_per_loinc:
-                break
             for source in self.research_sources:
-                if len(records) >= self.max_articles_per_loinc:
-                    break
                 LOGGER.info("Study search: %s · %s · LOINC %s", source, category, term.code)
                 try:
-                    found = (self._pubmed_records(self._pubmed_ids(query)) if source == "pubmed"
-                             else self._europe_pmc_records(query))
+                    search = provider_query(query, source)
+                    found = (self._pubmed_records(self._pubmed_ids(search)) if source == "pubmed"
+                             else self._europe_pmc_records(search))
                     for record in found:
-                        identity = record.get("record_key") or "pmid:" + record["pmid"]
-                        if identity not in records and len(records) < self.max_articles_per_loinc:
+                        identity = record.get("doi", "").casefold() or record.get("record_key") or "pmid:" + record["pmid"]
+                        if identity not in records or len(record["abstract"]) > len(records[identity]["abstract"]):
                             records[identity] = record
                 except (OSError, ValueError, RuntimeError) as exc:
                     self.query_log.append({"source": source, "state": "unavailable", "error_type": type(exc).__name__})
+            if sum(screen_record(r, aliases, term.property)[0] > 0 for r in records.values()) >= self.max_articles_per_loinc:
+                break
+        ranked = sorted(records.values(), key=lambda r: -screen_record(r, aliases, term.property)[0])
+        selected = [r for r in ranked if screen_record(r, aliases, term.property)[0] > 0][:self.max_articles_per_loinc]
+        for record in ranked:
+            score, reason = screen_record(record, aliases, term.property)
+            self.query_log.append({"source": record["url"], "task": "study_screen", "state": "selected" if record in selected else "excluded",
+                "loinc": term.code, "title": record["title"], "score": score,
+                "reason": reason if score == 0 or record in selected else "model_article_budget",
+                "aliases": aliases, "terminology_source": term.source, "terminology_version": term.version,
+                "source_sha256": record["source_sha256"], "abstract": record["abstract"],
+                "source_text_rendering": TEXT_RENDERING})
+        LOGGER.info("LOINC %s: screened %s articles; selected %s for extraction", term.code, len(records), len(selected))
         candidates = []
-        for record in records.values():
+        for article_index, record in enumerate(selected, 1):
             before = len(candidates)
             extraction_unavailable = False
-            LOGGER.info("LOINC %s: article %s/%s, source %s", term.code, list(records).index(record.get("record_key") or "pmid:" + record["pmid"]) + 1, len(records), record["url"])
+            LOGGER.info("LOINC %s: article %s/%s, source %s", term.code, article_index, len(selected), record["url"])
             if self.llm is not None:
                 try:
                     answer = self.llm.json(prompts.STUDY_EXTRACT, {
                         "loinc_code": term.code, "analyte": term.component or term.display,
                         "analyte_definition": {"display": term.display, "component": term.component, "property": term.property,
                                                "system": term.system, "scale": term.scale, "method": term.method,
-                                               "example_units": list(term.example_ucum_units)},
+                                               "example_units": list(term.example_ucum_units), "aliases": aliases},
                         "title": record["title"], **self._abstract_payload(record)})
                     candidates += self._extract_study_candidates("unclassified_discovery", [record], term, answers=[answer["bounds"]])
                     for row in answer["measurements"]:
@@ -890,6 +903,21 @@ class PublicEvidenceClient:
                 candidates.append(ResearchCandidate("unclassified_discovery", record["url"],
                     excerpt=record["title"], status="extraction_unavailable" if extraction_unavailable else "no_supported_extraction",
                     **self._study_provenance(record)))
+        # Retain the literal unit; validate a separate typography-derived UCUM spelling.
+        for index, candidate in enumerate(candidates):
+            if not candidate.unit or self.ucum is None:
+                continue
+            spelling = ucum_spelling(candidate.unit)
+            try:
+                valid = self.ucum.is_valid(spelling)
+                state = "valid" if valid is True else "invalid" if valid is False else "unknown"
+            except (OSError, ValueError, RuntimeError):
+                state = "unknown"
+            source = getattr(self.ucum, "source", "") or ""
+            self.query_log.append({"task": "study_unit_validation", "state": state, "source": source,
+                "unit_source": candidate.unit, "ucum_candidate": spelling, "loinc": term.code})
+            candidates[index] = replace(candidate, unit_ucum=spelling if state == "valid" else "",
+                unit_validation_state=state, unit_validation_source=source)
         self._study_cache[key] = candidates
         return list(candidates)
 
@@ -912,11 +940,9 @@ class PublicEvidenceClient:
             source, identifier = row.get("source", ""), str(row.get("id", ""))
             if not re.fullmatch(r"[A-Z]+", source) or not re.fullmatch(r"[A-Za-z0-9_-]+", identifier):
                 continue
-            parser = _PlainText()
-            parser.feed(str(row.get("abstractText", "")))
             records.append({"pmid": identifier if source == "MED" else "",
                 "record_key": "pmid:" + identifier if source == "MED" else source + ":" + identifier,
-                "title": str(row.get("title", "")), "abstract": re.sub(r"\s+", " ", parser.text()).strip(),
+                "title": study_text(row.get("title", "")), "abstract": study_text(row.get("abstractText", "")),
                 "source_sha256": digest, "retrieved_at": retrieved_at, "doi": str(row.get("doi", "")),
                 "url": f"https://europepmc.org/article/{source}/{identifier}"})
         return records
@@ -940,8 +966,8 @@ class PublicEvidenceClient:
             pmid = article.findtext(".//MedlineCitation/PMID") or ""
             title_node = article.find(".//ArticleTitle")
             abstracts = article.findall(".//Abstract/AbstractText")
-            title = "".join(title_node.itertext()) if title_node is not None else ""
-            abstract = re.sub(r"\s+", " ", " ".join("".join(node.itertext()) for node in abstracts)).strip()
+            title = study_text(ET.tostring(title_node, encoding="unicode")) if title_node is not None else ""
+            abstract = study_text(" ".join(ET.tostring(node, encoding="unicode") for node in abstracts))
             if pmid in ids:
                 records.append(
                     {
@@ -1039,7 +1065,8 @@ class PublicEvidenceClient:
     def _study_provenance(record):
         """Citation metadata comes from the retrieved provider record, never the model."""
         return {"source_title": record.get("title", ""), "source_sha256": record.get("source_sha256", ""),
-                "retrieved_at": record.get("retrieved_at", ""), "doi": record.get("doi", "")}
+                "retrieved_at": record.get("retrieved_at", ""), "doi": record.get("doi", ""),
+                "source_text_rendering": TEXT_RENDERING}
 
 
 def services_from_environment(

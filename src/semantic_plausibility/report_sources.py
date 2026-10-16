@@ -322,6 +322,8 @@ def recommendation_html(row):
         if comparisons:
             context += "; comparisons for original LOINC " + str(complete["values"].get("comparison_loinc") or "unresolved") + ": "
             context += "; ".join(str(comparison.get("state", "unresolved")) + " / " + str(comparison.get("reference_relation", "not_comparable")) for comparison in comparisons)
+        if candidate.get("unit_ucum"):
+            context += "; source unit " + str(candidate.get("unit")) + " → validated UCUM " + candidate["unit_ucum"] + "; no numeric conversion"
         if candidate.get("candidate_loinc"):
             label += " · LOINC " + str(candidate["candidate_loinc"])
         add(label, [candidate], context or "Evidence of reported practice; applicability requires clinician review.")

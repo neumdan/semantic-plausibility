@@ -578,6 +578,8 @@ def configured_checker(config, prepared, *, profile=None, research=None, options
         checker.ucum, checker.loinc = ReliableLookup(checker.ucum), ReliableLookup(checker.loinc)
         if checker.spelling:
             checker.spelling.ucum = checker.ucum
+    if checker.evidence is not None:
+        checker.evidence.ucum = checker.ucum
     if profile is not None:
         checker.custom = profile
     # Use one traced route for LOINC membership and its unit/axis metadata.

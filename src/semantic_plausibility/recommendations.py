@@ -130,7 +130,7 @@ def value_checks(item: dict, ranges: list, stats: dict, quantity: dict, pipeline
         kind = candidate.get("evidence_type")
         if kind not in {"reference_interval", "analytical_interval", "documented_extreme"}:
             continue
-        source_unit = candidate.get("unit")
+        source_unit = candidate.get("unit_ucum") if candidate.get("unit_validation_state") == "valid" else candidate.get("unit")
         low, high = number(candidate.get("low")), number(candidate.get("high"))
         entry = {
             "source": candidate.get("source"),

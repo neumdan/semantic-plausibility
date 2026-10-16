@@ -9,13 +9,13 @@ def counts(candidates):
             'extracted_measurements': sum(r.get('evidence_type') == 'reported_measurement' and r.get('reported_value') is not None for r in candidates),
             'extracted_intervals': sum(r.get('evidence_type') in {'reference_interval', 'analytical_interval', 'documented_extreme'} and (r.get('low') is not None or r.get('high') is not None) for r in candidates),
             'extracted_unclassified_ranges': sum(r.get('evidence_type') == 'unclassified_numeric_range' for r in candidates),
-            'unit_only_records': sum(r.get('value_kind') == 'unit_only' for r in candidates),
+            'unit_only_records': sum(r.get('evidence_type') == 'reported_measurement' and bool(r.get('unit')) and r.get('reported_value') is None for r in candidates),
             'articles_without_supported_extraction': len({r.get('source') for r in candidates if r.get('evidence_type') == 'unclassified_discovery'}),
             'articles_with_failed_extraction': len({r.get('source') for r in candidates if r.get('status') == 'extraction_unavailable'})}
 
 
 def write_studies(path, rows):
-    fields = ['loinc', 'tuple_ids', 'evidence_type', 'status', 'value_kind', 'reported_value', 'low', 'high', 'unit', 'population', 'specimen', 'method', 'source_title', 'source', 'doi', 'excerpt', 'source_sha256', 'retrieved_at']
+    fields = ['loinc', 'tuple_ids', 'evidence_type', 'status', 'value_kind', 'reported_value', 'low', 'high', 'unit', 'unit_ucum', 'unit_validation_state', 'unit_validation_source', 'source_text_rendering', 'population', 'specimen', 'method', 'source_title', 'source', 'doi', 'excerpt', 'source_sha256', 'retrieved_at']
     entries = {}
     for row in rows:
         for item in json.loads(row.get('study_evidence_json') or '[]'):

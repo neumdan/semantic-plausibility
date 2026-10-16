@@ -23,6 +23,7 @@ from .observation_services import PublicEvidenceClient
 from .report_sources import review_set_fields
 from .research_summary import counts, write_studies
 from .report_context import run_context, item_context, execution_position, execution_since
+from .study_sources import provider_query
 
 
 def research_plan(config_path, report=None, *, scope=None):
@@ -45,11 +46,15 @@ def research_plan(config_path, report=None, *, scope=None):
         from .observation_quality import LoincTerm
         term = LoincTerm(code or "", label, **{k: item.get("loinc_axes", {}).get(k, "")
             for k in ("component", "system")}) if item.get("loinc_axes") else LoincTerm(code or "", label)
+        queries = PublicEvidenceClient.study_queries(term) if code and scope == "studies" else {}
         targets[key] = {"code": code, "version": key[1], "analyte_name": label,
             "name_lookup": row.get("analyte_name", ""), "unit": row["unit_code"],
-            "study_queries": (PublicEvidenceClient.study_queries(term) if code else "After exact verification of retrieved candidates") if scope == "studies" else {}}
+            "study_queries": (queries if code else "After exact verification of retrieved candidates") if scope == "studies" else {},
+            "provider_queries": {provider: {category: provider_query(query, provider) for category, query in queries.items()}
+                for provider in config.data.get("research", {}).get("sources", ["pubmed"])} if queries else {}}
     return {"goal": "Evidence of reported practice supports clinician semantic adjudication",
         "scope": scope,
+        "query_plan_note": "Preliminary labels from the audited report; execution refreshes verified terminology aliases. Actual queries and source-specific filters are recorded in the trace.",
         "terminology_plan": terminology_plan(config), "targets": list(targets.values()),
         "study_sources": config.data.get("research", {}).get("sources", ["pubmed"]) if scope == "studies" else [],
         "max_articles_per_loinc": config.data.get("research", {}).get("max_articles_per_loinc", 3) if scope == "studies" else 0,
@@ -213,6 +218,7 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
                             research={"scope": scope, "sources": list(getattr(evidence, "source_records", {}).values()),
                                 "study_providers": list(evidence.research_sources) if scope == "studies" else [],
                                 **query_counts(getattr(evidence, "query_log", [])), "accepted_model_calls": getattr(llm, "audit_records", []),
+                                "partially_accepted_model_calls": sum(bool(t.get("extraction_rejections")) and t.get("state") == "accepted_by_source_guards" for t in getattr(llm, "trace", [])),
                                 "max_articles_per_loinc": evidence.max_articles_per_loinc,
                                 "model_state": "responses_accepted" if getattr(llm, "audit_records", []) else "no_accepted_response",
                                 "groups_with_code_proposals": sum(bool(row.get("suggested_code")) for row in reviewed),
@@ -270,5 +276,8 @@ def query_counts(events):
     retrievals = [event for event in events if "state" not in event and "task" not in event]
     return {"queries": len(retrievals), "retrieval_requests": len(retrievals),
         "literature_searches": sum(event.get("source") == "europe_pmc" or event.get("endpoint") == "esearch.fcgi" for event in retrievals),
+        "articles_screened": sum(event.get("task") == "study_screen" for event in events),
+        "articles_selected": sum(event.get("task") == "study_screen" and event.get("state") == "selected" for event in events),
+        "articles_excluded": sum(event.get("task") == "study_screen" and event.get("state") == "excluded" for event in events),
         "extraction_failures": sum("task" in event and event.get("state") == "unavailable" for event in events),
         "retrieval_failures": sum("task" not in event and event.get("state") == "unavailable" for event in events)}

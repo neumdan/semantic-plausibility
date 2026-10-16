@@ -347,7 +347,10 @@ def write_html(path, rows, summary, csv_name, log_name):
             + escape(str(intervals if intervals is not None else "not recorded")) + ' quoted intervals; '
             + escape(str(study_counts.get("articles_with_failed_extraction", "not recorded"))) + ' rejected/unavailable extractions. '
             + ('<strong>No study-derived value or reference-range recommendation.</strong> ' if no_numbers else '')
-            + 'Green numeric fields describe format/bound checks only; clinical plausibility remains unestablished.</p>')
+            + 'Screened article/code pairs: ' + escape(str(research.get('articles_screened', 'not recorded')))
+            + '; selected: ' + escape(str(research.get('articles_selected', 'not recorded'))) + '. '
+            + 'Calls with individually rejected claims: ' + escape(str(research.get('partially_accepted_model_calls', 'not recorded'))) + '. '
+            + 'Screening and per-claim exclusion reasons are recorded in the AI trace. Green numeric fields describe format/bound checks only; clinical plausibility remains unestablished.</p>')
     html = f'''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">
 <title>{title}</title><style>

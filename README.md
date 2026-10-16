@@ -73,9 +73,11 @@ Direct script: `uv run --no-sync --env-file .env python run-plausibility-check.p
 | --- | --- | --- |
 | A1 | Exact membership/syntax, code–unit fit, numeric/reference consistency, supported transformations | Checked CSV/HTML + evidence/audit |
 | A2 | A1 report → real candidate lookups → local model → exact guards | Code, analyte/name and unit proposals |
-| A3 | A1 report → A2 tasks + bounded article retrieval/extraction | Sourced statistics/intervals for clinician review |
+| A3 | A1 report → screened articles → quoted statistics/intervals + checked unit spelling | Sourced statistics/intervals for clinician review |
 
 A2 and A3 both start from the **original A1 report and sidecars**. They do not overwrite source data or turn a published interval into an approved local reference interval.
+
+Use [your own Ollama model, LM Studio/local API or terminology service](docs/configuration.md#use-your-own-model-or-service) through the same TOML. Secrets stay in `.env` or secret files. Study reports retain the quoted unit beside a separately checked UCUM spelling; source guards still require exact numbers, quotations and the matching analyte.
 
 The starter uses local Ollama **`ministral-3:3b`**. Provision once:
 
