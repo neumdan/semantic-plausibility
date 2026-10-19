@@ -75,7 +75,9 @@ specimen = "specimen"
 status = "status"
 ```
 
-**Expected:** five input rows become four groups. Two compatible Hb summaries combine to n=30 and mean=13.3333… g/dL. `sd` means sample SD (n−1). Pool summaries only when their underlying measurements are disjoint. All statistics are numbers in the common `unit_code`; no separate mean/SD/min/max unit columns are needed. Omit unavailable statistic/count mappings. For exact-value frequency rows, map `value` and `count` instead of summary statistics; the starter `examples/laboratory.csv` demonstrates this (8 rows → 7 groups, 84 occurrences).
+**Typo exercise:** the final row deliberately uses `g/dLL`. The real UCUM service rejects it; AI lookup can propose independently validated `g/dL`. Review the intended unit before changing values or bounds. The source row stays unchanged.
+
+**Expected:** six input rows become five groups. Two compatible Hb summaries combine to n=30 and mean=13.3333… g/dL. `sd` means sample SD (n−1). Pool summaries only when their underlying measurements are disjoint. All statistics are numbers in the common `unit_code`; no separate mean/SD/min/max unit columns are needed. Omit unavailable statistic/count mappings. For exact-value frequency rows, map `value` and `count` instead of summary statistics; the starter `examples/laboratory.csv` demonstrates this (8 rows → 7 groups, 84 occurrences).
 
 ## FHIR
 
@@ -164,7 +166,7 @@ DB_TABLE = "laboratory_summary"
 DB_SSLMODE = "disable" # Only the isolated local example; use verify-full for the hospital connection.
 ```
 
-Run the normal check with compose.yaml, e.g. `podman-compose run --rm run-plausibility-check check --out output/postgres-01.csv`. Expected: 5 → 4 groups, matching the aggregate CSV. Stop the exercise with `stop example-postgres`; its volume persists.
+Run the normal check with compose.yaml, e.g. `podman-compose run --rm run-plausibility-check check --out output/postgres-01.csv`. Expected: 6 → 5 groups, matching the aggregate CSV. Stop the exercise with `stop example-postgres`; its volume persists.
 
 For a hospital/CDS Hub connection, select a read-only account, host/database, schema, table/view and actual columns. Use `granularity="individual"` for raw measurements. A curated view handles joins/current-version selection. For JSONB Observations, map only `resource_json="resource"` and use individual granularity. For full-document validation, export the resources to FHIR files. [DSN, TLS and secret-file settings](../../docs/configuration.md#postgresql-and-sqlite).
 

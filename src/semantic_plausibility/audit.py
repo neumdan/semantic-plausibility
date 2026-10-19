@@ -19,7 +19,7 @@ from .fhir_quality_pipeline import FhirQualityPipeline, _approvals, number
 from .recommendations import transformation, value_checks, display_checks
 from .observation_quality import LoincTerm
 from .observation_services import services_from_environment
-from .profile_config import InputProfile, load_profile
+from .profile_config import InputProfile, load_profile, missing_metadata_only
 from .unit_catalog import UnitSpelling, spelling_columns, FiniteUnitCodeSource
 from .snapshot_services import SnapshotLoinc, SnapshotUcum
 from .terminology_router import TerminologyRouter, load_sources, router_from_environment
@@ -414,7 +414,7 @@ class Checker:
         self.evidence_mode = "offline_snapshot" if snapshot else "configured_services"
         from .laboratory_suggestions import LaboratorySuggestions
 
-        self.suggestions = LaboratorySuggestions(getattr(self.evidence, "llm", None)) if research else None
+        self.suggestions = LaboratorySuggestions(getattr(self.evidence, "llm", None) if research else None)
 
     def profile_for(self, kind: str) -> InputProfile:
         if kind != "Observation":
@@ -482,11 +482,13 @@ class Checker:
         if not codes:
             findings.append(("unclear", "Code oder Codesystem fehlt."))
         elif not item["code_policy_compatible"] and all(c["state"] == "compatible" for c in codes):
-            findings.append(("error", "Ein vom Profil verlangtes Codesystem fehlt in der Code-Zuordnung."))
+            findings.append(("unclear", "Target-profile metadata incomplete: required coding system is absent."))
         for check in codes:
             if check["state"] == "invalid":
                 findings.append(
-                    ("error", "Code verletzt eine explizite Profilregel: " + ", ".join(check["issues"]))
+                    ("unclear" if missing_metadata_only(check) else "error",
+                     "Code metadata incomplete: " + ", ".join(check["issues"]) if missing_metadata_only(check)
+                     else "Code verletzt eine explizite Profilregel: " + ", ".join(check["issues"]))
                 )
             elif check["state"] != "compatible":
                 findings.append(("unclear", "Code-System-Zuordnung ist unvollständig."))
@@ -509,7 +511,9 @@ class Checker:
         rule = item["quantity_policy"]
         if payload["numeric_applicable"] and rule["state"] == "invalid":
             findings.append(
-                ("error", "Einheit verletzt eine explizite Elementregel: " + ", ".join(rule["issues"]))
+                ("unclear" if missing_metadata_only(rule) else "error",
+                 "Unit metadata incomplete: " + ", ".join(rule["issues"]) if missing_metadata_only(rule)
+                 else "Einheit verletzt eine explizite Elementregel: " + ", ".join(rule["issues"]))
             )
         unit_state = item["unit_check"]["state"]
         if not payload["numeric_applicable"]:
@@ -603,7 +607,9 @@ class Checker:
             elif item[fit] == "not_provided":
                 findings.append(("unclear", f"{noun} ist nicht ausreichend aufgelöst."))
         for check in ranges:
-            if check["state"] in {"invalid_bounds", "policy_invalid", "unit_invalid"}:
+            if check["state"] == "metadata_incomplete":
+                findings.append(("unclear", "Reference-range unit metadata incomplete; confirm code and system."))
+            elif check["state"] in {"invalid_bounds", "policy_invalid", "unit_invalid"}:
                 findings.append(
                     ("error", "Referenzgrenzen oder ihre Einheiten-Codes/Elementregeln sind fehlerhaft.")
                 )
@@ -652,7 +658,18 @@ class Checker:
             findings.append(
                 ("error", "Input encoding or structure violates the selected laboratory contract.")
             )
-        plan = transformation(mapping, q, payload["reference_ranges"], target, pipeline)
+        suggestions = item.get("laboratory_suggestions") or {}
+        selected = next((candidate for candidate in suggestions.get("coding_candidates", [])
+            if candidate["code"] == suggestions.get("selected_code") and candidate["selectable"]), None)
+        proposal_mapping = mapping
+        if selected:
+            fit = selected["unit_fit"]
+            target, basis = fit.get("target") or "", "verified_target_code_unit_candidate"
+            proposal_mapping = {**fit, "class": fit["class"] if fit.get("source_unit_mapping_verified") else "unresolved",
+                "factor": fit.get("factor_from_original")}
+            factor = fit.get("factor_from_original") or ""
+            proposal = f"Review verified LOINC candidate {selected['code']} and UCUM {target}; confirm source systems and specimen."
+        plan = transformation(proposal_mapping, q, payload["reference_ranges"], target, pipeline)
         row = self._base_row(payload, stats, findings)
         row["werttyp_pruefung"] = (
             "widersprüchliche Werttypen/Fehlgrund"

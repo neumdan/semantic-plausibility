@@ -312,6 +312,8 @@ def recommendation_html(row):
         kind = candidate.get("evidence_type", "unclassified_discovery")
         if kind == "reported_measurement":
             label = f"Reported {candidate.get('value_kind', 'measurement')}: {candidate.get('reported_value', '') or ''} {candidate.get('unit', '')}"
+        elif kind == "analytical_limit":
+            label = f"Analytical {candidate.get('value_kind', 'limit').replace('_', ' ')}: {candidate.get('reported_value', '')} {candidate.get('unit', '')}"
         elif kind in {"reference_interval", "analytical_interval", "documented_extreme"}:
             label = f"{kind.replace('_', ' ').capitalize()}: {candidate.get('low')}–{candidate.get('high')} {candidate.get('unit', '')}"
         else:

@@ -151,6 +151,9 @@ def check_configuration(path, *, source_alias=None, connections=False, research=
             from .fhir_validation import target_profile
             probe("fhir_validation_profile", lambda: bool(target_profile(configuration)))
         if connections:
+            if raw_config.get("decision", {}).get("enabled"):
+                from .input_decision import InputDecision
+                probe("laya_decision_service", InputDecision(configuration).ready)
             if source["kind"] == "postgres":
 
                 def db_probe():

@@ -17,3 +17,10 @@ files and are not distributed in this repository.
 The optional local UCUM service installs the official NLM ucum-lhc package
 at image-build time. Its upstream licence and notices remain with the installed
 dependency: https://github.com/LHNCBC/ucum-lhc
+
+The optional decision service installs the Apache-2.0 Laya runtime:
+https://github.com/NandhaKishorM/laya
+The pinned Apache-2.0 multilingual model is downloaded separately at startup:
+https://huggingface.co/convaiinnovations/laya-multilingual
+Model files remain in the operator's ignored local/laya cache. Upstream licences
+and dependency notices remain with the installed packages and downloaded files.

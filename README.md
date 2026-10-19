@@ -66,6 +66,10 @@ uv run --no-sync --env-file .env run-plausibility-check check --out output/01-lo
 
 `profile-init` retrieves the pinned MII Laboratory snapshot and selected HL7 binding into `local/profiles/`; repeat calls verify and reuse them. `config-check --connections` tests the selected sources. Open **`output/01-lookup.html`** and inspect each field's finding, proposal and source. Use a fresh `--out` name for the next run.
 
+**Read the report:** each field shows its finding, condition, recommendation, short **Why**, and sources. **Conditional match** means, for example, “if the intended system is LOINC, `2823-3` is valid.” Matching name and compatible unit strengthen this finding: **code → code + name → code + name + unit**. These are evidence levels, not probabilities. Missing system URIs stay missing until confirmed; the actual specimen also needs source confirmation. A valid number is a format result, not clinical approval.
+
+Each laboratory item also has five small assessment rows: **profile element QC; code/name/context; values/unit/system; code–quantity compatibility; whole set with reference ranges and evidence**. Each reports its result and completeness separately. A complete supplied set can contain errors; a conditional match can still lack metadata. [Column and status definitions](docs/data-contract.md#assessment-scopes).
+
 ## 2. Choose the input and method
 
 | Input | Set in the same TOML | Example and mapping |
@@ -98,6 +102,26 @@ podman-compose --profile research run --rm research-evidence research-evidence -
 
 Docker uses the same commands with `docker compose` in place of `podman-compose`. Python uses `uv run --no-sync --env-file .env run-plausibility-check` followed by the same subcommands, with your local Ollama running. `model-init` downloads the selected model only if missing; weights persist in `semantic-plausibility-ollama`. `catalog-init` explicitly acquires the official UCUM definition/candidate files for AI spelling suggestions, stored in `local/`. [Own model / LM Studio](docs/shipped-stack.md#models).
 
+### Optional Laya input assessment — experimental
+
+In the existing `[decision]` block of `pipeline.toml`, set `enabled=true`. Laya adds **domain, declared unit-system and next-step suggestions** to each checked laboratory group. Ministral continues to perform A2/A3 research and extraction.
+
+```sh
+mkdir -p local/laya
+podman-compose --profile decision up -d --build laya
+podman-compose --profile decision logs -f laya
+```
+
+When the service reports it is ready, leave the log view with Ctrl+C and run:
+
+```sh
+podman-compose run --rm run-plausibility-check check --out output/laya-laboratory.csv
+```
+
+Open `output/laya-laboratory.html`: **Input decision** shows the model's choices, scores and abstentions. The exact request/response and pinned model revision are in `*.evidence.jsonl`; `decision.*` CSV columns retain individual scores. Docker uses `docker compose` instead. [Python setup and settings](docs/configuration.md#optional-laya-decisions).
+
+FHIR `resourceType` identifies the resource. CSV/DB columns are mapped explicitly. Declare hospital origin with `input.origin="lis"` or `"cpoe"`; similar content can originate in either system. The initial laboratory evaluation produced uncertain or incorrect domain choices; keep automatic routing disabled. Laya's uncalibrated scores are review hints and retain the configured source, terminology results and chosen research scope.
+
 ## 3. Understand the stack and decisions
 
 ```mermaid
@@ -110,6 +134,8 @@ flowchart LR
   PY --> TX
   PY --> U[Optional local UCUM service]
   PY -->|complete FHIR input| V[Optional Matchbox validator]
+  PY -.-> LAYA[Optional local Laya: input and next-step hints]
+  LAYA -.-> R
   PY --> R[CSV + HTML + audit]
   R --> AI[Optional Ollama + retrieved study evidence]
   AI --> REVIEW[Sources + proposals for clinician review]
@@ -122,17 +148,20 @@ flowchart TD
   VALIDATE -->|no| GROUP[Group equivalent semantic sets or retain items]
   FHIR --> GROUP
   GROUP --> CHECK[Check code + name + specimen + values + unit + reference context]
-  CHECK --> RESULT[Per-field finding and source]
+  CHECK -.-> LAYA[Optional Laya assessment; retain declared source]
+  LAYA -.-> RESULT
+  CHECK --> RESULT[Field finding + condition + short reason + source]
   RESULT --> AI{AI method selected?}
   AI -->|lookup| CANDIDATE[Ground candidate changes in retrieved terminology]
   AI -->|studies| EVIDENCE[Retrieve studies and verify quoted numeric evidence]
   AI -->|A1 only| REPORT[CSV + HTML review tables]
   CANDIDATE --> REPORT
   EVIDENCE --> REPORT
-  REPORT --> HUMAN[Clinician reviews and approves any mapping]
+  REPORT --> SCOPES[Profile QC / identity / quantity / code-unit fit / whole set + evidence]
+  SCOPES --> HUMAN[Clinician reviews and approves any mapping]
 ```
 
-The runner is a one-shot batch command. Ollama, Blaze, UCUM and Matchbox are optional persistent services. Start Blaze only to serve your imported terminology or support FHIR validation. Direct file lookup reads local files without a server. [Containers and persistent storage](docs/shipped-stack.md).
+The runner is a one-shot batch command. Laya, Ollama, Blaze, UCUM and Matchbox are optional persistent services. Start Blaze only to serve your imported terminology or support FHIR validation. Direct file lookup reads local files without a server. [Containers and persistent storage](docs/shipped-stack.md).
 
 ## 4. Working examples and tests
 

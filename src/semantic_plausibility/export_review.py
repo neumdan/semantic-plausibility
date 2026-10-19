@@ -74,6 +74,7 @@ def csv_rows(path, *, delimiter=",", required=()):
 
 EXTRA_FIELDS = [
     *SET_FIELDS,
+    "input_decision_json",
     "fhir_validation_state",
     "fhir_validation_scope",
     "semantic_signature",
@@ -602,6 +603,9 @@ def configured_checker(config, prepared, *, profile=None, research=None, options
 
 def _review_export(config):
     local_model_only(config)
+    from .input_decision import InputDecision
+    decision = InputDecision(config)
+    decision_counts = {}
     target = config.path_value(config.output.get("path", "output/laboratory-review.csv"))
     registry_path = config.data.get("quality", {}).get("review_registry")
     registry = ReviewRegistry(config.path_value(registry_path)) if registry_path else None
@@ -831,6 +835,8 @@ def _review_export(config):
                     for key in (
                         "code_verified",
                         "unit_verified",
+                        "loinc_candidate_verified",
+                        "ucum_candidate_verified",
                         "value_numeric_ready",
                         "reference_numeric_ready",
                     )
@@ -920,7 +926,8 @@ def _review_export(config):
                                 "target_version": candidate["version"], "target_verified": True,
                                 "equivalence": "not_established", "source": candidate["source"],
                                 "method": "retrieved_candidate_exact_lookup",
-                                "model_selected": candidate["code"] == selected_code,
+                                "model_selected": suggestions.get("selection_method") == "model" and candidate["code"] == selected_code,
+                                "selection_method": suggestions.get("selection_method", "model" if suggestions.get("model_used") else "unselected"),
                                 "unit_fit": candidate["unit_fit"], "review_required": True,
                             })
                         unambiguous = next((p for p in proposals if p["target_code"] == selected_code), None) if selected_code else (
@@ -972,10 +979,18 @@ def _review_export(config):
                                         review_required=approval["review_required"], approval_id=approval["decision_id"])
                             row["fhir_mapping_proposal_json"] = encoded(plan)
                         row.update(review_set_fields(row, detail))
+                        input_decision = decision.assess(payload, row)
+                        if input_decision is not None:
+                            detail["input_decision"] = input_decision
+                            row["input_decision_json"] = encoded(input_decision)
+                            state = input_decision["state"]
+                            decision_counts[state] = decision_counts.get(state, 0) + 1
                         detail["assessment_context"] = item_context(assessment_run, row, detail)
                         detail["assessment_context"]["execution"] = execution_since(checker, execution_start)
                         row["assessment_context_json"] = encoded(detail["assessment_context"])
                         selected = {field: row.get(field, "") for field in all_fields}
+                        from .laboratory_assessment import assessment_layers
+                        detail["assessment_layers"] = assessment_layers(selected, {"operation": config.operation})
                         writer.writerow(project(selected, detail, operation=config.operation))
                         detail["report_row"] = {field: value for field, value in selected.items() if field != "evidence_json"}
                         evidence_out.write(encoded(detail) + "\n")
@@ -1007,6 +1022,8 @@ def _review_export(config):
                     "configuration_sha256": config.deployment.sha256,
                     "run_context": assessment_run,
                     "terminology_updates": package_updates,
+                    "input_decision": {"enabled": decision.options["enabled"], "calls": decision.calls,
+                                       "states": decision_counts},
                     "input_sha256": input_hash,
                     "reference_pack_sha256": _input_hash(snapshot) if snapshot else None,
                     "reference_artifacts": artifacts,

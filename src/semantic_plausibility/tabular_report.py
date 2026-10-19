@@ -22,16 +22,22 @@ def flatten(value, prefix, result):
         result[prefix] = "" if value is None else value
 
 
-def project(row, detail, *, operation="check"):
+def project(row, detail, *, operation="check", summary=None):
     """Keep scalar summary/review columns and the same field decisions as the HTML."""
     result = {key: value for key, value in row.items()
-              if not key.endswith("_json") and not isinstance(value, (dict, list))}
+              if not key.endswith("_json") and not key.startswith(("assessment.", "qc."))
+              and not isinstance(value, (dict, list))}
     if row.get("resource_type") == "Observation":
+        from .laboratory_assessment import assessment_layers
         from .laboratory_report_table import laboratory_fields
         source = json.loads(row.get("source_data_json") or "{}")
         if "source_id" not in row:
             source = {key: val for key, val in source.items() if key not in {"source_id", "source_ref"}}
-        fields = laboratory_fields(row, {"operation": operation})
+        if operation == "research-evidence" and summary is None:
+            raise ValueError("Research CSV projection requires the same summary as the HTML report")
+        fields = laboratory_fields(row, summary or {"operation": operation})
+        layers = assessment_layers(row, summary or {"operation": operation})
+        flatten(layers, "qc", result)
         transform = json.loads(row.get("transformation_json") or "{}")
         flatten(transform, "transformation", result)
     else:
@@ -39,6 +45,10 @@ def project(row, detail, *, operation="check"):
         source = detail.get("source_set", {})
         fields = medication_fields(row, detail)
     flatten(source, "input", result)
+    if row.get("input_decision_json"):
+        decision = json.loads(row["input_decision_json"])
+        flatten({key: decision[key] for key in ("state", "model", "revision", "declared", "min_probability", "calibration", "decisions")
+                 if key in decision}, "decision", result)
     for field in fields:
         name = re.sub(r"[^a-z0-9]+", "_", field.name.lower()).strip("_")
         prefix = "assessment." + name
@@ -50,6 +60,7 @@ def project(row, detail, *, operation="check"):
                 sources.append(source)
         flatten({"finding": field.findings, "action": field.action,
                  "recommendation": field.recommendation, "reason": field.reason,
+                 "condition": field.condition, "support_level": field.support_level,
                  "source_status": field.source_state, "proposal_status": field.proposal_state,
                  "source": sources}, prefix, result)
     return result

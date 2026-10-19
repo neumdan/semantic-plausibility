@@ -22,6 +22,7 @@ from .profile_config import (
     assess_coding,
     assess_quantity,
     element_rule,
+    missing_metadata_only,
 )
 
 
@@ -79,7 +80,8 @@ class FhirQualityPipeline:
         self.profile = profile or load_profile("fhir-r4-lab")
         self.terminology = terminology
         self.spelling = spelling
-        self.suggestions = suggestions
+        from .laboratory_suggestions import LaboratorySuggestions
+        self.suggestions = suggestions or LaboratorySuggestions(None)
 
     def check(
         self,
@@ -438,9 +440,13 @@ class FhirQualityPipeline:
         comparisons = self._study_comparisons(studies, unit, value, interval) if ucum_valid else []
 
         proposals = None
-        if do_research and self.suggestions:
+        if self.suggestions:
             proposals = self.suggestions.assess(item.get("code") or {}, quantity, term, self,
                 specimen=loinc_system, method=method, name_checks=name_checks,
+                research=do_research,
+                allow_loinc=not code_rule.prohibited and (code_rule.allowed_systems is None or LOINC in code_rule.allowed_systems),
+                allow_ucum=(quantity_policy["allowed_systems"] is None or UCUM in quantity_policy["allowed_systems"])
+                    and "element_excluded_by_guide" not in quantity_policy["issues"],
                 source_axes=source_axes,
                 context_conflict=(mapping["class"] in {"needs_refinement", "unresolved"}
                     or system_fit == "mismatch" or method_fit == "mismatch"
@@ -702,8 +708,10 @@ class FhirQualityPipeline:
                 if isinstance(interval.get(side), dict)
             ):
                 result = {"state": "comparator_unresolved"}
-            if any(policy["state"] != "compatible" for policy in policies):
-                result = {**result, "state": "policy_invalid"}
+            failed_policies = [policy for policy in policies if policy["state"] != "compatible"]
+            if failed_policies and result["state"] not in {"invalid_bounds", "unit_invalid"}:
+                result = {**result, "state": "metadata_incomplete"
+                    if all(missing_metadata_only(policy) for policy in failed_policies) else "policy_invalid"}
             checks.append(
                 {
                     "index": index,

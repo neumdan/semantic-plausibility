@@ -14,6 +14,16 @@ LOINC = "http://loinc.org"
 UCUM = "http://unitsofmeasure.org"
 
 
+def missing_metadata_only(policy: dict) -> bool:
+    """Keep formal FHIR violations, but distinguish absent data from contradictions."""
+    issues = set(policy.get("issues", []))
+    return bool(issues) and issues <= {
+        "missing_code", "guide_requires_code_system", "missing_system_for_coded_check",
+        "qty-3_missing_system", "guide_requires_unit_code", "guide_requires_unit_system",
+        "guide_requires_unit_display",
+    }
+
+
 @dataclass(frozen=True)
 class ElementRule:
     """One IG constraint. None means inherited FHIR R4, not an allow-list."""

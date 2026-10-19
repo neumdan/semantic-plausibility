@@ -47,6 +47,7 @@ These sections cover the supported workflow. Unknown settings are rejected. Use 
 | `network` | `mode`, `allowed_http_hosts` | Offline/connected lookups and explicit local plain-HTTP hosts |
 | `lookups.NAME` | `enabled`, `role`, `source` (catalogue ID), optional `type`, `endpoint`/`container_endpoint` or `path`, `systems` | Real primary/source/optional terminology services |
 | `packages.NAME` | Registry, name, exact version, path, acceptance | Exact pins for optional release metadata checks; laboratory downloads are manual |
+| `decision` | `enabled`, local URLs, pinned model/revision, score threshold | Optional Laya input hints during a laboratory check |
 | `models.NAME` | Runtime, native URL reference, `container_base_url`, model ID, budgets | Optional local inference endpoint |
 | `research` | Scope, providers, per-LOINC budget, catalogue | Separate page/study evidence retrieval |
 | `quality` | `review_registry`, optional `concept_map` | Reviewed local mappings; clinician registry is the feedback route |
@@ -189,7 +190,7 @@ Environment references name a variable whose value lives in `.env` or the runtim
 
 ## Local models and research
 
-A deterministic `run-plausibility-check` does not use a model, even if the TOML enables research. `research-evidence --scope lookup` selects terminology AI without study queries; `--scope studies` adds the configured literature providers. A scope argument overrides TOML for that invocation and is retained in the report/trace. Use the separate `research-evidence` command on the completed audited report. The legacy `plausibility batch` command still honours `research.enabled`.
+`check` uses deterministic terminology/consistency checks. With `decision.enabled=true`, it also records separate Laya input hints. Research/extraction remain explicit A2/A3 commands. `research-evidence --scope lookup` selects terminology AI without study queries; `--scope studies` adds the configured literature providers. A scope argument overrides TOML for that invocation and is retained in the report/trace. Use the separate `research-evidence` command on the completed audited report. The legacy `plausibility batch` command still honours `research.enabled`.
 
 ```toml
 [models.local]
@@ -206,6 +207,45 @@ response_mode = "json_schema"
 The starter defines the native address directly in TOML. For an environment reference, replace `base_url` with `base_url_env="LOCAL_MODEL_BASE_URL"` and set that variable in `.env`; choose exactly one. Inside Compose, `container_base_url` overrides the native address automatically. The endpoint must remain local. Choose the actual served model ID; configuring it does not start or download the model. `general.MODEL_ALIAS` selects a named table.
 
 `response_mode` supports `json_schema` or `json_object` with the same application guards. Optional controls include `reasoning_effort`, `enable_thinking`, `expected_digest` and `pull_timeout_seconds`; use only controls supported by the selected server/model. [Provisioning and native URLs](shipped-stack.md#ollama).
+
+### Optional Laya decisions
+
+**Experimental, disabled by default.** Initial tests with our laboratory examples did not establish reliable domain classification. Use this service to inspect model suggestions and collect evaluation data. The configured score threshold is an abstention gate, not a medical accuracy estimate.
+
+Use the existing `[decision]` block in `pipeline.toml`:
+
+```toml
+[decision]
+enabled = true
+base_url = "http://127.0.0.1:8085"
+container_base_url = "http://laya:8000"
+model = "convaiinnovations/laya-multilingual"
+revision = "1720e3e3357cfe1e281542e223f8273b0890ca34"
+min_probability = 0.8
+```
+
+The optional [Laya runtime](https://github.com/NandhaKishorM/laya) is pinned to **0.4.10**; the [multilingual checkpoint](https://huggingface.co/convaiinnovations/laya-multilingual/tree/1720e3e3357cfe1e281542e223f8273b0890ca34) uses **Apache-2.0**. Its model licence and exact revision are recorded with every response. Laya runs in its own CPU service; Ministral stays in Ollama for terminology proposals and study extraction.
+
+| Question | Input used | Review outcome |
+| --- | --- | --- |
+| Clinical domain | Name, code, specimen, native resource type when present | Laboratory / medication / other / unclear |
+| Unit system | Explicit source unit-system URI | UCUM / other / unclear; actual validity comes from the terminology check |
+| Next review step | Semantic metadata and existing check findings | AI terminology lookup / study evidence / human clarification |
+
+Names and bounded semantic metadata stay local. IDs, measured values, reference numbers, paths and credentials are omitted from the Laya request. Technical input type and column mapping come from configuration; native FHIR `resourceType` comes from the resource. **Declare LIS/CPOE provenance with `input.origin`**. The model scores are uncalibrated for this workflow. Scores below `min_probability`, unclear answers and truncated contexts produce abstentions. An unresolved laboratory domain also suppresses its next-step suggestion. Conflicts and service failures remain visible; the model never changes the source, check verdict, profile or research scope.
+
+**Podman / Docker:** start the `laya` service with profile `decision` as shown in the README. First startup downloads the pinned files from Hugging Face into ignored `local/laya/`; later starts reuse them. The image contains the optional CPU runtime; the regular runner retains its small dependency set. `models.local` is unchanged.
+
+**Native Python**, in one terminal:
+
+```sh
+uv sync --locked --extra decision --extra postgres
+uv run --no-sync --env-file .env run-plausibility-check decision-serve
+```
+
+In another terminal, run the ordinary `check --out output/laya-laboratory.csv` command. The service uses CPU by default; native macOS can select `device="mps"` when supported. Optional settings are `threads=2`, `timeout_seconds=120` and `cache_dir="local/laya"`. Container images use CPU wheels. Changing a cache path also requires changing the matching Compose mount. Local/LAN endpoints only; use `api_key_env="LAYA_SERVICE_KEY"` with its value in `.env`, or `api_key_file="local/secrets/laya-key"`, when protecting the service.
+
+The HTML adds one **Input decision** row per laboratory set. CSV uses scalar `decision.*` columns; audited `*.evidence.jsonl` retains the full bounded request, response, model revision, timing and response hash. A2/A3 preserve this record from the checked report. Set `enabled=false` to use the original model-free check.
 
 ### Use your own model or service
 

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "semantic-plausibility"
-version = "0.14.0"
+version = "0.15.0"
 description = "Local, auditable semantic reviews of laboratory and medication exports"
 readme = "README.md"
 requires-python = ">=3.14,<3.15"
@@ -13,6 +13,7 @@ dependencies = ["duckdb==1.5.6"]
 
 [project.optional-dependencies]
 postgres = ["psycopg[binary]==3.3.6"]
+decision = ["laya[serve]==0.4.10", "torch==2.14.1"]
 
 [project.scripts]
 plausibility = "semantic_plausibility.cli:main"
@@ -39,6 +40,15 @@ cache-keys = [
     { file = "src/**/*.html" },
     { file = "src/**/*.Dockerfile" },
 ]
+
+[tool.uv.sources]
+# Keep the optional Linux decision service free of CUDA packages.
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [tool.ruff]
 target-version = "py314"

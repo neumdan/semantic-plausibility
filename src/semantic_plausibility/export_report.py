@@ -39,6 +39,11 @@ FIELDS = [
     "reference_ranges_json",
     "status",
     "reason",
+    "metadata_status",
+    "missing_metadata",
+    "detected_error_count",
+    "loinc_candidate_verified",
+    "ucum_candidate_verified",
     "code_check",
     "unit_check",
     "code_unit_fit",
@@ -128,6 +133,28 @@ def review_row(row, evidence, config):
         "error": "At least one deterministic code, unit, profile or numeric check failed.",
         "not_applicable": "Outside the quantitative laboratory scope.",
     }[row["status"]]
+    metadata = evidence["metadata"]
+    missing = []
+    for index, coding in enumerate(metadata.get("code", {}).get("coding", [])):
+        missing += [f"code.coding[{index}].{key}" for key in ("code", "system") if not coding.get(key)]
+    if not metadata.get("code", {}).get("coding"):
+        missing.append("code.coding")
+    if metadata.get("numeric_applicable"):
+        missing += [f"quantity.{key}" for key in ("code", "system") if not metadata.get("quantity", {}).get(key)]
+    if not metadata.get("context", {}).get("loinc_system"):
+        missing.append("specimen")
+    ranges = metadata.get("reference_ranges", [])
+    if not ranges:
+        missing.append("referenceRange")
+    for index, interval in enumerate(ranges):
+        for side in ("low", "high"):
+            if interval.get(side):
+                missing += [f"referenceRange[{index}].{side}.{key}" for key in ("code", "system") if not interval[side].get(key)]
+    errors = sum(state == "error" for state, _ in evidence.get("findings", []))
+    result.update(metadata_status="incomplete" if missing else "supplied",
+                  missing_metadata="; ".join(missing), detected_error_count=errors)
+    if missing and not errors:
+        result["reason"] = "Missing source metadata requires review; no definite code, unit or numeric error was detected. Unverified checks remain open."
     result["transformation_json"] = json.dumps(
         evidence.get("recommendation", {}).get("transformation", {}), ensure_ascii=False
     )
@@ -204,6 +231,11 @@ def grade(row, evidence):
     check = evidence["report"]["measurements"][0]
     stats = evidence["observed_values"]
     ranges = evidence.get("reference_metadata", [])
+    suggestions = check.get("laboratory_suggestions") or {}
+    code_candidate = any(candidate.get("target_verified") and candidate.get("selectable")
+        and candidate.get("code") == suggestions.get("selected_code") for candidate in suggestions.get("coding_candidates", []))
+    unit_candidates = [candidate for candidate in suggestions.get("unit_interpretations", [])
+                       if candidate.get("state") == "valid" and candidate.get("source")]
     numeric = (stats["minimum"] is not None or stats["maximum"] is not None) and not stats["invalid"]
     refs = bool(ranges) and all(interval.get("state") == "bounds_valid" for interval in ranges)
     ready = (
@@ -239,6 +271,8 @@ def grade(row, evidence):
         "lookup_credibility": credibility,
         "code_verified": fields["code"],
         "unit_verified": fields["unit"],
+        "loinc_candidate_verified": code_candidate,
+        "ucum_candidate_verified": len({candidate["unit"] for candidate in unit_candidates}) == 1,
         "value_numeric_ready": fields["numeric_value_or_bounds"],
         "reference_numeric_ready": refs,
         "mii_numeric_set_ready": bool(ready),
@@ -260,6 +294,7 @@ def write_html(path, rows, summary, csv_name, log_name):
     from .report_context import run_context_html, item_context_html
     from .research_summary import html as evidence_summary_html
     from .laboratory_report_table import laboratory_fields, approval_html, blocked_selection
+    from .laboratory_assessment import assessment_layers, assessment_table_html
     from .report_comparison import CSS as comparison_css, legend_html, field_table_html, field_details_html
     title = "Laboratory evidence research" if summary.get("operation") == "research-evidence" else "Laboratory export review"
     if summary.get("operation") == "research-evidence" and summary.get("research", {}).get("scope") == "lookup":
@@ -271,16 +306,20 @@ def write_html(path, rows, summary, csv_name, log_name):
     body = ""
     for index, row in enumerate(rows, 1):
         fields = laboratory_fields(row, summary)
+        layers = assessment_layers(row, summary)
         prefix = "item-" + str(row.get("tuple_id") or index)
         blocked = blocked_selection(row)
         raw_label = "Original recorded proposals (conflicting AI selection blocked)" if blocked else "Recorded proposals and study quotations"
         label = str(row.get("code") or "Unspecified code") + " · " + str(row.get("analyte_name") or "Unnamed analyte")
         body += ('<section class="item" data-tuple-id="' + escape(str(row.get("tuple_id", "")), quote=True) + '">'
             + '<div class="item-heading"><h2>' + str(index) + '. ' + escape(label) + '</h2><p>'
-            + escape(str(row.get("occurrence_count") or "Unknown")) + ' occurrences · source verdict: '
-            + escape(str(row.get("status") or "unknown")) + '</p></div>'
+            + escape(str(row.get("occurrence_count") or "Unknown")) + ' occurrences · set assessment: '
+            + escape(layers["complete_set"]["state"].replace("_", " "))
+            + (' · metadata: ' + escape(str(row["metadata_status"])) + ' · detected errors: '
+               + escape(str(row.get("detected_error_count", "not recorded"))) if row.get("metadata_status") else '') + '</p></div>'
             + ('<p class="warning">Conflicting recorded AI proposal blocked. No code switch or unverified factor is applied.</p>' if blocked else '')
             + field_table_html(fields, prefix=prefix)
+            + assessment_table_html(layers)
             + '<details class="set-details"><summary>Sources &amp; details</summary>'
             + field_details_html(fields, prefix=prefix)
             + '<p>Set <code>' + escape(str(row.get("tuple_id", ""))) + '</code> · Input rows: '
@@ -325,8 +364,11 @@ def write_html(path, rows, summary, csv_name, log_name):
     def metric_text(key):
         value = metrics.get(key, {})
         return f"{value['numerator']} / {value['denominator']}" if "numerator" in value and "denominator" in value else "not recorded"
-    kpis = [("Approved mapping ready", approval_count), ("Code verified", metric_text("code_verified")),
-        ("Unit verified", metric_text("unit_verified")), ("Numerically ready", metric_text("mii_numeric_set_ready")),
+    kpis = [("Approved mapping ready", approval_count), ("Declared code verified", metric_text("code_verified")),
+        ("Declared unit verified", metric_text("unit_verified")),
+        ("Verified LOINC candidates", metric_text("loinc_candidate_verified")),
+        ("Verified UCUM candidates", metric_text("ucum_candidate_verified")),
+        ("Numerically ready", metric_text("mii_numeric_set_ready")),
         ("FHIR validation", validation.get("state", "not recorded"))]
     kpi_html = ''.join('<span><strong>' + escape(label) + ': ' + escape(str(value)) + '</strong></span>' for label, value in kpis)
     mode_label = "AI-supported evidence" if has_studies else "AI-supported lookup" if has_ai else "Lookup and consistency checks"

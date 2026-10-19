@@ -7,6 +7,7 @@ from html import escape
 def counts(candidates):
     return {'articles_retrieved': len({r.get('source') for r in candidates}),
             'extracted_measurements': sum(r.get('evidence_type') == 'reported_measurement' and r.get('reported_value') is not None for r in candidates),
+            'extracted_analytical_limits': sum(r.get('evidence_type') == 'analytical_limit' and r.get('reported_value') is not None for r in candidates),
             'extracted_intervals': sum(r.get('evidence_type') in {'reference_interval', 'analytical_interval', 'documented_extreme'} and (r.get('low') is not None or r.get('high') is not None) for r in candidates),
             'extracted_unclassified_ranges': sum(r.get('evidence_type') == 'unclassified_numeric_range' for r in candidates),
             'unit_only_records': sum(r.get('evidence_type') == 'reported_measurement' and bool(r.get('unit')) and r.get('reported_value') is None for r in candidates),
@@ -39,6 +40,7 @@ def html(summary, csv_name):
     data = research.get('evidence_counts', {})
     name = Path(csv_name).with_suffix('.studies.csv').name
     labels = {'articles_retrieved': 'Distinct articles retrieved', 'extracted_measurements': 'Quoted numerical measurements',
+        'extracted_analytical_limits': 'Quoted analytical limits (LoD / LoQ / LoB)',
         'extracted_intervals': 'Quoted intervals', 'extracted_unclassified_ranges': 'Unclassified ranges',
         'unit_only_records': 'Unit-only evidence', 'articles_without_supported_extraction': 'Articles without supported extraction',
         'articles_with_failed_extraction': 'Articles with failed/rejected extraction', 'records': 'Article/LOINC evidence records'}

@@ -206,11 +206,18 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
                                 row["fhir_mapping_proposal_json"] = encoded(mapping_proposal(row,
                                     {"recommendation": {"transformation": json.loads(row["transformation_json"])}}, json.loads(row["coding_proposal_json"])))
                                 assessment.update(metadata=payload, observed_values=detail["observed_values"])
+                                from .export_report import grade
+                                candidate_grades = grade(row, assessment)
+                                for key in ("loinc_candidate_verified", "ucum_candidate_verified"):
+                                    row[key] = candidate_grades[key]
                                 row["evidence_json"] = encoded(assessment)
                                 row.update(review_set_fields(row, assessment))
                                 assessment["assessment_context"] = item_context(assessment_run, row, assessment)
                                 assessment["assessment_context"]["execution"] = execution_since(checker, execution_start)
                                 row["assessment_context_json"] = encoded(assessment["assessment_context"])
+                                from .laboratory_assessment import assessment_layers
+                                assessment["assessment_layers"] = assessment_layers(row,
+                                    {"operation": "research-evidence", "research": {"scope": scope}})
                                 reviewed.append(row)
                                 if progress:
                                     progress(f"Completed {len(reviewed)}/{len(original)} groups; study retrieval/extraction: {counts(item['study_candidates'])}")
@@ -226,6 +233,8 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
                         # Reused/withdrawn approvals are evaluated in this run, not inherited from A1.
                         summary["metrics"]["approved_mapping_ready"] = ratio(
                             sum(row["approved_mapping_ready"] for row in reviewed), len(reviewed))
+                        for key in ("loinc_candidate_verified", "ucum_candidate_verified"):
+                            summary["metrics"][key] = ratio(sum(row[key] for row in reviewed), len(reviewed))
                         summary.update(run_id=run_id, operation="research-evidence", software=versions(),
                             run_context=assessment_run,
                             output_path=str(target),
@@ -237,7 +246,8 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
                                 **query_counts(getattr(evidence, "query_log", [])), "accepted_model_calls": getattr(llm, "audit_records", []),
                                 "partially_accepted_model_calls": sum(bool(t.get("extraction_rejections")) and t.get("state") == "accepted_by_source_guards" for t in getattr(llm, "trace", [])),
                                 "max_articles_per_loinc": evidence.max_articles_per_loinc,
-                                "model_state": "responses_accepted" if getattr(llm, "audit_records", []) else "no_accepted_response",
+                                "model_state": "responses_accepted" if getattr(llm, "audit_records", []) else
+                                    "no_accepted_response" if getattr(llm, "trace", []) else "not_needed",
                                 "groups_with_code_proposals": sum(bool(row.get("suggested_code")) for row in reviewed),
                                 "groups_with_name_proposals": sum(bool(row.get("suggested_name")) for row in reviewed),
                                 "groups_with_retrieved_articles": sum(bool(json.loads(row["study_evidence_json"])) for row in reviewed),
@@ -250,7 +260,7 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
                             checker.terminology.close()
                 with (folder / paths["csv"].name).open("w", encoding="utf-8-sig", newline="") as handle, ColumnWriter(handle) as writer:
                     for row in reviewed:
-                        writer.writerow(project(row, {}, operation="research-evidence"))
+                        writer.writerow(project(row, {}, operation="research-evidence", summary=summary))
                 summary["source_check_elapsed_seconds"] = source_summary.get("elapsed_seconds")
                 summary["elapsed_seconds"] = round(time.monotonic() - started, 4)
                 write_html(folder / paths["html"].name, reviewed[:2000], summary, paths["csv"].name, paths["audit"].name)

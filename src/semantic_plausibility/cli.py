@@ -21,6 +21,8 @@ def log_configuration(configuration):
                 configuration.output.get("mode", "distinct"), configuration.network_mode)
     LOGGER.info("Target profile: %s; full-resource validation: %s", configuration.profile,
                 "enabled" if configuration.validation.get("enabled") else "disabled")
+    if configuration.data.get("decision", {}).get("enabled"):
+        LOGGER.info("Optional Laya input assessment enabled; model suggestions are recorded for review")
     for alias, lookup in configuration.data.get("lookups", {}).items():
         if lookup.get("enabled", False):
             LOGGER.info("Terminology %s: %s (%s); %s", alias, lookup.get("type"), lookup.get("role", "primary"),
@@ -87,6 +89,8 @@ def main(argv: list[str] | None = None) -> int:
     validate.add_argument("--config", type=Path, default=Path("pipeline.toml"))
     validate.add_argument("--input", type=Path)
     validate.add_argument("--out", type=Path)
+    decision = sub.add_parser("decision-serve", help="Serve the optional pinned Laya decision model locally")
+    decision.add_argument("--config", type=Path, default=Path("pipeline.toml"))
     for name, help_text in (
         ("model-init", "Provision the configured local Ollama model"),
         ("catalog-init", "Prepare the configured local unit catalogue"),
@@ -180,6 +184,9 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(report, indent=2))
             print(f"Configuration report: {target}")
             return 0 if report["passed"] else 1
+        elif args.command == "decision-serve":
+            from .input_decision import serve
+            serve(args.config)
         elif args.command == "model-init":
             from .deployment_checks import initialise_model
 
@@ -212,7 +219,7 @@ def main(argv: list[str] | None = None) -> int:
 def run_main(argv=None):
     """The named runner defaults to the deterministic check; legacy CLI stays available."""
     arguments = list(sys.argv[1:] if argv is None else argv)
-    commands = {"batch", "check", "research-evidence", "review-import", "compare", "verify", "lookup",
+    commands = {"batch", "check", "research-evidence", "review-import", "compare", "verify", "lookup", "decision-serve",
                 "profile-import", "profile-init", "config-check", "model-init", "catalog-init", "package-init", "package-check", "validator-init", "terminology-init", "validate-fhir"}
     if not arguments or arguments[0] not in commands and arguments[0] not in {"-h", "--help"}:
         arguments.insert(0, "check")

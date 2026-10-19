@@ -52,7 +52,7 @@ class SingleConfigurationTests(unittest.TestCase):
                         self.assertEqual(selected.database["DB_TABLE"], "laboratory_summary")
                         continue
                     result = run_plausibility_check(config, output=folder / f"report-{index}.csv")
-                    expected = (3, 1) if index in (0, 4) else (5, 4) if index == 1 else (1, 1)
+                    expected = (3, 1) if index in (0, 4) else (6, 5) if index == 1 else (1, 1)
                     self.assertEqual((result.input_records, result.distinct_tuples), expected)
                     plan = research_plan(config, result.csv, scope="studies")
                     self.assertEqual(plan["checked_groups"], expected[1])

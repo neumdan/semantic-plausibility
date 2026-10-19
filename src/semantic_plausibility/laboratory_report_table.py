@@ -7,9 +7,10 @@ from html import escape
 
 from .aggregate_statistics import quantities
 from .fhir_quality_pipeline import number
-from .laboratory_suggestions import existing_code_conflicts
+from .laboratory_assessment import blocked_selection, selected_candidate, verified_unit_candidate, conditional_support
 from .report_sources import document
 from .report_comparison import Field, field_table_html as render_table
+from .profile_config import missing_metadata_only
 
 
 def is_true(value):
@@ -47,23 +48,6 @@ def references_text(ranges):
     return "\n".join(result) or "Not supplied"
 
 
-def blocked_selection(row):
-    """Also flag conflicting selections in reports recorded before this guard existed."""
-    suggestions = document(row.get("laboratory_suggestions_json"))
-    selected = suggestions.get("selected_code")
-    evidence = document(row.get("evidence_json"))
-    item = next(iter(evidence.get("report", {}).get("measurements", [])), {})
-    if not selected or selected == item.get("loinc_code"):
-        return []
-    candidate = next((c for c in suggestions.get("coding_candidates", []) if c.get("code") == selected), None)
-    if not candidate:
-        return ["selected_code_without_verified_candidate"]
-    conflicts = list(candidate.get("context_conflicts", []))
-    conflicts += existing_code_conflicts(item.get("loinc_axes", {}), candidate.get("axes", {}))
-    if not candidate.get("selectable") and not conflicts:
-        conflicts.append("candidate_not_selectable")
-    return sorted(set(conflicts))
-
 
 def approval_html(row):
     ready = is_true(row.get("approved_mapping_ready"))
@@ -88,13 +72,6 @@ def transformation_text(plan):
     return f"Candidate {target}; no verified factor"
 
 
-def selected_candidate(row):
-    suggestions = document(row.get("laboratory_suggestions_json"))
-    if blocked_selection(row):
-        return {}
-    return next((c for c in suggestions.get("coding_candidates", [])
-        if c.get("code") == suggestions.get("selected_code") and c.get("selectable")), {})
-
 
 def reference_state(row, item):
     states = {r.get("state") for r in item.get("reference_checks", [])}
@@ -113,7 +90,8 @@ def set_decisions(row, summary):
     item = next(iter(evidence.get("report", {}).get("measurements", [])), {})
     complete = document(row.get("recommendation_set_json"))
     term = linked.get("code", {})
-    selected = selected_candidate(row) if summary.get("operation") == "research-evidence" else {}
+    selected = selected_candidate(row)
+    unit_candidate = verified_unit_candidate(row)
     conflicts = blocked_selection(row)
     plan = (complete.get("quantity", {}).get("transformation", {}) if selected else
         evidence.get("recommendation", {}).get("transformation", {}))
@@ -154,11 +132,17 @@ def set_decisions(row, summary):
     elif verified and (row.get("code_unit_fit") == "correct" or selected):
         decisions["Unit code / display"] = ("Keep" if not selected else "Review candidate", plan.get("target_unit") or unit,
             "Compatible in the recorded check; candidate code still requires review." if selected else "Syntax and code–unit compatibility established in the recorded check.")
+    elif unit_candidate and not row.get("unit_system"):
+        decisions["Unit code / display"] = ("Review candidate", unit_candidate["unit"],
+            "Literal code validated as UCUM; confirm the source system before interpreting or converting values.")
     else:
         decisions["Unit code / display"] = ("Review", transformation_text(plan), "Do not infer a missing denominator or apply an unverified factor.")
     policy = item.get("quantity_policy", {})
     decisions["Unit system"] = ("Keep" if policy.get("state") == "compatible" and row.get("unit_check") == "valid" else "Review",
         row.get("unit_system") or "Missing unit system", "Profile-compatible unit system." if policy.get("state") == "compatible" else "Unit-system compatibility has not been established.")
+    if unit_candidate and not row.get("unit_system"):
+        decisions["Unit system"] = ("Review candidate", unit_candidate["system"],
+            "The unit code was validated against UCUM. Confirm this source-system interpretation; input remains unchanged.")
     numeric = is_true(row.get("value_numeric_ready"))
     if not numeric:
         decisions["Value / statistics"] = ("Correct source" if number(row.get("n_invalid")) else "Complete", "Obtain finite numeric source values", "No numerical replacement is inferred from a code or reference interval.")
@@ -195,7 +179,8 @@ def laboratory_fields(row, summary):
     item = next(iter(evidence.get("report", {}).get("measurements", [])), {})
     term = linked.get("code", {})
     research = summary.get("operation") == "research-evidence"
-    selected = selected_candidate(row) if research else {}
+    selected = selected_candidate(row)
+    unit_candidate = verified_unit_candidate(row)
     conflicts = blocked_selection(row)
     decisions = set_decisions(row, summary)
     plan = (document(row.get("recommendation_set_json")).get("quantity", {}).get("transformation", {})
@@ -204,7 +189,7 @@ def laboratory_fields(row, summary):
     code_state = "green" if code_valid else "red" if row.get("code_check") == "invalid" else "yellow"
     term_sources = term.get("sources", [])
     candidate_sources = [selected, selected.get("retrieval", {})] if selected else []
-    unit_sources = [linked.get("unit", {}), {"source": item.get("ucum_source")}]
+    unit_sources = [linked.get("unit", {}), unit_candidate, {"source": item.get("ucum_source")}]
     axes = selected.get("axes") or term.get("axes") or item.get("loinc_axes") or {}
     ranges = source.get("reference_ranges") or document(row.get("reference_ranges_json")) or []
     stats = statistics_text(source.get("statistics") or quantities(row))
@@ -230,13 +215,15 @@ def laboratory_fields(row, summary):
         if state == "green" and field.action.startswith("Keep"):
             field.proposal_state = "green"
 
-    put("Code", code_state, ["Lookup: " + (term.get("canonical_name") or "no verified definition found")], term_sources)
+    put("Code", code_state, ["Source lookup: " + (term.get("canonical_name") or
+        ("system missing; source membership is unconfirmed." if not row.get("code_system") else "no verified definition found"))], term_sources)
     if conflicts:
         fields["Code"].findings.append("AI: conflicting selection blocked; no code switch.")
         if code_valid:
             fields["Code"].action, fields["Code"].recommendation, fields["Code"].proposal_state = "Keep checked code", row["code"], "green"
     elif selected:
-        fields["Code"].findings.append("AI + exact lookup: candidate " + selected["code"] + ". Confirm measured analyte.")
+        method = "Exact code + name lookup" if document(row.get("laboratory_suggestions_json")).get("selection_method") == "exact_code_name_unit" else "AI + exact lookup"
+        fields["Code"].findings.append(method + ": verified candidate " + selected["code"] + " · " + selected["display"] + ". Confirm source mapping.")
         fields["Code"].proposal_state = "yellow"
         fields["Code"].sources += candidate_sources
     elif research:
@@ -244,18 +231,20 @@ def laboratory_fields(row, summary):
         fields["Code"].findings.append("AI-assisted search: no code change selected." if model_used else
             "AI code selection not needed; existing lookup retained." if code_valid else "AI: no code selection recorded.")
     policy_ok = is_true(item.get("code_policy_compatible"))
-    invalid_policy = any(c.get("state") == "invalid" for c in item.get("code_checks", [])) or (code_valid and item.get("code_policy_compatible") is False)
+    invalid_policy = any(c.get("state") == "invalid" and not missing_metadata_only(c) for c in item.get("code_checks", []))
     put("Code system", "red" if invalid_policy else "green" if code_valid and policy_ok else "yellow",
         ["Profile check: " + ("declared system accepted for this coding." if code_valid and policy_ok else "compatibility not established for a verified code.")],
         term_sources + candidate_sources)
     if selected:
         fields["Code system"].proposal_state = "yellow"
-        fields["Code system"].findings.append("AI + lookup: target system belongs to candidate code.")
+        fields["Code system"].findings.append("Exact lookup: LOINC is the verified candidate system; source declaration remains absent or unconfirmed.")
     name_states = set(str(row.get("name_check") or "").split("; "))
     name_ok = bool(name_states) and name_states <= {"exact_alias", "component_label"} and code_valid
     name_result = ("matched component label; full definition below." if name_states == {"component_label"} and name_ok else
         "matched terminology label." if name_ok else "name not verified against this code.")
     put("Analyte / name", "green" if name_ok else "yellow", ["Lookup: " + name_result], term_sources + candidate_sources)
+    if selected and selected.get("source_name_matches"):
+        fields["Analyte / name"].findings = ["Exact label lookup: supplied name matches the verified LOINC candidate definition."]
     if fields["Analyte / name"].action == "Normalize label" or selected and not conflicts:
         fields["Analyte / name"].proposal_state = "yellow"
         fields["Analyte / name"].action = "Use canonical label (review)"
@@ -296,6 +285,10 @@ def laboratory_fields(row, summary):
         ["Unit lookup: " + str(row.get("unit_check") or "unknown") + ".", "Code–unit check: "
          + {"correct": "compatible.", "conversion_verified": "verified conversion available.", "needs_refinement": "meaning or conversion unresolved."}.get(fit, "compatibility unresolved.")],
         unit_sources + term_sources + candidate_sources)
+    if unit_candidate and not row.get("unit_system"):
+        fields["Unit code / display"].findings = ["UCUM candidate validation: " + unit_candidate["unit"] + " is valid. Source unit-system metadata is missing."]
+        if selected:
+            fields["Unit code / display"].findings.append("Candidate code–unit check: " + str(selected["unit_fit"].get("class")) + "; conditional on confirming LOINC and UCUM mappings.")
     if fields["Unit code / display"].action in {"Convert", "Review candidate"} or plan.get("target_unit"):
         if fields["Unit code / display"].action != "Keep":
             fields["Unit code / display"].proposal_state = "yellow"
@@ -309,8 +302,11 @@ def laboratory_fields(row, summary):
         fields["Unit code / display"].findings.append("AI spelling: " + str(spelling.get("selected_unit") or "abstained") + "; equivalence needs verification.")
         fields["Unit code / display"].sources.append({"source": spelling.get("catalogue_source"), "version": spelling.get("catalogue_version")})
     unit_policy = item.get("quantity_policy", {})
-    put("Unit system", "red" if unit_policy.get("state") == "invalid" else "green" if unit_policy.get("state") == "compatible" and row.get("unit_check") == "valid" else "yellow",
+    put("Unit system", "red" if unit_policy.get("state") == "invalid" and not missing_metadata_only(unit_policy) else "green" if unit_policy.get("state") == "compatible" and row.get("unit_check") == "valid" else "yellow",
         ["Profile + lookup: " + ("accepted unit system." if unit_policy.get("state") == "compatible" and row.get("unit_check") == "valid" else "not verified.")], unit_sources)
+    if unit_candidate and not row.get("unit_system"):
+        fields["Unit system"].findings = ["Metadata missing. Verified UCUM candidate available; the formal FHIR system requirement remains unmet until confirmed and supplied."]
+        fields["Unit system"].proposal_state = "yellow"
     put("Reference ranges", reference_state(row, item),
         ["Bounds check: " + ("ordered numeric bounds; clinical applicability unverified." if reference_state(row, item) == "green" else
             "not supplied." if not ranges else str(row.get("reference_check") or "unresolved").replace("_", " ") + ".")])
@@ -324,7 +320,7 @@ def laboratory_fields(row, summary):
         supported = [r for r in records if r.get("status") == "candidate" and r.get("excerpt") and r.get("source")
             and any(number(r.get(k)) is not None for k in ("reported_value", "low", "high"))]
         for name, kinds in (("Value / statistics", {"reported_measurement", "documented_extreme"}),
-                            ("Reference ranges", {"reference_interval", "analytical_interval"})):
+                            ("Reference ranges", {"reference_interval"})):
             extracted = [r for r in supported if r.get("evidence_type") in kinds]
             fields[name].findings.append(f"Studies: {len({r['source'] for r in records if r.get('source')})} articles; {len(extracted)} quoted numeric records.")
             failed = len({r['source'] for r in records if r.get('source') and r.get('status') == 'extraction_unavailable'})
@@ -344,6 +340,54 @@ def laboratory_fields(row, summary):
                 fields[name].proposal_state = "yellow"
                 fields[name].action = "Review published evidence"
                 fields[name].recommendation = "Retain source pending context review; no automatic replacement"
+        limits = [r for r in supported if r.get("evidence_type") in {"analytical_limit", "analytical_interval"}]
+        if limits:
+            fields["Analytical limits"] = Field("Analytical limits", "Instrument performance evidence", [
+                r.get("value_kind", "limit").replace("_", " ") + ": " + str(r["reported_value"])
+                + " " + str(r.get("unit") or "(unit missing)") for r in limits if r.get("evidence_type") == "analytical_limit"] + [
+                "Analytical interval: " + str(r.get("low")) + " … " + str(r.get("high"))
+                + " " + str(r.get("unit") or "(unit missing)") for r in limits if r.get("evidence_type") == "analytical_interval"],
+                "Review instrument applicability", "Compare with the source laboratory's instrument and method",
+                source_state="yellow", proposal_state="yellow",
+                reason="Analytical limits describe assay performance; source measurements and reference intervals remain unchanged.",
+                sources=limits)
+    decision = document(row.get("input_decision_json"))
+    support = conditional_support(row)
+    candidate = support["candidate"]
+    if support["code_condition"]:
+        code = fields["Code"]
+        code.source_state = code.proposal_state = "conditional"
+        code.action, code.recommendation = "Keep if LOINC is intended", candidate["code"]
+        code.condition, code.support_level = support["code_condition"], support["level"]
+        code.reason = "Confirm the source system; the literal code exists in LOINC."
+        code.findings = ["Exact LOINC lookup: " + candidate["display"] + ".", "Corroboration: " + ", ".join(support["signals"]) + "."]
+        code.sources += [candidate]
+        system = fields["Code system"]
+        system.action, system.recommendation, system.proposal_state = "Confirm system", candidate["system"], "conditional"
+        system.reason = "The system URI was omitted from the source export."
+        system.sources += [candidate]
+        if support["name_match"]:
+            name = fields["Analyte / name"]
+            name.source_state = name.proposal_state = "conditional"
+            name.action, name.recommendation = "Keep under this coding", values["Analyte / name"]
+            name.reason, name.condition = "The supplied name matches this LOINC definition.", support["code_condition"]
+            name.support_level = support["level"]
+            name.sources += [candidate]
+    if support["unit_condition"]:
+        unit = fields["Unit code / display"]
+        unit.source_state = unit.proposal_state = "conditional"
+        unit.action, unit.recommendation = "Keep if UCUM is intended", support["unit_candidate"]["unit"]
+        unit.condition = support["unit_condition"]
+        unit.reason = "Confirm the source unit system before adopting the interpretation."
+        unit.support_level = "unit_syntax_verified"
+        system = fields["Unit system"]
+        system.action, system.recommendation, system.proposal_state = "Confirm system", support["unit_candidate"]["system"], "conditional"
+        system.reason = "The unit code validates as UCUM; its source system is missing."
+    if support["context_conflicts"]:
+        fields["Code"].reason += " Resolve the conflicting source context before accepting the set."
+    if decision:
+        from .input_decision import decision_field
+        fields["Input decision"] = decision_field(decision)
     return list(fields.values())
 
 

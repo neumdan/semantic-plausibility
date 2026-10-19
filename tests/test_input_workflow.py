@@ -144,7 +144,7 @@ class InputWorkflowTests(unittest.TestCase):
             module.prepare_database(folder)
             with closing(sqlite3.connect(target)) as database, database:
                 self.assertEqual(database.execute('SELECT count(*) FROM laboratory_values').fetchone()[0], 3)
-                self.assertEqual(database.execute('SELECT count(*) FROM laboratory_summary').fetchone()[0], 5)
+                self.assertEqual(database.execute('SELECT count(*) FROM laboratory_summary').fetchone()[0], 6)
                 database.execute("UPDATE laboratory_values SET value='99' WHERE id='example-1'")
             with self.assertRaises(SystemExit):
                 module.prepare_database(folder)

@@ -81,7 +81,10 @@ def ucum_spelling(unit):
 
 def analyte_aliases(term):
     """Use the component and English analyte labels; RELATEDNAMES also has non-analytes."""
-    base = term.component or term.display.split("[", 1)[0].strip()
+    display_name = term.display.split("[", 1)[0].strip()
+    # Entitic properties describe a cell quantity (e.g. MCHC), not the generic
+    # component's blood concentration. Keep the terminology's specific labels.
+    base = display_name if term.property.startswith("Ent") and display_name else term.component or display_name
     aliases = [base]
     for designation in term.designations:
         if not designation.get("language", "").startswith("en"):
@@ -102,9 +105,55 @@ def mentions_analyte(text, aliases):
     return any(re.search(r"(?<!\w)" + re.escape(a) + r"(?!\w)", text, re.I) for a in aliases if a)
 
 
+def statistic_context(text, aliases):
+    """'Mean' inside an analyte name (MCHC/MCV/MCH) is not a sample statistic."""
+    for alias in sorted(filter(None, aliases), key=len, reverse=True):
+        text = re.sub(r"(?<!\w)" + re.escape(alias) + r"(?!\w)", "[analyte]", text, flags=re.I)
+    return text
+
+
 def analyte_clauses(text, aliases):
-    # A multi-analyte list must not lend its neighbour's numbers to this analyte.
-    return [part for part in re.split(r";|,(?=\s*[A-Za-z])|(?<=[.!?])\s+(?=[A-Z])", text) if mentions_analyte(part, aliases)]
+    # Parentheses can contain an analyte and its unit: "(MCHC; g/dL)".
+    # Keep sex-labelled strata with their analyte, while separating other tests.
+    parts, start = [], 0
+    for delimiter in re.finditer(r";|,(?=\s*[A-Za-z])", text):
+        following = text[delimiter.end():].lstrip()
+        unit = _UNIT.match(following)
+        if unit and re.match(r"\s*[)\]]", following[unit.end():]):
+            continue
+        if re.match(r"(?:female|male|women|men|girls|boys|respectively)\b", following, re.I):
+            continue
+        parts.append(text[start:delimiter.start()])
+        start = delimiter.end()
+    parts.append(text[start:])
+    return [clause for part in parts for clause in re.split(r"(?<=[.!?])\s+(?=[A-Z])", part)
+            if mentions_analyte(clause, aliases)]
+
+
+ANALYTICAL_LIMITS = {
+    "limit_of_detection": r"\b(?:LoD|limit of detection|detection limit)\b",
+    "limit_of_quantification": r"\b(?:LoQ|limit of quanti(?:fication|tation)|quantification limit)\b",
+    "limit_of_blank": r"\b(?:LoB|limit of blank)\b",
+}
+
+
+def analytical_limit_matches(clause, kind, value, unit):
+    """Bind explicit LoD/LoQ/LoB labels to their printed numbers, never to patients."""
+    labels = sorted((m.start(), m.end(), role) for role, pattern in ANALYTICAL_LIMITS.items()
+                    for m in re.finditer(pattern, clause, re.I))
+    quantities = list(re.finditer(r"(?<![\w.])([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s*"
+                                 + re.escape(unit) + r"(?!\w)", clause))
+    # Explicit ordered lists, e.g. "LoD and LoQ were 0.05 x10^9/L and 0.1 x10^9/L".
+    if labels and quantities and labels[-1][1] < quantities[0].start():
+        return len(labels) == len(quantities) and any(
+            label[2] == kind and quantity[1] == value for label, quantity in zip(labels, quantities))
+    # Individually labelled values, e.g. "LoD = 0.05 ...; LoQ = 0.1 ...".
+    for index, (_, end, role) in enumerate(labels):
+        stop = labels[index + 1][0] if index + 1 < len(labels) else len(clause)
+        values = [q for q in quantities if end <= q.start() < stop]
+        if role == kind and len(values) == 1 and values[0][1] == value:
+            return True
+    return False
 
 
 def ambiguous_analyte_clause(text, aliases):
@@ -120,12 +169,16 @@ def ambiguous_analyte_clause(text, aliases):
     return False
 
 
-def quantity_exclusion(text, unit, property_code="", *, bounds=False):
+def quantity_exclusion(text, unit, property_code="", *, bounds=False, analytical=False):
     """Conservative exclusions, not a clinical equivalence or applicability test."""
-    if unit_key(unit) == "%" and property_code in {"MCnc", "SCnc", "NCnc"}:
+    if unit_key(unit) == "%" and property_code in {"MCnc", "SCnc", "NCnc", "EntMCnc"}:
         return "percentage_is_not_the_requested_concentration"
     if re.search(r"\bbias\b|limits? of agreement|Bland.?Altman|\bdifference\b", text, re.I):
         return "method_difference_is_not_an_analyte_result"
+    if re.search(r"\binterferen\w*\b|\bspik(?:e|ed|ing)\b", text, re.I):
+        return "interference_experiment_is_not_an_analyte_result"
+    if not analytical and any(re.search(pattern, text, re.I) for pattern in ANALYTICAL_LIMITS.values()):
+        return "analytical_limit_requires_its_own_category"
     if not bounds and re.search(r"\bthresholds?\b|\bcut[ -]?(?:off|point)s?\b|\bsensitivity\b|\bspecificity\b|\bdefined\b|\beligib\w*|\brisk\b|\bincidence\b", text, re.I):
         return "decision_threshold_is_not_a_measured_result"
     return ""
@@ -137,7 +190,7 @@ def screen_record(record, aliases, property_code=""):
         return 0, "no_abstract"
     clauses = analyte_clauses(abstract, aliases)
     quantitative = [c for c in clauses if re.search(r"\d", c) and any(
-        not quantity_exclusion(c, u, property_code,
+        not quantity_exclusion(c, u, property_code, analytical=True,
             bounds=bool(re.search(r"reference\s+(?:interval|range)|\bRIs?\b", c, re.I)))
         for u in unit_tokens(c))]
     if not quantitative:

@@ -8,7 +8,8 @@ import re
 from typing import Any
 
 from . import research_prompts as prompts
-from .study_sources import analyte_clauses, source_unit, quantity_exclusion, ambiguous_analyte_clause
+from .study_sources import (analyte_clauses, source_unit, quantity_exclusion, ambiguous_analyte_clause,
+                            ANALYTICAL_LIMITS, analytical_limit_matches, statistic_context, unit_tokens)
 
 
 def _text(limit: int, *, nullable: bool = False, nonempty: bool = False) -> dict[str, Any]:
@@ -68,7 +69,7 @@ SCHEMAS = {
     }),
     prompts.STUDY_MEASUREMENTS: _object({"measurements": _array(_object({
         "reported_value": _BOUND,
-        "value_kind": {"type": "string", "enum": ["individual_value", "mean", "sd", "min", "max", "median", "iqr", "summary_statistic", "unit_only", "unspecified"]},
+        "value_kind": {"type": "string", "enum": ["individual_value", "mean", "sd", "min", "max", "median", "iqr", "summary_statistic", "unit_only", "unspecified", *ANALYTICAL_LIMITS]},
         "unit": _text(80, nonempty=True), **_CONTEXT, "excerpt": _text(6000, nonempty=True),
     }), 3)}),
     prompts.TERMINOLOGY_CLAIMS: _object({
@@ -106,6 +107,9 @@ def evidence_schema(instruction: str, evidence: dict[str, Any]) -> dict[str, Any
         if not sentences:
             schema["properties"]["measurements"]["maxItems"] = 0
             schema["properties"]["measurements"]["items"]["properties"]["excerpt"] = _text(6000, nonempty=True)
+        intervals = printed_reference_intervals(evidence)
+        if intervals:
+            schema["properties"]["bounds"] = {"type": "string", "enum": ["", *intervals]}
         return schema
     schema = deepcopy(response_schema(instruction))
     excerpts = evidence.get("excerpt_candidates")
@@ -124,18 +128,53 @@ def source_sentences(evidence):
     return {"s" + str(i + 1): text for i, text in enumerate(evidence.get("excerpt_candidates", []))}
 
 
+def printed_reference_intervals(evidence):
+    """Literal sex-stratified ranges: offer whole pairs, never independent extrema."""
+    aliases = evidence.get("analyte_definition", {}).get("aliases", [])
+    number = r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)"
+    pattern = r"\b(?:male|female|men|women|boys|girls)\b\s*:?\s*\(\s*(" + number + r")\s*[-–−—]\s*(" + number + r")\s*\)"
+    result = {}
+    for sentence in source_sentences(evidence).values():
+        if not supports_evidence_type("reference_interval", sentence, evidence.get("abstract", "")):
+            continue
+        for clause in analyte_clauses(sentence, aliases):
+            units = unit_tokens(clause)
+            if len(units) != 1:
+                continue
+            for match in re.finditer(pattern, clause, re.I):
+                result["i" + str(len(result) + 1)] = {"evidence_type": "reference_interval",
+                    "low": match[1], "high": match[2], "unit": units[0], "excerpt": sentence,
+                    "population": match[0], "specimen": "", "method": ""}
+                if len(result) == 8:
+                    return result
+    return result
+
+
 def model_evidence(instruction, evidence):
     if instruction != prompts.STUDY_EXTRACT:
         return evidence
+    sentences = source_sentences(evidence)
+    intervals = printed_reference_intervals(evidence)
+    choices = {key: {**row, "excerpt": next(k for k, text in sentences.items() if text == row["excerpt"])}
+               for key, row in intervals.items()}
     return {**{k: v for k, v in evidence.items() if k not in {"abstract", "excerpt_candidates"}},
-            "sentences": source_sentences(evidence)}
+            "sentences": sentences, **({"printed_bounds": choices} if choices else {})}
 
 
 def resolve_sentences(value, evidence):
     """Resolve only enumerated source IDs, then subject restored quotations to normal guards."""
     result = deepcopy(value)
     sentences = {"": "", **source_sentences(evidence)}
-    for row in [result["bounds"], *result["measurements"]]:
+    rows = list(result["measurements"])
+    if isinstance(result["bounds"], str):
+        choices = {"": {**dict.fromkeys(("evidence_type", "low", "high", "unit")),
+                        **dict.fromkeys((*_CONTEXT, "excerpt"), "")}, **printed_reference_intervals(evidence)}
+        if result["bounds"] not in choices:
+            raise ValueError("Model returned an unknown printed interval ID")
+        result["bounds"] = choices[result["bounds"]]
+    else:
+        rows.insert(0, result["bounds"])
+    for row in rows:
         for field in ("excerpt", *_CONTEXT):
             try:
                 row[field] = sentences[row[field]]
@@ -167,9 +206,10 @@ def _analyte_guard(row, evidence, tokens, *, bounds=False):
     if not matches:
         raise ValueError("Study evidence numbers/unit are not in a clause naming the verified analyte")
     eligible = [clause for clause in matches if not quantity_exclusion(
-        clause, row.get("unit") or "", definition.get("property", ""), bounds=bounds)]
+        clause, row.get("unit") or "", definition.get("property", ""), bounds=bounds,
+        analytical=row.get("value_kind") in ANALYTICAL_LIMITS)]
     if not eligible:
-        raise ValueError("Study evidence is a difference/decision threshold or incompatible percentage, not the requested analyte quantity")
+        raise ValueError("Study evidence is a difference, interference, analytical limit, decision threshold or incompatible percentage; its category must match the source")
     eligible = [clause for clause in eligible if not ambiguous_analyte_clause(clause, aliases)]
     if not eligible:
         raise ValueError("Study evidence combines named analytes; number/unit association is unresolved")
@@ -304,7 +344,12 @@ def validate_grounding(instruction: str, value: dict[str, Any], evidence: dict[s
     elif instruction == prompts.STUDY_BOUNDS:
         _range_guard(value, evidence.get("abstract", ""))
         if value["low"] is not None or value["high"] is not None:
-            _analyte_guard(value, evidence, [value["low"], value["high"], value["unit"]], bounds=True)
+            clauses = _analyte_guard(value, evidence, [value["low"], value["high"], value["unit"]], bounds=True)
+            if value["low"] is not None and value["high"] is not None:
+                pair = (r"(?<![\d.])" + re.escape(value["low"]) + r"\s*(?:[-–−—]|to|and)\s*"
+                        + re.escape(value["high"]) + r"(?![\d.])")
+                if not any(re.search(pair, clause, re.I) for clause in clauses):
+                    raise ValueError("Study bounds must be one printed interval; do not mix population strata")
         kind = value["evidence_type"]
         if (value["low"] is not None or value["high"] is not None) and kind is None:
             raise ValueError("Study bounds need an explicit evidence type, not a search-query category")
@@ -314,11 +359,18 @@ def validate_grounding(instruction: str, value: dict[str, Any], evidence: dict[s
         for row in value["measurements"]:
             _range_guard({**row, "low": row["reported_value"], "high": None}, evidence.get("abstract", ""))
             clauses = _analyte_guard(row, evidence, [row["reported_value"], row["unit"]])
+            if row["value_kind"] in ANALYTICAL_LIMITS and (row["reported_value"] is None or not any(
+                analytical_limit_matches(clause, row["value_kind"], row["reported_value"], row["unit"])
+                for clause in clauses)):
+                raise ValueError("Analytical limit label, value and unit must have an explicit source association")
             markers = {"mean": r"\bmean\b|average", "sd": r"\bSD\b|standard deviation", "min": r"minimum|lowest|\bmin\b", "max": r"maximum|highest|\bmax\b", "median": r"median", "iqr": r"interquartile|\bIQR\b"}
-            if row["value_kind"] in markers and not any(re.search(markers[row["value_kind"]], clause, re.I) for clause in clauses):
+            definition = evidence.get("analyte_definition", {})
+            contexts = [statistic_context(clause, definition.get("aliases") or [definition.get("component", "")])
+                        for clause in clauses]
+            if row["value_kind"] in markers and not any(re.search(markers[row["value_kind"]], clause, re.I) for clause in contexts):
                 raise ValueError("Study evidence statistic role is not explicitly labelled")
             if row["value_kind"] == "individual_value" and any(re.search(
-                r"\bmean\b|\bmedian\b|standard deviation|\bSD\b|\bIQR\b|interquartile", clause, re.I) for clause in clauses):
+                r"\bmean\b|\bmedian\b|standard deviation|\bSD\b|\bIQR\b|interquartile", clause, re.I) for clause in contexts):
                 raise ValueError("Study evidence labels a population statistic as an individual value")
             if row["value_kind"] == "individual_value" and supports_evidence_type(
                 "reference_interval", row["excerpt"], evidence.get("abstract", "")):

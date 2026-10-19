@@ -22,7 +22,7 @@
 <text x="36" y="524" class="heading">4. A1: check source meaning, then cross-field plausibility</text>
 <text x="36" y="552" class="body">Exact code/system and unit evidence → name/axes/specimen fit → code–unit compatibility</text>
 <text x="36" y="577" class="body">Check finite values, reference order/context and supported whole-set transformations</text>
-<text x="36" y="602" class="body">Write original A1 CSV + evidence/audit; valid, inconsistent and unresolved findings remain explicit</text>
+<text x="36" y="602" class="body">Optional Laya: record domain/unit-system/next-step hints; keep original checks and declared source</text>
 </g>
 <g data-node="A2"><rect x="20" y="680" width="510" height="125" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
 <text x="36" y="709" class="heading">5a. Optional A2: lookup proposals</text>
@@ -38,8 +38,8 @@
 </g>
 <g data-node="REVIEW"><rect x="20" y="920" width="1060" height="170" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
 <text x="36" y="949" class="heading">6. Review the complete set</text>
-<text x="36" y="977" class="body">HTML field table / scalar CSV: source → finding → recommendation, with sources and status</text>
-<text x="36" y="1002" class="body">Verify specimen, assay, population, unit conversion and each reference interval</text>
+<text x="36" y="977" class="body">Field table: source → finding/condition → recommendation + why → status and sources</text>
+<text x="36" y="1002" class="body">Scope results: profile QC / identity / quantity / code–unit fit / whole set + evidence</text>
 <text x="36" y="1027" class="body">Clinician approves / rejects / defers; source data is retained</text>
 <text x="36" y="1052" class="body">Reuse compatible approved laboratory mappings after rechecking targets and factors</text>
 </g>

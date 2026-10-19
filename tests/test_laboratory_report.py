@@ -108,8 +108,7 @@ class RecordedRunTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as name:
             for folder in sorted(root.glob("0*-lab-*")):
                 self.assertEqual(verify_audit(folder / "report.audit.jsonl")["status"], "verified")
-                with (folder / "report.csv").open(encoding="utf-8-sig") as stream:
-                    rows = list(csv.DictReader(stream))
+                rows, _ = report_details(folder / "report.csv", hydrate=True)
                 summary = json.loads((folder / "report.summary.json").read_text())
                 path = Path(name) / (folder.name + ".html")
                 write_html(path, rows, summary, "report.csv", "report.audit.jsonl")
@@ -146,7 +145,7 @@ class RecordedRunTests(unittest.TestCase):
                         self.assertEqual(decisions["Unit code / display"][0], "Review")
                         self.assertIn("no verified factor", decisions["Unit code / display"][1])
                         self.assertNotEqual(fields["Unit code / display"].proposal_state, "green")
-                    if row.get("value_numeric_ready") == "False":
+                    if row.get("value_numeric_ready") in (False, "False"):
                         self.assertEqual(decisions["Value / statistics"][0], "Correct source")
                         self.assertEqual(fields["Value / statistics"].source_state, "red")
                         self.assertEqual(fields["Value / statistics"].proposal_state, "red")

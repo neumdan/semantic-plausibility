@@ -4,3 +4,4 @@ code,name,code_system,unit,unit_code,unit_system,count,mean,sd,min,max,reference
 718-7,Hemoglobin,http://loinc.org,g/L,g/L,http://unitsofmeasure.org,15,140,12,120,160,120,160,Bld,final
 786-4,MCHC,http://loinc.org,g/dL,g/dL,http://unitsofmeasure.org,25,33,1.1,30,36,32,36,RBC,final
 6690-2,Leukocytes,http://loinc.org,10*3/uL,10*3/uL,http://unitsofmeasure.org,20,6.5,1.2,3,12,4,11,Bld,final
+718-7,Hemoglobin,http://loinc.org,g/dLL,g/dLL,http://unitsofmeasure.org,5,13.5,1,12,16,12,16,Bld,final

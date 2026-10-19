@@ -47,7 +47,7 @@ class UnitEvidence:
 
 @dataclass(frozen=True)
 class ResearchCandidate:
-    evidence_type: str  # reference_interval | analytical_interval | documented_extreme
+    evidence_type: str  # reference_interval | analytical_interval | analytical_limit | reported_measurement | documented_extreme
     source: str  # PMID or other persistent source URL
     low: str | None = None
     high: str | None = None

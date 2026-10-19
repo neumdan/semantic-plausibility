@@ -17,7 +17,7 @@ from threading import Lock
 from typing import Any
 from urllib.parse import quote, urlparse, urlsplit, urlunsplit
 from urllib.parse import urlencode
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 from urllib.error import HTTPError, URLError
 import base64
 import json
@@ -35,7 +35,7 @@ from .model_schemas import explicit_token as _explicit_token
 from .model_schemas import evidence_schema, model_evidence, resolve_sentences, ground_study_units, guard_study_parts, response_schema, validate_grounding, validate_response, supports_evidence_type
 from . import research_prompts as prompts
 from .progress import LOGGER, activity
-from .study_sources import TEXT_RENDERING, study_text, study_queries, analyte_aliases, screen_record, ucum_spelling, provider_query
+from .study_sources import ANALYTICAL_LIMITS, TEXT_RENDERING, study_text, study_queries, analyte_aliases, screen_record, ucum_spelling, provider_query
 
 
 class _Response:
@@ -54,6 +54,12 @@ class _Response:
 
 
 class _HttpSession:
+    def __init__(self, *, local_only=False):
+        self.local_only = local_only
+
+    def opener(self):
+        return build_opener(ProxyHandler({}) if self.local_only else ProxyHandler(), _NoModelRedirects())
+
     def get(
         self,
         url: str,
@@ -70,7 +76,7 @@ class _HttpSession:
             actual_headers["Authorization"] = f"Basic {token}"
         request = Request(full_url, headers=actual_headers)
         try:
-            with build_opener(_NoModelRedirects()).open(request, timeout=timeout) as answer:
+            with self.opener().open(request, timeout=timeout) as answer:
                 body = answer.read(4 * 1024 * 1024 + 1)
                 if len(body) > 4 * 1024 * 1024:
                     raise ValueError("Lookup response exceeds the four-megabyte budget")
@@ -89,7 +95,7 @@ class _HttpSession:
             url, data=body, headers={"Content-Type": "application/json", **(headers or {})}, method="POST"
         )
         try:
-            with build_opener(_NoModelRedirects()).open(request, timeout=timeout) as answer:
+            with self.opener().open(request, timeout=timeout) as answer:
                 body = answer.read(64001)
                 if len(body) > 64000:
                     raise ValueError("Model server response exceeds the 64000-byte budget")
@@ -883,14 +889,15 @@ class PublicEvidenceClient:
             if self.llm is not None:
                 try:
                     answer = self.llm.json(prompts.STUDY_EXTRACT, {
-                        "loinc_code": term.code, "analyte": term.component or term.display,
+                        "loinc_code": term.code, "analyte": aliases[0] if aliases else term.display,
                         "analyte_definition": {"display": term.display, "component": term.component, "property": term.property,
                                                "system": term.system, "scale": term.scale, "method": term.method,
                                                "example_units": list(term.example_ucum_units), "aliases": aliases},
                         "title": record["title"], **self._abstract_payload(record)})
                     candidates += self._extract_study_candidates("unclassified_discovery", [record], term, answers=[answer["bounds"]])
                     for row in answer["measurements"]:
-                        candidates.append(ResearchCandidate("reported_measurement", record["url"],
+                        kind = "analytical_limit" if row["value_kind"] in ANALYTICAL_LIMITS else "reported_measurement"
+                        candidates.append(ResearchCandidate(kind, record["url"],
                             unit=row["unit"], population=row["population"], specimen=row["specimen"],
                             method=row["method"], excerpt=row["excerpt"], reported_value=row["reported_value"],
                             value_kind=row["value_kind"], **self._study_provenance(record)))

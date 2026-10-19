@@ -12,6 +12,7 @@ from build_docs_site import PUBLIC_DOCS
 
 ROOT_FILES = {
     "README.md",
+    "CHANGELOG.md",
     "run-plausibility-check.py",
     "CONTRIBUTING.md",
     ".gitattributes",

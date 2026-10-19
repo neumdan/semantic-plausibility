@@ -11,6 +11,7 @@ Use either `podman-compose` or `docker compose` with the same file. The table na
 | Read local terminology files | Runner with file sources in TOML | Your `local/terminologies/` files |
 | Serve imported terminology | `--profile terminology up -d blaze`; `--profile terminology run --rm terminology-init` | Named `validation_blaze` volume; installation receipt in `local/validation/` |
 | Local UCUM | `--profile terminology up -d --build ucum` | Built image with official pinned library |
+| Optional input decisions | `--profile decision up -d --build laya` | Ignored `local/laya/`; pinned Apache-2.0 model, reused across runs |
 | Local AI | `--profile research up -d ollama`; `--profile research run --rm model-init` | Shared `semantic-plausibility-ollama` model volume |
 | Full FHIR conformance | `validator-init`, build/start `matchbox` | `local/validation/` setup and cached validator image; [instructions](validation.md) |
 | SQLite exercise | `--profile examples run --rm prepare-examples` | `local/examples/lab.sqlite` |
@@ -30,11 +31,13 @@ podman-compose run --rm run-plausibility-check config-check --connections
 podman-compose run --rm run-plausibility-check check --out output/first.csv
 ```
 
-Build after source/dependency changes. Ordinary checks reuse the `semantic-plausibility-stack:local` image. The example script fingerprints build inputs and rebuilds only when needed. Models are reused across manual and example runs. Stop selected services with `podman-compose stop ollama blaze ucum matchbox`; their volumes remain. Keep volumes when using `down` so model/import downloads are retained.
+Build after source/dependency changes. Ordinary checks reuse the `semantic-plausibility-stack:local` image. The example script fingerprints build inputs and rebuilds only when needed. Models are reused across manual and example runs. Stop selected services with `podman-compose stop laya ollama blaze ucum matchbox`; their volumes remain. Keep volumes when using `down` so model/import downloads are retained.
 
 Docker uses `docker compose` in place of `podman-compose`. Python uses `uv sync --locked --extra postgres` followed by `uv run --no-sync --env-file .env run-plausibility-check COMMAND`. The TOML stays the same; `container_base_url` / `container_endpoint` choose service-network addresses inside Compose.
 
 ## Models
+
+**Laya** supplies optional input/next-step hints; **Ministral in Ollama** supplies research and extraction. Enable Laya in the same TOML; [setup, licence, prompts and output](configuration.md#optional-laya-decisions). The Laya service binds host port 8085 to loopback, runs one CPU request at a time and retains weights in `local/laya/`.
 
 ### Compose Ollama
 

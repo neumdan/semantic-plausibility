@@ -115,6 +115,7 @@ class BatchConfiguration:
                 "validation",
                 "logging",
                 "terminology",
+                "decision",
             },
         )
         self.version = data.get("config_version")
@@ -138,6 +139,9 @@ class BatchConfiguration:
         if self.lookup_strategy not in {"fallback", "all"}:
             raise ValueError("terminology.strategy must be fallback or all")
         self.kind = general.get("RESOURCE_TYPE", "Observation")
+        from .input_decision import settings as decision_settings
+        if decision_settings(self)["enabled"] and self.kind != "Observation":
+            raise ValueError("Enable decision for laboratory Observation runs; use decision.enabled=false for medication runs")
         if self.kind not in {"Observation", "Medication", "MedicationRequest", "MedicationAdministration", "MedicationStatement"}:
             raise ValueError(
                 "RESOURCE_TYPE must be Observation, Medication, MedicationRequest, MedicationAdministration or MedicationStatement"

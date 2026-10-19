@@ -5,17 +5,19 @@ flowchart TD
     RUN["Python runner: one-shot container or uv command<br/>Read and check input contract; optional full FHIR validation<br/>Preserve code + name + value + unit + reference context<br/>Aggregate complete sets and statistics with embedded DuckDB<br/>A1 checks; separate A2 / A3 research from audited A1 output<br/>CSV + HTML + evidence + hash-chained audit"]
     TX["Terminology evidence<br/>Direct local files OR API<br/>Optional Blaze: explicit imports<br/>UCUM: NLM API OR local service<br/>Sources / editions / hashes"]
     AI["Optional Ollama service<br/>Local inference; shared weights<br/>A2: real lookup candidates<br/>A3: Europe PMC / PubMed<br/>Quotes + numbers + unit guards"]
+    LAYA["Optional Laya service<br/>Input/domain + next-step hints<br/>Declared source and checks kept"]
     VALIDATE["Optional local validation services<br/>Matchbox: HL7 validator + acquired FHIR / MII packages<br/>Blaze: terminology, persistent database, internal network<br/>Complete documents checked before semantic grouping"]
-    OUT["Output and clinical review<br/>One item/group per CSV row; one value per cell; numbered columns for repeated elements<br/>HTML: source value → method/finding → proposal → source/proposal status and citations<br/>Original structures in evidence JSONL; clinician decisions in a versioned local registry"]
+    OUT["Output and clinical review<br/>One item/group per CSV row; one value per cell; numbered columns for repeated elements<br/>HTML: input → finding/condition → recommendation + why → status and sources<br/>Original structures in evidence JSONL; clinician decisions in a versioned local registry"]
     INPUT --> RUN
     CONFIG --> RUN
     RUN --> |"lookups"| TX
     RUN -.-> |"A2 / A3"| AI
+    RUN -.-> |"advisory"| LAYA
     RUN -.-> |"selected validation"| VALIDATE
     RUN --> |"reports"| OUT
     VALIDATE --> |"outcomes"| OUT
     classDef normal fill:#f3f7fa,stroke:#c4d5df,color:#142d42
-    class INPUT,CONFIG,TX,VALIDATE normal
+    class INPUT,CONFIG,TX,LAYA,VALIDATE normal
     classDef teal fill:#eef7f4,stroke:#a8cfc6,color:#142d42
     class RUN,AI,OUT teal
     classDef error fill:#fcf1f3,stroke:#ecc7cf,color:#142d42

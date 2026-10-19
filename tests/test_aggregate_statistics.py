@@ -55,7 +55,7 @@ class AggregateStatisticsTests(unittest.TestCase):
                 result=run_plausibility_check(config,output=root/(kind+'.csv'))
                 with result.csv.open(encoding='utf-8-sig',newline='') as f:
                     rows=list(csv.DictReader(f))
-                self.assertEqual(len(rows),4)
+                self.assertEqual(len(rows),5)
                 for row in rows:
                     self.assertTrue(row['input.statistics.sd.unit'])
                     self.assertEqual(row['input.statistics.mean.unit'],row['unit_code'])

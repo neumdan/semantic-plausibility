@@ -107,6 +107,17 @@ source = "bfarm-lab" # Manual downloads under local/terminologies/bfarm-lab/.
 # 5. OPTIONAL AI — used by research-evidence, after check.
 # --scope lookup: suggestions; --scope studies: suggestions + literature.
 
+[decision]
+# Optional advisory input assessment during check; start the laya Compose service.
+# Declared origin/resource type and terminology verdicts remain authoritative.
+enabled = false
+base_url = "http://127.0.0.1:8085"
+container_base_url = "http://laya:8000"
+model = "convaiinnovations/laya-multilingual" # Apache-2.0; separate from Ollama.
+revision = "1720e3e3357cfe1e281542e223f8273b0890ca34"
+min_probability = 0.8 # Uncalibrated model score; lower scores abstain.
+# cache_dir = "local/laya" # Persistent downloaded weights; excluded from Git.
+
 [models.local]
 container_base_url = "http://ollama:11434/v1" # Compose Ollama; native inference uses base_url(_env) below.
 runtime = "ollama"

@@ -58,6 +58,8 @@ def run_context(config, prepared, *, output_path=None, source_report=None, sourc
                   "original_input_sha256": original.get("input_sha256"),
                   "original_configuration_sha256": original.get("configuration_sha256")}
     settings = config.data.get("research", {})
+    from .input_decision import settings as decision_settings
+    decision = decision_settings(config)
     return {"format_version": 1, "created_at": datetime.now(timezone.utc).isoformat(),
             "configuration_file": str(config.path), "configuration_sha256": config.deployment.sha256,
             "operation": config.operation, "level": "A3" if scope == "studies" else "A2" if scope == "lookup" else "A1",
@@ -67,6 +69,7 @@ def run_context(config, prepared, *, output_path=None, source_report=None, sourc
             "target": select(config.data.get("specification", {}), ("FHIR_VERSION", "PROFILE", "PROFILE_VERSION", "IG_PACKAGE", "IG_VERSION", "IG_CANONICAL", "STRUCTURE_DEFINITION", "PROFILE_FILE", "VALUE_SETS")),
             "lookup_strategy": config.lookup_strategy, "configured_lookups": lookups,
             "validation": select(config.validation, ("enabled", "backend", "fail_on_error")),
+            "input_decision": select(decision, ("enabled", "model", "revision", "min_probability")),
             "research": {"scope": scope, "model": model,
                          "study_providers": settings.get("sources", ["pubmed"]) if scope == "studies" else [],
                          "max_articles_per_loinc": settings.get("max_articles_per_loinc", 3) if scope == "studies" else 0},
@@ -193,7 +196,8 @@ def run_context_html(summary, csv_name):
                        for suffix, label in ((".summary.json", "Run summary"), (".evidence.jsonl", "Item evidence"), (".audit.jsonl", "Audit log")))
     parts = [('Input and mapping', context['input']), ('Target and grouping', {"target": context['target'], "applied_profile_rules": summary.get('terminology_plan', {}), "grouping": context['grouping']}),
              ('Configured terminology sources (including disabled sources)', {"strategy": context['lookup_strategy'], "sources": context['configured_lookups'], "release_metadata": summary.get('terminology_updates', {})}),
-             ('Validation and research settings', {"validation": context['validation'], "research": context['research']}),
+             ('Validation and model settings', {"validation": context['validation'], "research": context['research'],
+                                                "input_decision": context.get('input_decision', {"enabled": False})}),
              ('Output and reproducibility', {"output": context['output'], "input_sha256": summary.get('input_sha256'), "software": summary.get('software')})]
     return '<section id="run-configuration"><h2>Configuration and methods</h2><p><b>' + escape(context['level'] + ' · ' + context['resource_type']) + '</b> · ' + escape(context['network_mode']) + '</p><p>Configuration: <code>' + escape(context['configuration_file']) + '</code><br>Configuration SHA-256: <code>' + escape(context['configuration_sha256']) + '</code></p><p>' + escape(context['configuration_scope']) + '</p>' + ''.join('<details><summary>' + label + '</summary>' + _json(data) + '</details>' for label, data in parts) + '<p>' + links + '</p></section>'
 

@@ -108,8 +108,9 @@ class ClinicianLoopTests(unittest.TestCase):
             changed["quantity"]["value"] = 150
             self.assertEqual(mapping_scope(changed, source["source_namespace"], profile, catalogues)[1], key)
             text = config.read_text().replace(BatchConfiguration(config).output["path"], str(root / "rechecked.csv"))
-            text = text.replace('# review_registry = "local/clinician-mappings.json"', 'review_registry = ' + json.dumps(str(registry)))
+            text += '\n[quality]\nreview_registry = ' + json.dumps(str(registry)) + '\n'
             config.write_text(text)
+            self.assertEqual(BatchConfiguration(config).data['quality']['review_registry'], str(registry))
             checked = run_plausibility_check(config)
             with checked.csv.open(encoding="utf-8-sig", newline="") as handle:
                 reused = next(row for row in csv.DictReader(handle) if row["tuple_id"] == source["tuple_id"])

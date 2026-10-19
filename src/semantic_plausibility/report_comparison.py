@@ -15,6 +15,7 @@ section.item,.run-details{background:white;border:1px solid #dbe1e5;border-radiu
 .item-table{table-layout:fixed;min-width:980px}.item-table th:nth-child(1){width:12%}.item-table th:nth-child(2){width:19%}.item-table th:nth-child(3){width:27%}.item-table th:nth-child(4){width:24%}.item-table th:nth-child(5),.item-table th:nth-child(6){width:9%}
 .item-table tbody th{font-weight:600}.input-value,.proposed-value{white-space:pre-line}.finding{margin:0 0 5px}.finding:last-child{margin-bottom:0}.citation{font-size:11px;margin-left:4px;white-space:nowrap}.action{font-weight:600;display:block;margin-bottom:3px}
 .badge{display:inline-block;font-size:11px;line-height:1.4;font-weight:600;border-radius:4px;padding:4px 6px;border:1px solid transparent}.badge.green{color:#205a3c;background:#edf6ee;border-color:#cbdccb}.badge.yellow{color:#765210;background:#fff6dd;border-color:#e7d8b0}.badge.red{color:#963e36;background:#fceeed;border-color:#eacac6}.badge.grey{color:#58636b;background:#f0f2f3;border-color:#dce1e4}
+.badge.conditional{color:#245878;background:#edf5fb;border-color:#bcd7e8}.review-reason,.condition{display:block;margin-top:5px;font-size:12px}.assessment-table{margin-top:16px}.assessment-table caption{text-align:left;font-weight:600;padding:6px 0}
 .legend{font-size:12px;color:#53636d;margin:12px 0}.legend .badge{margin-right:4px}.kpis{display:flex;flex-wrap:wrap;gap:8px 20px;padding:12px 0;border-block:1px solid #dbe1e5;margin:14px 0}.kpis span{font-size:13px}
 summary{cursor:pointer;font-weight:600}summary:focus-visible,a:focus-visible{outline:2px solid #116a64;outline-offset:3px}.set-details{margin-top:12px}.set-details>summary{color:#116a64;font-size:12px}.set-details[open]{padding-top:8px}.set-details details{margin:12px 0}.source-list li{padding:4px 0}.source-list .source-meta{display:block}.field-reasons{font-size:13px}.field-reasons dt{font-weight:600;margin-top:8px}.field-reasons dd{margin:0}.run-details>section{border-top:1px solid #dbe1e5;padding:16px 0;margin-top:16px}
 .source-meta{overflow-wrap:anywhere}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;background:#f6f7f8;padding:10px}code{font-size:12px}.note,.approval{border-left:3px solid #7b9894;padding:8px 12px;background:#f1f6f5}.warning,.blocked{color:#963e36}.warning{border-left:3px solid #963e36;padding:8px 12px;background:#fceeed}blockquote{margin:8px 0;padding-left:12px;border-left:2px solid #7b9894}.recommendation{padding:8px 0;border-bottom:1px solid #dbe1e5}
@@ -34,6 +35,8 @@ class Field:
     proposal_state: str = "red"
     reason: str = ""
     sources: list[dict] = field(default_factory=list)
+    condition: str = ""
+    support_level: str = ""
 
 
 def display(value):
@@ -41,8 +44,8 @@ def display(value):
 
 
 def badge(state, *, proposal=False):
-    labels = ({"green": "Already correct", "yellow": "Needs review", "red": "No proposal", "grey": "N/A"}
-        if proposal else {"green": "Checked", "yellow": "Unclear", "red": "Problem", "grey": "N/A"})
+    labels = ({"green": "Keep", "conditional": "Confirm condition", "yellow": "Needs review", "red": "No proposal", "grey": "N/A"}
+        if proposal else {"green": "Checked", "conditional": "Conditional match", "yellow": "Not established", "red": "Problem", "grey": "N/A"})
     if state not in labels:
         raise ValueError("Unknown report field state")
     return '<span class="badge ' + state + '">' + labels[state] + '</span>'
@@ -50,8 +53,10 @@ def badge(state, *, proposal=False):
 
 def legend_html():
     return ('<div class="legend"><p><strong>Source:</strong> ' + badge("green") + ' checked · '
+        + badge("conditional") + ' supported under the stated system/context · '
         + badge("yellow") + ' unresolved · ' + badge("red") + ' issue found</p>'
         + '<p><strong>Recommendation</strong> · ' + badge("green", proposal=True) + ' keep within the stated check · '
+        + badge("conditional", proposal=True) + ' confirm metadata · '
         + badge("yellow", proposal=True) + ' verify proposal · ' + badge("red", proposal=True)
         + ' clarify the source; no supported replacement · ' + badge("grey", proposal=True) + ' not applicable</p>'
         + '<p>Field checks are separate. Green does not mean that the whole set is clinically approved. No source values are changed.</p></div>')
@@ -78,9 +83,11 @@ def field_table_html(fields, *, prefix):
         numbers = sorted({indices[(str(r["source"]), str(r.get("version") or ""))] for r in item.sources if r.get("source")})
         refs = ''.join(citation_link(records[n - 1], n, prefix) for n in numbers)
         findings = ''.join('<p class="finding">' + display(f) + '</p>' for f in item.findings)
+        condition = '<span class="condition">' + display(item.condition) + '</span>' if item.condition else ''
+        reason = '<small class="review-reason">Why: ' + display(item.reason) + '</small>' if item.reason else ''
         body.append('<tr><th scope="row">' + display(item.name) + '</th><td class="input-value">' + display(item.value)
-            + '</td><td>' + findings + refs + '</td><td class="proposed-value"><span class="action">' + display(item.action)
-            + '</span>' + display(item.recommendation) + '</td><td>' + badge(item.source_state) + '</td><td>'
+            + '</td><td>' + findings + condition + refs + '</td><td class="proposed-value"><span class="action">' + display(item.action)
+            + '</span>' + display(item.recommendation) + reason + '</td><td>' + badge(item.source_state) + '</td><td>'
             + badge(item.proposal_state, proposal=True) + '</td></tr>')
     return ('<div class="scroll"><table class="item-table"><thead><tr>'
         + ''.join('<th scope="col">' + label + '</th>' for label in ("Data field", "Input value", "Method + finding", "Recommendation", "Source", "→ Proposal"))

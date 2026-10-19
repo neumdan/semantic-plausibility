@@ -95,7 +95,11 @@ CSV column families:
 | `input.reference_ranges.1.low.value` | First interval's lower value; `.code` and `.system` are separate |
 | `input.dosages.1.doseAndRate.1.doseQuantity.value` | Medication dose value; unit/system have their own columns |
 | `code_check`, `unit_check`, `code_unit_fit`, `reference_check` | Implemented check outcomes |
+| `metadata_status`, `missing_metadata`, `detected_error_count` | Absent source metadata separately from demonstrated errors |
+| `loinc_candidate_verified`, `ucum_candidate_verified` | Verified review candidates; source systems remain unchanged |
 | `assessment.code.finding.1`, `.action`, `.recommendation`, `.source_status`, `.proposal_status` | The corresponding HTML field decision |
+| `assessment.code.condition`, `.support_level`, `.reason` | Explicit system assumption, ordered corroboration and short review reason |
+| `qc.profile_qc.*`, `qc.identity_set.*`, `qc.quantity_set.*`, `qc.code_quantity_fit.*`, `qc.complete_set.*` | Separate scope result, completeness, reason and supporting context |
 | `assessment.code.source.1.source`, `.version` | Source URI and edition; additional citations get separate numbered columns |
 | `suggested_code`, `suggested_name`, `suggested_unit`, `suggested_factor`, `transformation.*` | Sourced proposal and verified arithmetic |
 | `fhir_validation_state`, `mii_numeric_set_ready`, `approved_mapping_ready` | Separate conformance, numerical readiness and clinician-approved mapping signals |
@@ -107,10 +111,28 @@ Headers are the union of fields found in that run. Empty cells retain absence; e
 
 Laboratory `passed` means the implemented checks found supporting evidence; `suggestion` presents a proposed transformation; `unclear` needs context/evidence; `error` identifies a supported inconsistency. Medication uses `needs_review` for unresolved technical findings. `dose_check` summarises structural/arithmetic review; clinical dose evaluation is the physician's step.
 
+The legacy top-level `status` remains a broad workflow signal for existing consumers. Use `assessment.*` for individual fields and `qc.*` for the scope results below. A legacy `unclear` row can contain strong conditional matches and zero detected errors.
+
+## Assessment scopes
+
+| Scope / CSV prefix | What is assessed |
+| --- | --- |
+| `qc.profile_qc` | Implemented profile element rules, declared terminology membership and required bindings. Full-resource validation has its own document/run outcome. |
+| `qc.identity_set` | Code, declared system, supplied name, specimen and any method required by the code. |
+| `qc.quantity_set` | Finite numeric values/statistics and unit code/system membership. |
+| `qc.code_quantity_fit` | Compatibility between the identified code and quantity unit; verified conversion requirements. |
+| `qc.complete_set` | Combined identity/quantity/reference checks, quoted study measurements and reference intervals, with clinician review still required. Analytical performance limits are counted separately. |
+
+Every scope has `state`, `complete` and `reason`. Completeness means the selected fields were supplied; it does not mean they are correct. `supported` refers to that scope only. `conditional` requires confirmation of the stated system/context. `incomplete` requires metadata; `unverified` needs lookup/context resolution; `error` identifies a demonstrated conflict. `transformation_required` requires a verified conversion. `needs_review` retains pending checks; `needs_evidence` requests physiological evidence after technical checks; `evidence_for_review` means sourced numeric evidence is available for applicability review.
+
+For missing source systems, a literal `2823-3` match can have `support_level="code_only"`. A matching name adds `code_name`; a compatible unit adds `code_name_unit` when the source context does not conflict. These are ordered corroboration levels, not calibrated probabilities. A different proposed code or spelling correction remains a review proposal. No system URI, specimen or measurement is written back to the input.
+
+The HTML contains the same five scope rows as the CSV. `.evidence.jsonl` retains `assessment_layers`; library callers can use `semantic_plausibility.assessment_layers(row, summary)` on a hydrated report row. `qc.complete_set.evidence_state` distinguishes `not_searched`, `no_eligible_evidence` and `evidence_for_review`. A search without eligible evidence does not show that no relevant study exists.
+
 `lookup_credibility` is a source-support category. `mii_numeric_set_ready` counts the defined numeric/code/unit/reference checks. Full FHIR conformance is separately recorded per validated document/run. Clinician-approved mapping readiness counts reusable plans that pass current target/context checks.
 
 ## Reading the recommendation
 
-Use **field → source → method/finding → recommendation → source/proposal status**. Green source means supported within scope; yellow needs resolution; red identifies a problem. Green proposal means keep; yellow means review; red asks for source clarification and a supported replacement. Grey means not applicable.
+Use **field → source → method/finding → recommendation and Why → source/proposal status**. Green source means supported within scope; blue **conditional match** names the assumption; yellow needs resolution; red identifies a problem. Green proposal means keep; blue means confirm the condition; yellow means review; red asks for source clarification and a supported replacement. Grey means not applicable.
 
 A conversion proposal includes its verified factor and consistent value/statistic/reference transformations. Name normalisation retains the local name. Study evidence retains the measured quantity type, literal quoted unit, checked UCUM spelling, population, source and extraction state. Reference-interval adoption requires laboratory review. [Clinician feedback](research.md#clinician-feedback).
