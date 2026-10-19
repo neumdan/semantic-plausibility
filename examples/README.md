@@ -23,6 +23,13 @@ bash tools/run-podman-examples.sh --dry-run
 bash tools/run-podman-examples.sh
 ```
 
-The script uses test fixtures and writes separate folders for lookup, FHIR validation, AI suggestions and AI study evidence. It prints the report directory and creates `index.html`. `--lookup-only` runs just the first mode. Model/terminology volumes and image layers persist.
+| Report folder | Input | Checks |
+| --- | --- | --- |
+| `01-lab-lookup` | `lab/aggregated.csv`: 6 rows → 5 groups | A1 terminology and set consistency |
+| `02-lab-fhir-validation` | `laboratory-fhir.csv`: one complete Observation in a Bundle | MII/HL7 validation, then A1 |
+| `03-lab-ai-recommendations` | Audited mode-01 report and sidecars | A2 sourced terminology proposals |
+| `04-lab-ai-evidence` | The same audited mode-01 report and sidecars | A3 lookup proposals plus study evidence |
 
-Your own data uses `pipeline.toml` and `run-plausibility-check check`; the example script deliberately selects its own illustrative inputs. Medication source files and internal regression configurations are retained for later development under `examples/medication/` and `tests/configurations/medication/`.
+The script writes a separate folder for each mode. It prints the report directory and creates `index.html`. `--lookup-only` runs just the first mode. Model/terminology volumes and image layers persist.
+
+Your own data uses `pipeline.toml` and `run-plausibility-check check`; the example script deliberately selects its own illustrative inputs. Medication development checks are retained as the starting point for version 2 under `examples/medication/` and `tests/configurations/medication/`.

@@ -136,7 +136,7 @@ granularity = "individual"
 DB_TABLE = "laboratory_values"
 ```
 
-The read-only query produces the same 3 → 1 result as the individual CSV. For aggregate input, select `laboratory_summary`, `granularity="distinct"` and the aggregate column map. This produces the same 5 → 4 result as the aggregate CSV.
+The read-only query produces the same 3 → 1 result as the individual CSV. For aggregate input, select `laboratory_summary`, `granularity="distinct"` and the aggregate column map. This produces the same 6 → 5 result as the aggregate CSV.
 
 ## PostgreSQL
 
@@ -179,4 +179,4 @@ podman-compose run --rm run-plausibility-check check --out output/lab-01.csv
 
 Open `output/lab-01.html`. Change the output filename on the next run. Docker uses `docker compose`. Python uses `uv run --no-sync --env-file .env run-plausibility-check` in place of the Compose prefix (install `--extra postgres` for PostgreSQL).
 
-Then use the **same configuration** and grouped report for `research-evidence --scope lookup` or `--scope studies`. [Ollama setup and exact commands](../../docs/shipped-stack.md#four-run-modes). Inputs and values stay local; configured APIs provide terminology and study evidence. A missing source remains visibly unverified.
+Then use the **same configuration** and grouped report for `research-evidence --scope lookup` or `--scope studies`. [Ollama setup and exact commands](../../README.md#local-ai-select-download-run). Inputs and values stay local; configured APIs provide terminology and study evidence. A missing source remains visibly unverified.

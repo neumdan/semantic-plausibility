@@ -1,23 +1,30 @@
-%% Same node/edge contract as architecture.svg.
+%% Generated with architecture.svg by tools/render_batch_diagrams.py.
 flowchart TD
-    INPUT["Input: selected laboratory data<br/>CSV columns or read-only SQLite / PostgreSQL view<br/>FHIR JSON / Bundle / NDJSON / DB resource column<br/>TORCH / CQL creates the selected FHIR export"]
-    CONFIG["pipeline.toml + catalog.csv + separate secrets<br/>Input/columns, item / distinct output<br/>profile-init downloads pinned profile / bindings to local/<br/>Terminology endpoints/files; local model + research"]
-    RUN["Python runner: one-shot container or uv command<br/>Read and check input contract; optional full FHIR validation<br/>Preserve code + name + value + unit + reference context<br/>Aggregate complete sets and statistics with embedded DuckDB<br/>A1 checks; separate A2 / A3 research from audited A1 output<br/>CSV + HTML + evidence + hash-chained audit"]
-    TX["Terminology evidence<br/>Direct local files OR API<br/>Optional Blaze: explicit imports<br/>UCUM: NLM API OR local service<br/>Sources / editions / hashes"]
-    AI["Optional Ollama service<br/>Local inference; shared weights<br/>A2: real lookup candidates<br/>A3: Europe PMC / PubMed<br/>Quotes + numbers + unit guards"]
-    LAYA["Optional Laya service<br/>Input/domain + next-step hints<br/>Declared source and checks kept"]
-    VALIDATE["Optional local validation services<br/>Matchbox: HL7 validator + acquired FHIR / MII packages<br/>Blaze: terminology, persistent database, internal network<br/>Complete documents checked before semantic grouping"]
-    OUT["Output and clinical review<br/>One item/group per CSV row; one value per cell; numbered columns for repeated elements<br/>HTML: input → finding/condition → recommendation + why → status and sources<br/>Original structures in evidence JSONL; clinician decisions in a versioned local registry"]
-    INPUT --> RUN
-    CONFIG --> RUN
-    RUN --> |"lookups"| TX
-    RUN -.-> |"A2 / A3"| AI
-    RUN -.-> |"advisory"| LAYA
-    RUN -.-> |"selected validation"| VALIDATE
-    RUN --> |"reports"| OUT
-    VALIDATE --> |"outcomes"| OUT
+    INPUT["Selected laboratory input<br/>CSV / FHIR export / read-only SQLite or PostgreSQL<br/>TORCH / CQL selects server exports upstream<br/>Mapped columns or native FHIR fields"]
+    CONFIG["One pipeline.toml + catalog.csv<br/>Mapping, grouping, profile, sources and model<br/>Downloaded profiles / terminology under local/<br/>Credentials in .env or secret files"]
+    A1["A1: Python runner + embedded DuckDB<br/>Preflight → optional validation → normalize → group → check<br/>Preserve code / system, name, specimen, values and units<br/>Check reference context and cross-field consistency"]
+    TX["Terminology evidence<br/>Direct files OR selected APIs<br/>Optional Blaze: imported content<br/>UCUM: NLM API OR local service"]
+    VALIDATE["Optional full FHIR validation<br/>Complete file / FHIR-in-CSV → Matchbox / HL7<br/>Pinned guide + local Blaze terminology; separate outcomes"]
+    LAYA["Optional local Laya<br/>Advisory domain / next step<br/>Configured source is retained"]
+    R1["A1: audited CSV + HTML<br/>Field decisions + five laboratory assessment scopes<br/>Evidence JSONL + summary + hash-chained audit"]
+    MODEL["Ollama / own local API<br/>Candidate selection + extraction<br/>Bounded texts; retained weights"]
+    RESEARCH["A2 / A3: Python research runner<br/>Read grouped A1 report and its verified sidecars<br/>Retrieve source text → local model → verify claims<br/>A3 includes AI lookup plus study extraction"]
+    WEB["Selected source APIs / pages<br/>A2: terminology + LOINC pages<br/>A3: Europe PMC / PubMed<br/>Python retrieves source text"]
+    OUT["CSV + HTML: clinical review<br/>Field → finding / condition → recommendation + why → sources<br/>Clinician approval → local registry; recheck targets and factors on later A1 runs"]
+    INPUT --> A1
+    CONFIG --> A1
+    A1 --> |"lookup"| TX
+    A1 -.-> |"if selected and applicable"| VALIDATE
+    A1 -.-> |"advisory"| LAYA
+    A1 --> |"check results"| R1
+    VALIDATE --> |"outcomes"| R1
+    LAYA -.-> |"hints"| R1
+    R1 -.-> |"A2 / A3 selected"| RESEARCH
+    R1 --> |"A1 review"| OUT
+    RESEARCH -.-> |"inference"| MODEL
+    RESEARCH --> |"retrieval"| WEB
+    RESEARCH --> |"sourced proposals"| OUT
     classDef normal fill:#f3f7fa,stroke:#c4d5df,color:#142d42
-    class INPUT,CONFIG,TX,LAYA,VALIDATE normal
+    class INPUT,CONFIG,TX,VALIDATE,LAYA,MODEL,WEB normal
     classDef teal fill:#eef7f4,stroke:#a8cfc6,color:#142d42
-    class RUN,AI,OUT teal
-    classDef error fill:#fcf1f3,stroke:#ecc7cf,color:#142d42
+    class A1,R1,RESEARCH,OUT teal

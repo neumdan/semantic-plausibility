@@ -55,7 +55,7 @@ Grouping preserves code systems/editions, names, unit codes/systems, reference q
 
 ### Medication columns
 
-Select the resource type and its recipe in [medication examples](../examples/medication/README.md).
+These columns belong to the existing medication development adapter. Use its [regression examples](../examples/medication/README.md); the operator workflow and five assessment scopes in this release are laboratory-focused. Medication onboarding and AI/evidence are planned for version 2.
 
 | Field family | Explicit columns |
 | --- | --- |
@@ -71,7 +71,7 @@ Each scalar row describes one complete product and one instruction. Full FHIR/DB
 
 ## Output
 
-Version 0.14 writes scalar CSV columns. Structured consumers use the audited evidence sidecar; the A2/A3 and review commands handle this hand-off automatically.
+CSV outputs use scalar columns. Structured consumers use the audited evidence sidecar; the A2/A3 and review commands handle this hand-off automatically.
 
 Every check writes a matching file set:
 
@@ -114,6 +114,8 @@ Laboratory `passed` means the implemented checks found supporting evidence; `sug
 The legacy top-level `status` remains a broad workflow signal for existing consumers. Use `assessment.*` for individual fields and `qc.*` for the scope results below. A legacy `unclear` row can contain strong conditional matches and zero detected errors.
 
 ## Assessment scopes
+
+These five scopes are implemented for laboratory Observations.
 
 | Scope / CSV prefix | What is assessed |
 | --- | --- |

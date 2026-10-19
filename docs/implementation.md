@@ -39,7 +39,7 @@ The library has one public check entry point: `run_plausibility_check(config_pat
 | `support`, `progress` | Hashing, formula-safe text, context/config helpers, phase logs and timed model activity |
 | `tools/run-podman-examples.sh`, `container-cache.sh` | Isolated example reports; reuse images/volumes and rebuild changed inputs only |
 | `tools/prepare-lab-examples.py` | Create/reuse the exact supplied synthetic SQLite source |
-| `tools/render_batch_diagrams.py` | Generate the two matching SVG/Mermaid diagrams |
+| `tools/render_batch_diagrams.py` | Generate SVG/Mermaid and the matching README diagrams from one graph definition |
 | `tools/build_docs_site.py`, `build_release.py` | Publish an allowlisted manual/runner; exclude private data, secrets and caches |
 
 `catalog.csv` is the single source directory. Actual terminology concepts, profiles and binding resources are acquired into ignored runtime folders. The wheel includes catalogue metadata; the image/ZIP exclude downloaded content.

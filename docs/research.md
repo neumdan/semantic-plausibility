@@ -15,7 +15,7 @@ Use `--scope lookup` for AI-assisted terminology recommendations without literat
 
 Without `--out`, lookup mode produces `<checked-name>.recommendations.csv/html`; studies mode produces `<checked-name>.research.csv/html`. Each has its own audit, trace and readable `.studies.csv` table. The table links extracted statistics/intervals to the checked tuple IDs and retains unsupported discoveries explicitly. For a direct comparison, start both modes from the original checked report, not from the other AI output.
 
-No second configuration is needed. The command selects the checked CSV at TOML `output.path` by default; `--report` is optional. A raw export or an edited CSV must first be checked, and its matching summary/evidence/audit files must remain together. [One-time model setup and exact Docker/Podman/Python commands](shipped-stack.md#ollama).
+No second configuration is needed. The command selects the checked CSV at TOML `output.path` by default; `--report` is optional. A raw export or an edited CSV must first be checked, and its matching summary/evidence/audit files must remain together. [One-time model setup and exact Docker/Podman/Python commands](shipped-stack.md#compose-ollama).
 
 The plan prints the system/task prompts, profile routing and planned queries without network/model calls. The executed dossier uses the selected output prefix: CSV, HTML, evidence JSONL, summary, trace JSONL and artifact audit. Original check statuses/readiness are retained; the dossier adds review evidence.
 
@@ -151,7 +151,7 @@ Imports require the same profile rules as the checked report. A later decision m
 
 ## Future domains and FDPG
 
-Medication needs product/ingredient, strength, dose/unit, route and timing; Condition needs edition, certainty/status, severity and site; Procedure needs edition, status, time, site and technique. Medication terminology and deterministic dose checks now use a [separate adapter](../examples/medication/README.md). Medication AI/evidence research, Condition and Procedure remain unimplemented; laboratory research cannot be applied to these records.
+Medication needs product/ingredient, strength, dose/unit, route and timing; Condition needs edition, certainty/status, severity and site; Procedure needs edition, status, time, site and technique. Medication terminology and deterministic dose checks use a [development adapter](../examples/medication/README.md). Medication AI/evidence, domain-specific assessment scopes and operator onboarding are planned for version 2. Use this research workflow for laboratory Observations; the catalogue also lists sources for later Condition/Procedure work.
 
 A later FDPG provider must use an authorised interface or permitted aggregate export with selection/cohort provenance. Feasibility counts alone cannot reconstruct value distributions or establish reference intervals. Evidence of practice supports final clinician evaluation.
 

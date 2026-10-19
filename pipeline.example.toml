@@ -44,7 +44,7 @@ status = "status"
 
 [output]
 mode = "distinct"                   # Aggregate each semantic set before evidence research.
-path = "output/laboratory-review.csv" # Optional per-run override: run-plausibility-check --out output/01-lookup.csv
+path = "output/laboratory-review.csv" # Optional per-run override: run-plausibility-check check --out output/01-lookup.csv
 
 # 3. LABORATORY TARGET — pinned MII profile; optional full-resource validation.
 

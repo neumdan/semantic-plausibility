@@ -13,13 +13,13 @@ Start with the [setup in pipeline.toml](../README.md#1-first-setup). This page e
 
 FHIR validation is independent: `[validation]` applies to complete resources, not scalar aggregates. A2/A3 currently support laboratory Observations only. Model settings belong in `[models]`; study APIs/budgets in `[research]`. **For laboratory, use one TOML for all three levels**, and keep `.env`/secret files for credentials. No shell exports are needed.
 
-Map actual source facts: a local LIS test identifier stays local until reviewed. Profiles supply target rules, not a guess about source column meanings. Reports are CSV/HTML; automatic FHIR/OMOP/database output writers are not implemented. All relative paths resolve from the selected TOML. [Laboratory configuration overview](index.html#configure) · [Input walkthroughs](index.html#inputs) · [Download/API walkthroughs](index.html#terminology).
+Map actual source facts: a local LIS test identifier stays local until reviewed. Profiles supply target rules, not a guess about source column meanings. Reports are CSV/HTML; automatic FHIR/OMOP/database output writers are not implemented. All relative paths resolve from the selected TOML. [Laboratory configuration overview](index.html#setup) · [Input walkthroughs](index.html#inputs) · [Download/API walkthroughs](index.html#terminology).
 
 ## Select the configuration
 
 | Runtime | Select the TOML | Default |
 | --- | --- | --- |
-| Python / uv | `run-plausibility-check --config pipeline.toml`; uv loads credentials with `--env-file .env` | `pipeline.toml` in the current directory |
+| Python / uv | `run-plausibility-check check --config pipeline.toml`; uv loads credentials with `--env-file .env` | `pipeline.toml` in the current directory |
 | Docker Compose | `.env` contains `SQC_CONFIG_FILE=pipeline.toml`; run `docker compose run --rm run-plausibility-check` | Host `pipeline.toml`, mounted at `/app/pipeline.toml` |
 | Podman Compose | Same `.env`; run `podman-compose run --rm run-plausibility-check` | Same host/container paths |
 
@@ -137,7 +137,7 @@ For SQLite, use `input.type="sqlite"`, `input.path="local/lab.sqlite"`, the colu
 
 ## Laboratory profile and terminology roles
 
-Keep `general.RESOURCE_TYPE="Observation"`. The starter pins FHIR R4 and MII Laboratory 2026.0.3 in `pipeline.toml`. `STRUCTURE_DEFINITION` is an installed resolved R4 Observation snapshot; `IG_PACKAGE`, `IG_VERSION` and `IG_CANONICAL` record its identity. Alternatively select a reviewed `PROFILE_FILE` policy. `VALUE_SETS` lists the real versioned definitions used to derive bound systems. Medication configuration is deferred; its existing adapters remain tested.
+Keep `general.RESOURCE_TYPE="Observation"`. The starter pins FHIR R4 and MII Laboratory 2026.0.3 in `pipeline.toml`. `STRUCTURE_DEFINITION` is an installed resolved R4 Observation snapshot; `IG_PACKAGE`, `IG_VERSION` and `IG_CANONICAL` record its identity. Alternatively select a reviewed `PROFILE_FILE` policy. `VALUE_SETS` lists the real versioned definitions used to derive bound systems. The operator workflow is laboratory-focused; medication onboarding and AI/evidence are planned for version 2. [Existing technical adapters](../examples/medication/README.md) retain their regression examples.
 
 Profiles define constraints/bindings, not API endpoint URLs or credentials. The MII snapshot fixes the quantitative unit system to UCUM and gives laboratory codes a **preferred** LOINC binding. ValueSet routing does not expand filters or prove membership. Unspecified selected rules fall back to international R4; explicit prohibitions remain effective. Set `validation.enabled=true` to run the selected local Matchbox/HL7 or MII service before grouping actual FHIR input. The complete guide and dependencies are pinned independently of the selected-element importer. [Validation configuration and examples](validation.md).
 
@@ -161,7 +161,7 @@ complete = false
 
 This references your actual file; the project does not generate local terminology. CSV catalogues require `system,code`, optionally `version,display,definition,expected_unit_code,expected_unit_system,specimen,method,ddd`. Set `complete=true` only for a complete edition.
 
-Supported types: `ucum`, `loinc`, `loinc_csv`, generic `fhir`, `csv`, `sqlite`, `fhir_artifacts`, `website`, `ols`, `who_icd`. Set `enabled=true` deliberately, one dedicated UCUM and LOINC service each. API adapters use `endpoint`; dedicated UCUM/LOINC also accept `endpoint_env`. Local adapters use `path` and declared `systems`. WHO ICD-11 is a standalone lookup, not a Condition batch check. [Adapter-specific fields, access and setup](lookups.md#use-the-configured-apis).
+Supported types: `ucum`, `loinc`, `loinc_csv`, generic `fhir`, `csv`, `sqlite`, `fhir_artifacts`, `website`, `ols`, `who_icd`. Set `enabled=true` deliberately, one dedicated UCUM and LOINC service each. API adapters use `endpoint`; dedicated UCUM/LOINC also accept `endpoint_env`. Local adapters use `path` and declared `systems`. WHO ICD-11 is a standalone lookup, not a Condition batch check. [Adapter-specific fields, access and setup](lookups.md#5-own-servers-and-extending-the-catalogue).
 
 ## Full FHIR validation
 
@@ -184,7 +184,7 @@ The starter uses `network.mode="lookups"` for enabled real sources. For `"offlin
 | PubMed optional key | `research.pubmed.API_KEY_ENV` / `API_KEY_FILE` |
 | Protected package setup | `packages.NAME.token_env` / `token_file`, with explicit conditions acceptance |
 
-Client certificate/key paths are passed to TLS without copying key contents into reports or logs. `config-check` loads the pair locally; `--connections` tests server access with it. [MII certificate setup](lookups.md#mii-client-certificates).
+Client certificate/key paths are passed to TLS without copying key contents into reports or logs. `config-check` loads the pair locally; `--connections` tests server access with it. [MII certificate setup](lookups.md#5-own-servers-and-extending-the-catalogue).
 
 Environment references name a variable whose value lives in `.env` or the runtime. File references point to a secret file containing only the value; mount it under `local/secrets/` for Compose. Plain Python can use file references without loading `.env`. The default user TOMLs and files under `local/`/`output/` are excluded from Git, as are `.env` credentials. Keep other site configurations under ignored `local/` or add them to your ignore rules.
 
@@ -206,7 +206,7 @@ response_mode = "json_schema"
 
 The starter defines the native address directly in TOML. For an environment reference, replace `base_url` with `base_url_env="LOCAL_MODEL_BASE_URL"` and set that variable in `.env`; choose exactly one. Inside Compose, `container_base_url` overrides the native address automatically. The endpoint must remain local. Choose the actual served model ID; configuring it does not start or download the model. `general.MODEL_ALIAS` selects a named table.
 
-`response_mode` supports `json_schema` or `json_object` with the same application guards. Optional controls include `reasoning_effort`, `enable_thinking`, `expected_digest` and `pull_timeout_seconds`; use only controls supported by the selected server/model. [Provisioning and native URLs](shipped-stack.md#ollama).
+`response_mode` supports `json_schema` or `json_object` with the same application guards. Optional controls include `reasoning_effort`, `enable_thinking`, `expected_digest` and `pull_timeout_seconds`; use only controls supported by the selected server/model. [Provisioning and native URLs](shipped-stack.md#compose-ollama).
 
 ### Optional Laya decisions
 
@@ -326,7 +326,7 @@ include_distribution = true
 # lookup_pack = "output/reference-pack.json"
 ```
 
-`run-plausibility-check --out output/another-check.csv` selects a fresh prefix without editing TOML. Relative `--out` and `--report` paths resolve against the selected TOML. The effective output path and research scope are audited separately from the unchanged configuration hash.
+`run-plausibility-check check --out output/another-check.csv` selects a fresh prefix without editing TOML. Relative `--out` and `--report` paths resolve against the selected TOML. The effective output path and research scope are audited separately from the unchanged configuration hash.
 
 Only CSV is the batch data output format; HTML, summary, evidence and audit sidecars are always produced. Pick a fresh path to preserve prior reports; research needs a fresh output prefix too. [Artifact contents](data-contract.md#output).
 

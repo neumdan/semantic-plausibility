@@ -28,7 +28,7 @@ For DB scalar columns, a mapping such as `code="test_id"`, `value="numeric_resul
 
 ## Laboratory set and checks
 
-Keep code + system/edition + name + specimen/method + value/comparator or statistics + unit/system + all reference qualifiers together. A1 checks terminology membership, name/axes, UCUM syntax, code–unit fit, supported conversions and numeric/reference consistency. A2/A3 add sourced proposals. Medication is retained for later development.
+Keep code + system/edition + name + specimen/method + value/comparator or statistics + unit/system + all reference qualifiers together. A1 checks terminology membership, name/axes, UCUM syntax, code–unit fit, supported conversions and numeric/reference consistency. A2/A3 add sourced proposals. The existing medication technical adapter is retained for version 2; [current scope](../README.md#scope).
 
 ## Method → input → decision → output
 
@@ -39,8 +39,8 @@ Keep code + system/edition + name + specimen/method + value/comparator or statis
 | Normalize | Mapped rows or native FHIR | Preserve all selected semantic context, numeric types, units and IDs | Internal laboratory set |
 | Represent | Set + input frequencies + `output.mode` | Keep records, or group by complete semantics and pool eligible statistics | Stable tuple ID, counts, source-value statistics |
 | A1 `check` | Set + profile + configured terminology | Source-code meaning and target-system fit, then cross-field consistency | Findings, source credibility, transformation proposals, evidence/audit |
-| A2 `research-evidence --scope lookup` | Original A1 CSV and sidecars | Retrieve candidates/pages; local model proposes; verify against real sources | Sourced code/name/unit proposals |
-| A3 `research-evidence --scope studies` | Original A1 CSV and sidecars | Screen Europe PMC/PubMed; local extraction; quote/analyte/number/unit guards | Sourced measurements, statistics and interval candidates; `.studies.csv` |
+| A2 `research-evidence --scope lookup` | Original grouped A1 CSV and sidecars | Retrieve candidates/pages; local model proposes; verify against real sources | Sourced code/name/unit proposals |
+| A3 `research-evidence --scope studies` | Original grouped A1 CSV and sidecars | A2 lookup plus screened Europe PMC/PubMed; local extraction; quote/analyte/number/unit guards | Sourced measurements, statistics and interval candidates; `.studies.csv` |
 | Review/reuse | Original report + clinician review copy | Recheck target code/unit/factor and scoped approval | Versioned local registry and approved-ready count on later checks |
 
 The report keeps field validity, whole-set fit, full-resource conformance and expert approval separately. Example: `140 g/L` can be converted with a verified factor `0.1` to `14 g/dL`; compatible reference bounds and SD change by the same factor. A published interval is a sourced comparison candidate whose population and method need review.

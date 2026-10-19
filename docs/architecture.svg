@@ -1,65 +1,82 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="925" viewBox="0 0 1100 925" role="img" aria-labelledby="title desc">
-<title id="title">Containers and data flow</title><desc id="desc">Input: selected laboratory data; pipeline.toml + catalog.csv + separate secrets; Python runner: one-shot container or uv command; Terminology evidence; Optional Ollama service; Optional Laya service; Optional local validation services; Output and clinical review</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1190" viewBox="0 0 1100 1190" role="img" aria-labelledby="title desc">
+<title id="title">Laboratory architecture: local processing and explicit source requests</title><desc id="desc">Selected laboratory input; One pipeline.toml + catalog.csv; A1: Python runner + embedded DuckDB; Terminology evidence; Optional full FHIR validation; Optional local Laya; A1: audited CSV + HTML; Ollama / own local API; A2 / A3: Python research runner; Selected source APIs / pages; CSV + HTML: clinical review</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#537487"/></marker></defs>
 <style>text{font-family:Arial,sans-serif;fill:#142d42}.heading{font-size:19px;font-weight:700}.body{font-size:17px}.label{font-size:14px;fill:#526978}</style><rect width="1100" height="100%" fill="white"/>
-<g data-node="INPUT"><rect x="20" y="20" width="510" height="135" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="36" y="49" class="heading">Input: selected laboratory data</text>
-<text x="36" y="77" class="body">CSV columns or read-only SQLite / PostgreSQL view</text>
-<text x="36" y="102" class="body">FHIR JSON / Bundle / NDJSON / DB resource column</text>
-<text x="36" y="127" class="body">TORCH / CQL creates the selected FHIR export</text>
+<g data-node="INPUT"><rect x="20" y="20" width="510" height="125" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="36" y="49" class="heading">Selected laboratory input</text>
+<text x="36" y="77" class="body">CSV / FHIR export / read-only SQLite or PostgreSQL</text>
+<text x="36" y="102" class="body">TORCH / CQL selects server exports upstream</text>
+<text x="36" y="127" class="body">Mapped columns or native FHIR fields</text>
 </g>
-<g data-node="CONFIG"><rect x="570" y="20" width="510" height="135" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="586" y="49" class="heading">pipeline.toml + catalog.csv + separate secrets</text>
-<text x="586" y="77" class="body">Input/columns, item / distinct output</text>
-<text x="586" y="102" class="body">profile-init downloads pinned profile / bindings to local/</text>
-<text x="586" y="127" class="body">Terminology endpoints/files; local model + research</text>
+<g data-node="CONFIG"><rect x="570" y="20" width="510" height="125" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="586" y="49" class="heading">One pipeline.toml + catalog.csv</text>
+<text x="586" y="77" class="body">Mapping, grouping, profile, sources and model</text>
+<text x="586" y="102" class="body">Downloaded profiles / terminology under local/</text>
+<text x="586" y="127" class="body">Credentials in .env or secret files</text>
 </g>
-<g data-node="RUN"><rect x="20" y="220" width="650" height="195" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="36" y="249" class="heading">Python runner: one-shot container or uv command</text>
-<text x="36" y="277" class="body">Read and check input contract; optional full FHIR validation</text>
-<text x="36" y="302" class="body">Preserve code + name + value + unit + reference context</text>
-<text x="36" y="327" class="body">Aggregate complete sets and statistics with embedded DuckDB</text>
-<text x="36" y="352" class="body">A1 checks; separate A2 / A3 research from audited A1 output</text>
-<text x="36" y="377" class="body">CSV + HTML + evidence + hash-chained audit</text>
+<g data-node="A1"><rect x="20" y="215" width="650" height="140" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="36" y="244" class="heading">A1: Python runner + embedded DuckDB</text>
+<text x="36" y="272" class="body">Preflight → optional validation → normalize → group → check</text>
+<text x="36" y="297" class="body">Preserve code / system, name, specimen, values and units</text>
+<text x="36" y="322" class="body">Check reference context and cross-field consistency</text>
 </g>
-<g data-node="TX"><rect x="740" y="220" width="340" height="157" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="756" y="249" class="heading">Terminology evidence</text>
-<text x="756" y="277" class="body" style="font-size:16px">Direct local files OR API</text>
-<text x="756" y="302" class="body" style="font-size:16px">Optional Blaze: explicit imports</text>
-<text x="756" y="327" class="body" style="font-size:16px">UCUM: NLM API OR local service</text>
-<text x="756" y="352" class="body" style="font-size:16px">Sources / editions / hashes</text>
+<g data-node="TX"><rect x="740" y="215" width="340" height="140" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="756" y="244" class="heading">Terminology evidence</text>
+<text x="756" y="272" class="body" style="font-size:16px">Direct files OR selected APIs</text>
+<text x="756" y="297" class="body" style="font-size:16px">Optional Blaze: imported content</text>
+<text x="756" y="322" class="body" style="font-size:16px">UCUM: NLM API OR local service</text>
 </g>
-<g data-node="AI"><rect x="740" y="445" width="340" height="157" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="756" y="474" class="heading">Optional Ollama service</text>
-<text x="756" y="502" class="body" style="font-size:16px">Local inference; shared weights</text>
-<text x="756" y="527" class="body" style="font-size:16px">A2: real lookup candidates</text>
-<text x="756" y="552" class="body" style="font-size:16px">A3: Europe PMC / PubMed</text>
-<text x="756" y="577" class="body" style="font-size:16px">Quotes + numbers + unit guards</text>
+<g data-node="VALIDATE"><rect x="20" y="420" width="650" height="115" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="36" y="449" class="heading">Optional full FHIR validation</text>
+<text x="36" y="477" class="body">Complete file / FHIR-in-CSV → Matchbox / HL7</text>
+<text x="36" y="502" class="body">Pinned guide + local Blaze terminology; separate outcomes</text>
 </g>
-<g data-node="LAYA"><rect x="740" y="625" width="340" height="90" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="756" y="654" class="heading">Optional Laya service</text>
-<text x="756" y="682" class="body" style="font-size:16px">Input/domain + next-step hints</text>
-<text x="756" y="707" class="body" style="font-size:16px">Declared source and checks kept</text>
+<g data-node="LAYA"><rect x="740" y="420" width="340" height="110" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="756" y="449" class="heading">Optional local Laya</text>
+<text x="756" y="477" class="body" style="font-size:16px">Advisory domain / next step</text>
+<text x="756" y="502" class="body" style="font-size:16px">Configured source is retained</text>
 </g>
-<g data-node="VALIDATE"><rect x="20" y="490" width="650" height="137" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="36" y="519" class="heading">Optional local validation services</text>
-<text x="36" y="547" class="body">Matchbox: HL7 validator + acquired FHIR / MII packages</text>
-<text x="36" y="572" class="body">Blaze: terminology, persistent database, internal network</text>
-<text x="36" y="597" class="body">Complete documents checked before semantic grouping</text>
+<g data-node="R1"><rect x="20" y="600" width="650" height="110" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="36" y="629" class="heading">A1: audited CSV + HTML</text>
+<text x="36" y="657" class="body">Field decisions + five laboratory assessment scopes</text>
+<text x="36" y="682" class="body">Evidence JSONL + summary + hash-chained audit</text>
 </g>
-<g data-node="OUT"><rect x="20" y="735" width="1060" height="135" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="36" y="764" class="heading">Output and clinical review</text>
-<text x="36" y="792" class="body">One item/group per CSV row; one value per cell; numbered columns for repeated elements</text>
-<text x="36" y="817" class="body">HTML: input → finding/condition → recommendation + why → status and sources</text>
-<text x="36" y="842" class="body">Original structures in evidence JSONL; clinician decisions in a versioned local registry</text>
+<g data-node="MODEL"><rect x="740" y="615" width="340" height="110" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="756" y="644" class="heading">Ollama / own local API</text>
+<text x="756" y="672" class="body" style="font-size:16px">Candidate selection + extraction</text>
+<text x="756" y="697" class="body" style="font-size:16px">Bounded texts; retained weights</text>
 </g>
-<path data-edge="INPUT-RUN" d="M275 155 V220" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="CONFIG-RUN" d="M825 155 V185 H520 V220" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="RUN-TX" d="M670 275 H740" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="RUN-AI" d="M670 340 H705 V520 H740" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
-<path data-edge="RUN-LAYA" d="M670 390 H690 V670 H740" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
-<path data-edge="RUN-VALIDATE" d="M250 415 V490" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
-<path data-edge="RUN-OUT" d="M20 335 H5 V690 H300 V735" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="VALIDATE-OUT" d="M350 627 V735" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<text x="32" y="710" class="label">Read-only inputs/configuration · writable output · retained model and terminology volumes</text>
+<g data-node="RESEARCH"><rect x="20" y="790" width="650" height="140" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="36" y="819" class="heading">A2 / A3: Python research runner</text>
+<text x="36" y="847" class="body">Read grouped A1 report and its verified sidecars</text>
+<text x="36" y="872" class="body">Retrieve source text → local model → verify claims</text>
+<text x="36" y="897" class="body">A3 includes AI lookup plus study extraction</text>
+</g>
+<g data-node="WEB"><rect x="740" y="800" width="340" height="140" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
+<text x="756" y="829" class="heading">Selected source APIs / pages</text>
+<text x="756" y="857" class="body" style="font-size:16px">A2: terminology + LOINC pages</text>
+<text x="756" y="882" class="body" style="font-size:16px">A3: Europe PMC / PubMed</text>
+<text x="756" y="907" class="body" style="font-size:16px">Python retrieves source text</text>
+</g>
+<g data-node="OUT"><rect x="20" y="1020" width="1060" height="115" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="36" y="1049" class="heading">CSV + HTML: clinical review</text>
+<text x="36" y="1077" class="body">Field → finding / condition → recommendation + why → sources</text>
+<text x="36" y="1102" class="body">Clinician approval → local registry; recheck targets and factors on later A1 runs</text>
+</g>
+<path data-edge="INPUT-A1" d="M275 145 V215" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="CONFIG-A1" d="M825 145 V180 H520 V215" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="A1-TX" d="M670 275 H740" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="A1-VALIDATE" d="M340 355 V420" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="A1-LAYA" d="M670 330 H700 V475 H740" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="A1-R1" d="M20 300 H8 V655 H20" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="VALIDATE-R1" d="M340 535 V600" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="LAYA-R1" d="M740 505 H710 V655 H670" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="R1-RESEARCH" d="M340 710 V790" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="R1-OUT" d="M20 685 H8 V1080 H20" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="RESEARCH-MODEL" d="M670 825 H700 V670 H740" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="RESEARCH-WEB" d="M670 880 H740" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="RESEARCH-OUT" d="M340 930 V1020" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<text x="350" y="390" class="label">Selected + complete FHIR</text>
+<text x="350" y="754" class="label">Optional research from grouped A1</text>
+<text x="32" y="1170" class="label">Source data and inference stay local; public services receive terminology / search context.</text>
 </svg>
