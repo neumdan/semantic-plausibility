@@ -157,8 +157,12 @@ def model_evidence(instruction, evidence):
     intervals = printed_reference_intervals(evidence)
     choices = {key: {**row, "excerpt": next(k for k, text in sentences.items() if text == row["excerpt"])}
                for key, row in intervals.items()}
-    return {**{k: v for k, v in evidence.items() if k not in {"abstract", "excerpt_candidates"}},
-            "sentences": sentences, **({"printed_bounds": choices} if choices else {})}
+    cells = {key: {name: cell[name] for name in ("measurements", "bounds")}
+             for key, sentence in sentences.items()
+             if (cell := evidence.get("table_cells", {}).get(sentence))}
+    return {**{k: v for k, v in evidence.items() if k not in {"abstract", "excerpt_candidates", "table_cells", "source_locations"}},
+            "sentences": sentences, **({"table_cells": cells} if cells else {}),
+            **({"printed_bounds": choices} if choices else {})}
 
 
 def resolve_sentences(value, evidence):
@@ -201,6 +205,20 @@ def ground_study_units(value):
 def _analyte_guard(row, evidence, tokens, *, bounds=False):
     definition = evidence.get("analyte_definition", {})
     aliases = definition.get("aliases") or [definition.get("component", "")]
+    cell = evidence.get("table_cells", {}).get(row["excerpt"])
+    if cell is not None:
+        from .study_sources import mentions_analyte
+        if not mentions_analyte(cell["row_label"] + " " + cell.get("alias_definition", ""), aliases) or row["unit"] != cell["unit"]:
+            raise ValueError("Table evidence must match its analyte row and explicit unit")
+        if quantity_exclusion(row["excerpt"], row["unit"], definition.get("property", ""), bounds=bounds):
+            raise ValueError("Table evidence is not a compatible measured analyte quantity")
+        if bounds:
+            allowed = cell.get("bounds")
+            if not allowed or any(row[k] != allowed[k] for k in ("evidence_type", "low", "high")):
+                raise ValueError("Table interval must match one explicit cell and its headers")
+        elif [row["value_kind"], row["reported_value"]] not in [list(v) for v in cell["measurements"]]:
+            raise ValueError("Table statistic must match its labelled cell; CI/counts are not measurements")
+        return [row["excerpt"]]
     clauses = analyte_clauses(row["excerpt"], aliases) if any(aliases) else [row["excerpt"]]
     matches = [clause for clause in clauses if all(explicit_token(token, clause) for token in tokens if token is not None)]
     if not matches:
@@ -353,7 +371,7 @@ def validate_grounding(instruction: str, value: dict[str, Any], evidence: dict[s
         kind = value["evidence_type"]
         if (value["low"] is not None or value["high"] is not None) and kind is None:
             raise ValueError("Study bounds need an explicit evidence type, not a search-query category")
-        if kind is not None and not supports_evidence_type(kind, value["excerpt"], evidence.get("abstract", "")):
+        if kind is not None and not evidence.get("table_cells", {}).get(value["excerpt"]) and not supports_evidence_type(kind, value["excerpt"], evidence.get("abstract", "")):
             raise ValueError("Study evidence category is not explicitly supported by its quotation")
     elif instruction == prompts.STUDY_MEASUREMENTS:
         for row in value["measurements"]:
@@ -396,6 +414,9 @@ def source_defined_reference_abbreviation(excerpt, source):
 
 def supports_evidence_type(kind, excerpt, source):
     """Use the same category guard during extraction and candidate projection."""
+    if kind == "documented_extreme" and re.search(
+        r"\b(?:would|could|hypothetical|simulat\w*|propos\w*)\b|for example", excerpt, re.I):
+        return False
     markers = {"reference_interval": r"(?:reference|normal)\s+(?:intervals?|ranges?)",
                "analytical_interval": r"analytical|reportable|measuring\s+(?:interval|range)",
                "documented_extreme": r"case\s+report|extreme|highest|lowest|maximum|minimum"}

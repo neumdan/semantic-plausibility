@@ -16,7 +16,7 @@ Use **one `pipeline.toml`**. The [input manual](lab/README.md) gives the exact i
 
 Inputs are illustrative. Lookup outcomes depend on the configured real services and are reported with source/version. Reference limits in the examples exercise the pipeline and are not clinical guidance.
 
-## Four laboratory modes
+## Laboratory workflows
 
 ```sh
 bash tools/run-podman-examples.sh --dry-run
@@ -25,11 +25,11 @@ bash tools/run-podman-examples.sh
 
 | Report folder | Input | Checks |
 | --- | --- | --- |
-| `01-lab-lookup` | `lab/aggregated.csv`: 6 rows → 5 groups | A1 terminology and set consistency |
-| `02-lab-fhir-validation` | `laboratory-fhir.csv`: one complete Observation in a Bundle | MII/HL7 validation, then A1 |
-| `03-lab-ai-recommendations` | Audited mode-01 report and sidecars | A2 sourced terminology proposals |
-| `04-lab-ai-evidence` | The same audited mode-01 report and sidecars | A3 lookup proposals plus study evidence |
+| `lookup` | `lab/aggregated.csv`: 6 rows → 5 groups | lookup terminology and set consistency |
+| `fhir-validation` | `laboratory-fhir.csv`: one complete Observation in a Bundle | MII/HL7 validation, then lookup |
+| `ai-lookup` | Audited `lookup` report and sidecars | ai-lookup sourced terminology proposals |
+| `ai-evidence` | The same audited `lookup` report and sidecars | ai-evidence lookup proposals plus study evidence |
 
-The script writes a separate folder for each mode. It prints the report directory and creates `index.html`. `--lookup-only` runs just the first mode. Model/terminology volumes and image layers persist.
+The script writes a separate folder for each workflow. It prints the report directory and creates `index.html`. `--lookup-only` runs just `lookup`. Model/terminology volumes and image layers persist.
 
 Your own data uses `pipeline.toml` and `run-plausibility-check check`; the example script deliberately selects its own illustrative inputs. Medication development checks are retained as the starting point for version 2 under `examples/medication/` and `tests/configurations/medication/`.

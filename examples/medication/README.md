@@ -16,8 +16,8 @@ Run the existing technical examples with:
 bash tools/run-podman-examples.sh --include-medication --lookup-only
 ```
 
-This runs laboratory A1 and five medication regression examples, with real terminology services and separate reports. Their developer configurations are under `tests/configurations/medication/`. The normal four-mode launcher runs laboratory examples only.
+This runs laboratory lookup and five medication regression examples, with real terminology services and separate reports. Their developer configurations are under `tests/configurations/medication/`. The normal four-mode launcher runs laboratory examples only.
 
 ## Planned for version 2
 
-Build on these adapters with a unified product–strength–dose–route–timing assessment, medication-specific conditional matches and scope results, AI/evidence research, profile/terminology onboarding and clinician feedback. A2/A3 and the five laboratory assessment scopes currently require `Observation`.
+Build on these adapters with a unified product–strength–dose–route–timing assessment, medication-specific conditional matches and scope results, AI/evidence research, profile/terminology onboarding and clinician feedback. ai-lookup/ai-evidence and the five laboratory assessment scopes currently require `Observation`.

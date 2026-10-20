@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Add bounded Europe PMC open-access XML/table extraction with exact cell locations, role guards and visible exclusions.
+- Compare input statistics and reference bounds locally with published evidence; preserve missing-metadata conditions and source values.
+
+- Document laboratory objectives, limits and a lean clinician validation protocol.
+- Add `study-template` and `study-metrics`: audited report → clinician CSV → sensitivity, recommendation/evidence quality and review-effort tables, with explicit denominators.
+
 ## 0.15.0
 
 - Separate missing source metadata from demonstrated semantic errors.

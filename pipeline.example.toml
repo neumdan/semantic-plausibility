@@ -1,14 +1,18 @@
-# LABORATORY SETUP: copy once to pipeline.toml and edit that file.
-# All commands and Python/Docker/Podman use it by default.
-# Choose your LOINC source in section 4; run profile-init once for section 3.
-# Source files are illustrative; terminology services are real.
+# LABORATORY SETUP — copy once to pipeline.toml; edit the existing tables there.
+# Python, Docker and Podman use that file by default. No shell exports required.
+# Fill in: INPUT -> OUTPUT -> TARGET PROFILE -> TERMINOLOGY -> optional AI.
+# Paths are relative to this TOML. Keep it in the repository root for Compose.
+# Private exports/downloads belong under local/; credentials belong in .env
+# or local/secrets/. These locations are ignored by Git.
+# Input examples are illustrative; lookup sources are real.
+# Walkthrough: docs/configuration.md#fill-in-your-own-export
+# Input recipes: examples/lab/README.md; source setup: docs/lookups.md.
 config_version = 3
 
 [catalog]
 path = "catalog.csv" # Service/download metadata only; extend this CSV with your sources.
 
-# 1. INPUT — change this block for your CSV, FHIR file or database.
-# Left = pipeline field; right = your column. Recipes: examples/lab/README.md.
+# INPUT — select the file/table and explain what each source column means.
 
 [general]
 PROJECT_NAME = "laboratory-review"
@@ -16,37 +20,62 @@ RESOURCE_TYPE = "Observation"
 
 [input]
 type = "csv"                         # csv, fhir_file, postgres, sqlite
-origin = "lis"
-source_namespace = "example-laboratory" # Stable source/site namespace; set yours before collecting reviews.
-path = "examples/laboratory.csv"      # Your export: local/laboratory.csv
-granularity = "distinct"             # count contains the source frequency
+origin = "lis"                       # Where the data originated: e.g. lis, fhir, cds_hub.
+source_namespace = "example-laboratory" # Your stable site/export label; used to scope reviewed mappings.
+path = "examples/laboratory.csv"      # Your file: local/input/laboratory.csv or local/data/laboratory.csv.
+delimiter = ","                      # CSV column separator: "," comma, ";" semicolon, "\t" tab.
+# Read the first line of YOUR file and match its separator; the .csv suffix is not enough.
+# delimiter separates columns, not decimal digits. Write numeric cells as 13.5.
+granularity = "distinct"             # individual = one measurement per row; distinct = supplied counts/statistics.
+# For FHIR: type="fhir_file", granularity="individual" and a JSON/NDJSON path;
+# remove input.columns. For DB: select sqlite/postgres and add database settings.
+# Complete runnable input blocks are in examples/lab/README.md.
 
 [input.columns]
-analyte_name = "analyte_name"          # Explicit source analyte/test label.
-code = "code"
-code_system = "code_system"
-value = "value"
-unit = "unit"
-unit_code = "unit_code"
-unit_system = "unit_system"
-count = "count"
-reference_low = "reference_low"
-reference_high = "reference_high"
-reference_unit = "reference_unit"
-reference_unit_system = "reference_unit_system"
-range_text = "range_text"
-specimen = "specimen"
-source_test = "source_test"
-status = "status"
+# LEFT = pipeline role (keep); RIGHT = exact header in your CSV or DB (edit).
+# Example: analyte_name="test_name" reads the source column named test_name.
+# Map available columns only: remove a mapping when the column is absent.
+# Missing metadata then remains a review point. Declare constants in input.defaults
+# only when documented by the source, e.g. a confirmed code-system URI.
+analyte_name = "analyte_name"          # Source test/analyte name, e.g. Hemoglobin.
+code = "code"                        # Source test code, e.g. 718-7; a code is not its system URI.
+code_system = "code_system"          # URI, e.g. http://loinc.org, or your actual LIS coding system.
+value = "value"                      # Single numeric value; also used for exact-value frequency rows.
+unit = "unit"                        # Human-readable unit label.
+unit_code = "unit_code"              # Machine-readable unit expression, e.g. g/dL.
+unit_system = "unit_system"          # URI, e.g. http://unitsofmeasure.org when declared by the source.
+count = "count"                      # Number of measurements represented; remove for individual/unknown counts.
+reference_low = "reference_low"      # Numeric lower reference bound from the source.
+reference_high = "reference_high"    # Numeric upper reference bound from the source.
+reference_unit = "reference_unit"    # Unit code for both bounds; may differ from the measurement unit.
+reference_unit_system = "reference_unit_system" # Declared URI for the bounds' unit code.
+range_text = "range_text"            # Original textual reference information, if available.
+specimen = "specimen"                # Resolved LOINC system-axis token when supplied, e.g. Bld.
+source_test = "source_test"          # Local test identifier retained as grouping/review context.
+status = "status"                    # Source result status, e.g. final.
+# For summary exports: REMOVE value above, keep granularity="distinct", then map:
+# value_mean = "mean"                # Numeric mean, e.g. 13.5; unit stays in unit_code.
+# value_sd = "sd"                    # Sample SD (n-1); numeric, in the same unit.
+# value_min = "min"                  # Observed minimum, distinct from reference_low.
+# value_max = "max"                  # Observed maximum, distinct from reference_high.
+# Keep count only when it is the number of measurements; pool disjoint summaries.
+# For individual rows: granularity="individual", map value, remove count/statistics.
+# id = "measurement_id"              # Optional source ID; retained with output.mode="items".
 
-# 2. OUTPUT — distinct aggregates individual values before evidence research.
-# Use a fresh --out filename for each run; mode="items" retains IDs for A1 review.
+# OUTPUT — distinct aggregates individual values before shared evidence research.
+# Each run writes CSV + HTML + audited sidecars. Keep these files together.
 
 [output]
 mode = "distinct"                   # Aggregate each semantic set before evidence research.
-path = "output/laboratory-review.csv" # Optional per-run override: run-plausibility-check check --out output/01-lookup.csv
+path = "output/laboratory-review.csv" # Override per run: check --out output/my-run/lookup.csv
+# mode="items" retains individual IDs for lookup review; use distinct for AI research.
+# Choose a fresh --out filename for each run; existing reports are protected.
 
-# 3. LABORATORY TARGET — pinned MII profile; optional full-resource validation.
+# TARGET PROFILE — describes the desired FHIR fields, bindings and constraints.
+# First run profile-init: it downloads the exact selected snapshot/binding below
+# into local/profiles/. Repeat calls verify/reuse them. Paths can be changed here.
+# When selecting another profile, update its identity, version and artifact paths
+# together; see docs/validation.md. Downloaded artifacts stay outside Git.
 
 [specification]
 FHIR_VERSION = "4.0.1"
@@ -66,7 +95,10 @@ guide = "https://www.medizininformatik-initiative.de/Kerndatensatz/KDS_Laborbefu
 source = "https://github.com/medizininformatik-initiative/kerndatensatzmodul-labor"
 
 [validation]
-# Enable for complete FHIR resources after following docs/validation.md.
+# Workflow fhir-validation: set true for complete FHIR files or resource_json CSV;
+# prepare/start the validator using docs/validation.md, then run check.
+# Scalar CSV/DB sets use profile-aware semantic checks; formal resource validation
+# is recorded as not_applicable when selected for these inputs.
 enabled = false
 backend = "matchbox"
 endpoint = "http://127.0.0.1:8081/matchboxv3/fhir"
@@ -76,36 +108,69 @@ terminology_endpoint = "http://127.0.0.1:8082/fhir"
 timeout_seconds = 180
 fail_on_error = true
 
-# 4. TERMINOLOGY — choose one LOINC route; catalog.csv supplies the defaults.
-# A. loinc-api: put LOINC_FHIR_USERNAME and LOINC_FHIR_PASSWORD in .env.
-# B. loinc-file: download full Loinc.csv to local/terminologies/loinc/;
-#    change source below, add version="2.83" (your edition) and complete=true.
-# Optional local server: see docs/lookups.md. BfArM translation files add labels.
+# TERMINOLOGY — source selects a row in catalog.csv (URLs, paths, credential names).
+# API only:         loinc.enabled=true;  loinc_local.enabled=false (default).
+# Local file only:  loinc.enabled=false; loinc_local.enabled=true; provide the file.
+# File + API:       enable both; strategy="fallback" tries local membership first.
+# Multiple checks:  enable both; strategy="all" compares their membership results.
+# The UCUM grammar/conversion service is selected separately under lookups.ucum.
+# Direct file lookup needs no server. To publish your files through a local API,
+# start Blaze and import them explicitly; docs/lookups.md#4-optional-local-terminology-server.
 
 [network]
-mode = "lookups"
+mode = "lookups" # Includes public APIs AND local server APIs. offline = files/captured evidence only.
 allowed_http_hosts = ["ollama", "ucum", "blaze", "host.containers.internal", "host.docker.internal"]
 
 [terminology]
-strategy = "fallback" # Local files first, then enabled APIs; "all" records every configured source.
+strategy = "fallback"
+# Code membership: local sources first; within local/API groups primary -> source -> optional.
+# fallback: stop at the first valid result; unknown/unavailable/invalid tries the next source.
+# all: query every enabled source covering the code-system URI; retain each attempt.
+# Conflicting valid/invalid results need review. A partial file's absence stays unknown.
+# Enable only installed files and configured credentials: setup errors must be fixed first.
+# This routing covers membership; UCUM syntax/conversion uses the ONE selected UCUM service.
 
 [lookups.loinc]
 enabled = true
 role = "primary"
-source = "loinc-api"
+source = "loinc-api" # Remote API: https://fhir.loinc.org (catalogue default).
+# In .env, fill LOINC_FHIR_USERNAME and LOINC_FHIR_PASSWORD with your account.
+# Secret-file alternative (overrides the catalogue's environment references):
+# username_file = "local/secrets/loinc-username"
+# password_file = "local/secrets/loinc-password"
+
+[lookups.loinc_local]
+enabled = false                     # Enable after manually downloading/extracting the full LOINC CSV.
+role = "primary"
+source = "loinc-file"                # Direct file lookup: no container/server required.
+path = "local/terminologies/loinc/Loinc.csv" # Change to your actual extracted file.
+version = ""                         # REQUIRED when enabled: your downloaded edition, e.g. "2.83".
+complete = true                     # Only for the complete edition; use false for a subset.
+# Download page: https://loinc.org/downloads/ (account/licence required).
 
 [lookups.ucum]
 enabled = true
 role = "primary"
-source = "ucum-api" # Or ucum-local after starting the optional ucum container.
+source = "ucum-api" # Public NLM syntax/conversion API; no account required.
+# Local API alternative: source="ucum-local", then start Compose service ucum
+# with --profile terminology. The catalogue selects the native/container URL.
 
 [lookups.bfarm_lab]
 enabled = false
 role = "optional"
 source = "bfarm-lab" # Manual downloads under local/terminologies/bfarm-lab/.
+# Download https://terminologien.bfarm.de/fhirpackages.html and extract the actual
+# FHIR CodeSystem JSON files here (path can be overridden). LOINC/UCUM supplements
+# add German labels; pair them with the base LOINC source and UCUM service above.
+# More sources: add a uniquely named lookups.* table using a catalogue ID, role
+# and covered systems. API examples and multiple-source setup: docs/lookups.md.
 
-# 5. OPTIONAL AI — used by research-evidence, after check.
-# --scope lookup: suggestions; --scope studies: suggestions + literature.
+# OPTIONAL AI — one model configuration, two named research workflows.
+# lookup:          check --out output/my-run/lookup.csv
+# fhir-validation: check with validation.enabled=true and complete FHIR input.
+# ai-lookup:       research-evidence --scope lookup --report output/my-run/lookup.csv
+# ai-evidence:     research-evidence --scope studies --report output/my-run/lookup.csv
+# Give each research command its own --out filename; both read lookup + its sidecars.
 
 [decision]
 # Optional advisory input assessment during check; start the laya Compose service.
@@ -122,7 +187,10 @@ min_probability = 0.8 # Uncalibrated model score; lower scores abstain.
 container_base_url = "http://ollama:11434/v1" # Compose Ollama; native inference uses base_url(_env) below.
 runtime = "ollama"
 base_url = "http://127.0.0.1:11434/v1" # Native Ollama; container_base_url is used in Compose.
-model = "ministral-3:3b"
+model = "ministral-3:3b" # Set your served model ID. model-init downloads missing Ollama weights.
+# Compose setup: --profile research up -d ollama; then run --rm model-init and catalog-init.
+# Reuse an existing local compatible API: runtime="external", set both URLs and model ID.
+# Native Python uses base_url; Compose uses container_base_url. Keep inference local.
 temperature = 0
 max_tokens = 2048
 timeout_seconds = 600 # Allow for CPU inference in a Podman VM.
@@ -139,6 +207,8 @@ loinc_website_base_url = "https://loinc.org"
 [research.europe_pmc]
 BASE_URL = "https://www.ebi.ac.uk/europepmc/webservices/rest"
 MAX_RESULTS = 6                     # Candidates per search, screened before model calls
+FULL_TEXT = true                    # Also inspect permitted Europe PMC XML paragraphs/tables.
+# false: abstract-only. Full-text downloads and model calls are each capped by max_articles_per_loinc.
 # Explicit hospital-research filter for Europe PMC; recorded, not an applicability verdict.
 QUERY_FILTER = '(human OR humans OR patients OR volunteers OR healthy OR population) NOT (feline OR cats OR canine OR dogs OR cattle OR rats OR mice OR veterinary)'
 

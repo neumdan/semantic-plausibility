@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1190" viewBox="0 0 1100 1190" role="img" aria-labelledby="title desc">
-<title id="title">Laboratory architecture: local processing and explicit source requests</title><desc id="desc">Selected laboratory input; One pipeline.toml + catalog.csv; A1: Python runner + embedded DuckDB; Terminology evidence; Optional full FHIR validation; Optional local Laya; A1: audited CSV + HTML; Ollama / own local API; A2 / A3: Python research runner; Selected source APIs / pages; CSV + HTML: clinical review</desc>
+<title id="title">Laboratory architecture: local processing and explicit source requests</title><desc id="desc">Selected laboratory input; One pipeline.toml + catalog.csv; lookup: Python + embedded DuckDB; Terminology evidence; Optional fhir-validation; Optional local Laya; lookup: audited CSV + HTML; Ollama / own local API; ai-lookup / ai-evidence: Python research; Selected source APIs / pages; CSV + HTML: clinical review</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#537487"/></marker></defs>
 <style>text{font-family:Arial,sans-serif;fill:#142d42}.heading{font-size:19px;font-weight:700}.body{font-size:17px}.label{font-size:14px;fill:#526978}</style><rect width="1100" height="100%" fill="white"/>
 <g data-node="INPUT"><rect x="20" y="20" width="510" height="125" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
@@ -14,20 +14,20 @@
 <text x="586" y="102" class="body">Downloaded profiles / terminology under local/</text>
 <text x="586" y="127" class="body">Credentials in .env or secret files</text>
 </g>
-<g data-node="A1"><rect x="20" y="215" width="650" height="140" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="36" y="244" class="heading">A1: Python runner + embedded DuckDB</text>
+<g data-node="LOOKUP"><rect x="20" y="215" width="650" height="140" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
+<text x="36" y="244" class="heading">lookup: Python + embedded DuckDB</text>
 <text x="36" y="272" class="body">Preflight → optional validation → normalize → group → check</text>
 <text x="36" y="297" class="body">Preserve code / system, name, specimen, values and units</text>
 <text x="36" y="322" class="body">Check reference context and cross-field consistency</text>
 </g>
 <g data-node="TX"><rect x="740" y="215" width="340" height="140" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
 <text x="756" y="244" class="heading">Terminology evidence</text>
-<text x="756" y="272" class="body" style="font-size:16px">Direct files OR selected APIs</text>
+<text x="756" y="272" class="body" style="font-size:16px">Files + APIs: fallback or all</text>
 <text x="756" y="297" class="body" style="font-size:16px">Optional Blaze: imported content</text>
 <text x="756" y="322" class="body" style="font-size:16px">UCUM: NLM API OR local service</text>
 </g>
 <g data-node="VALIDATE"><rect x="20" y="420" width="650" height="115" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
-<text x="36" y="449" class="heading">Optional full FHIR validation</text>
+<text x="36" y="449" class="heading">Optional fhir-validation</text>
 <text x="36" y="477" class="body">Complete file / FHIR-in-CSV → Matchbox / HL7</text>
 <text x="36" y="502" class="body">Pinned guide + local Blaze terminology; separate outcomes</text>
 </g>
@@ -37,7 +37,7 @@
 <text x="756" y="502" class="body" style="font-size:16px">Configured source is retained</text>
 </g>
 <g data-node="R1"><rect x="20" y="600" width="650" height="110" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="36" y="629" class="heading">A1: audited CSV + HTML</text>
+<text x="36" y="629" class="heading">lookup: audited CSV + HTML</text>
 <text x="36" y="657" class="body">Field decisions + five laboratory assessment scopes</text>
 <text x="36" y="682" class="body">Evidence JSONL + summary + hash-chained audit</text>
 </g>
@@ -47,28 +47,28 @@
 <text x="756" y="697" class="body" style="font-size:16px">Bounded texts; retained weights</text>
 </g>
 <g data-node="RESEARCH"><rect x="20" y="790" width="650" height="140" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
-<text x="36" y="819" class="heading">A2 / A3: Python research runner</text>
-<text x="36" y="847" class="body">Read grouped A1 report and its verified sidecars</text>
-<text x="36" y="872" class="body">Retrieve source text → local model → verify claims</text>
-<text x="36" y="897" class="body">A3 includes AI lookup plus study extraction</text>
+<text x="36" y="819" class="heading">ai-lookup / ai-evidence: Python research</text>
+<text x="36" y="847" class="body">Read grouped lookup report and its verified sidecars</text>
+<text x="36" y="872" class="body">Text/tables → parser or local model → source guards</text>
+<text x="36" y="897" class="body">ai-evidence includes AI lookup plus study extraction</text>
 </g>
 <g data-node="WEB"><rect x="740" y="800" width="340" height="140" rx="9" fill="#f3f7fa" stroke="#c4d5df"/>
 <text x="756" y="829" class="heading">Selected source APIs / pages</text>
-<text x="756" y="857" class="body" style="font-size:16px">A2: terminology + LOINC pages</text>
-<text x="756" y="882" class="body" style="font-size:16px">A3: Europe PMC / PubMed</text>
+<text x="756" y="857" class="body" style="font-size:16px">ai-lookup: terminology / pages</text>
+<text x="756" y="882" class="body" style="font-size:16px">ai-evidence: literature APIs</text>
 <text x="756" y="907" class="body" style="font-size:16px">Python retrieves source text</text>
 </g>
 <g data-node="OUT"><rect x="20" y="1020" width="1060" height="115" rx="9" fill="#eef7f4" stroke="#a8cfc6"/>
 <text x="36" y="1049" class="heading">CSV + HTML: clinical review</text>
 <text x="36" y="1077" class="body">Field → finding / condition → recommendation + why → sources</text>
-<text x="36" y="1102" class="body">Clinician approval → local registry; recheck targets and factors on later A1 runs</text>
+<text x="36" y="1102" class="body">Clinician approval → local registry; recheck targets and factors on later lookup runs</text>
 </g>
-<path data-edge="INPUT-A1" d="M275 145 V215" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="CONFIG-A1" d="M825 145 V180 H520 V215" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="A1-TX" d="M670 275 H740" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
-<path data-edge="A1-VALIDATE" d="M340 355 V420" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
-<path data-edge="A1-LAYA" d="M670 330 H700 V475 H740" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
-<path data-edge="A1-R1" d="M20 300 H8 V655 H20" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="INPUT-LOOKUP" d="M275 145 V215" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="CONFIG-LOOKUP" d="M825 145 V180 H520 V215" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="LOOKUP-TX" d="M670 275 H740" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
+<path data-edge="LOOKUP-VALIDATE" d="M340 355 V420" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="LOOKUP-LAYA" d="M670 330 H700 V475 H740" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path data-edge="LOOKUP-R1" d="M20 300 H8 V655 H20" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
 <path data-edge="VALIDATE-R1" d="M340 535 V600" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
 <path data-edge="LAYA-R1" d="M740 505 H710 V655 H670" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
 <path data-edge="R1-RESEARCH" d="M340 710 V790" fill="none" stroke="#537487" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
@@ -77,6 +77,6 @@
 <path data-edge="RESEARCH-WEB" d="M670 880 H740" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
 <path data-edge="RESEARCH-OUT" d="M340 930 V1020" fill="none" stroke="#537487" stroke-width="1.8" marker-end="url(#arrow)"/>
 <text x="350" y="390" class="label">Selected + complete FHIR</text>
-<text x="350" y="754" class="label">Optional research from grouped A1</text>
+<text x="350" y="754" class="label">Optional research from grouped lookup</text>
 <text x="32" y="1170" class="label">Source data and inference stay local; public services receive terminology / search context.</text>
 </svg>

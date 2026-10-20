@@ -27,8 +27,9 @@ The library has one public check entry point: `run_plausibility_check(config_pat
 | `catalog_evidence`, `snapshot_services` | Supplied ObservationDefinition evidence and replay of recorded real service responses |
 | `observation_services` | NLM UCUM, LOINC, bounded HTTP, local model client and public study retrieval |
 | `laboratory_suggestions`, `unit_catalog` | Retrieve real code/name/unit candidates, select/verify proposals, retain source catalogue provenance |
+| `study_fulltext`, `evidence_comparison` | Bounded JATS paragraphs/table-cell extraction and descriptive local comparisons, with source locations and conditional metadata |
 | `study_sources`, `research_prompts`, `model_schemas` | Analyte-aware screening, visible prompts/schema, exact quotation/number/unit/type guards |
-| `evidence_research`, `research_summary` | A2/A3 orchestration from verified A1 files, model/query trace and scalar study table |
+| `evidence_research`, `research_summary` | ai-lookup/ai-evidence orchestration from verified lookup files, model/query trace and scalar study table |
 | `medication_input`, `medication_checks` | Product/regimen normalization; all instructions; quantity, timing, strength and explicit constant-infusion consistency |
 | `export_report`, `medication_report` | Domain summaries, HTML reports, audit events, output hashes and atomic publication |
 | `report_sources`, `report_context` | Source → linked definition → proposal; effective settings, assumptions, methods and actual evidence |
@@ -36,6 +37,7 @@ The library has one public check entry point: `run_plausibility_check(config_pat
 | `laboratory_assessment` | Evidence-only conditional matches and five independent QC/completeness scopes, shared by CSV, HTML and structured evidence |
 | `tabular_report` | One scalar per CSV cell; numbered repeated elements; temporary spool keeps row memory bounded |
 | `review_feedback`, `study_compare` | Audit verification, clinician decisions and rechecked mapping reuse; matched-export congruence comparison |
+| `validation_study` | Blank clinician study template; offline metrics from adjudicated labels and audited report flags; no mapping approvals |
 | `support`, `progress` | Hashing, formula-safe text, context/config helpers, phase logs and timed model activity |
 | `tools/run-podman-examples.sh`, `container-cache.sh` | Isolated example reports; reuse images/volumes and rebuild changed inputs only |
 | `tools/prepare-lab-examples.py` | Create/reuse the exact supplied synthetic SQLite source |
@@ -65,15 +67,17 @@ uv run --no-sync python -m unittest discover -s tests -v
 | --- | --- |
 | `test_source_catalog` | Real catalogue configuration, file/API/server selection, explicit credential references, no bundled definitions, optional real local UCUM tests |
 | `test_batch`, `test_aggregate_statistics`, `test_run_modes` | Input/grouping modes, values/counts/statistics, CSV/SQLite/FHIR representation and output protection |
-| `test_single_configuration` | Executes the input blocks from the manual with the shared template; validates grouping/research hand-off and safe configuration logging |
+| `test_single_configuration` | Executes the manual's input blocks; checks comma/semicolon/tab CSV parity, grouping/research hand-off and safe configuration logging |
 | `test_input_workflow` | CSV/FHIR/DB scalar/DB JSON parity; individual statistics; grouping guards; audited research hand-off; private-data-safe progress; repeatable SQLite setup |
 | `test_tabular_contract` | Scalar CSV round-trip, repeated bounds, zero/false, union columns, explicit examples, audit-protected research hand-off and ambiguous mapping rejection |
 | `test_medication` | Product and every dosage instruction; scalar/DB/FHIR adapters; rate/duration and source-strength arithmetic when real services are selected |
 | `test_configuration_workflow`, `test_domain_terminologies`, `test_fhir_validation` | Source/profile configuration, read-only mappings, credential handling and local validation contracts |
 | `test_input_decision` | Disabled/default contract, source privacy, local endpoint settings and opt-in real Laya runs/recorded-response guards |
+| `test_evidence_fulltext` | Table roles/strata/units, CI/count exclusions, XML limits and real potassium XML; descriptive comparison arithmetic |
 | `test_model_schemas`, `test_study_sources` | Exact source quotations, numeric/statistic roles, separate analytical limits, unit typography, analyte/stratum attribution, CSV/HTML decision parity and real recorded-trace regressions |
 | `test_laboratory_report`, `test_report_comparison`, `test_report_context`, `test_review_feedback` | Field decisions/colours, sources, escaping, secret exclusion and clinician feedback integrity |
 | `test_missing_metadata`, `test_assessment_layers` | Missing versus conflicting metadata; real LOINC/UCUM conditional matches, name/specimen/unit conflicts, numeric errors, source preservation and scope/CSV/HTML agreement |
+| `test_validation_study` | Study arithmetic/denominators, reviewer inputs, report binding and the offline template → metrics commands |
 | `test_podman_examples` | All example execution plans, separate paths, service lifecycle, content fingerprint and public packaging |
 | `test_live_lookups`, `test_live_research`, `test_live_terminologies` | Actual configured terminology/model/provider responses and provenance |
 
@@ -95,7 +99,7 @@ bash tools/run-podman-examples.sh --lookup-only
 
 To test the real optional Laya service, set `decision.enabled=true`, start its container, and add `SQC_LIVE_LAYA_CONFIG=pipeline.toml` to `.env.tests`. Run `uv run --no-sync --env-file .env.tests python -m unittest discover -s tests -p test_input_decision.py -v`. This calls real Laya/terminology services, verifies provenance and abstention, and keeps model quality separate from protocol success.
 
-To recheck a completed study report, add `SQC_STUDY_REPORT=output/<run>/04-lab-ai-evidence/report.csv` to the ignored `.env.tests` file, then use the test command above. This verifies source guards, audit integrity and matching CSV/HTML field decisions.
+To recheck a completed study report, add `SQC_STUDY_REPORT=output/<run>/ai-evidence/report.csv` to the ignored `.env.tests` file, then use the test command above. This verifies source guards, audit integrity and matching CSV/HTML field decisions.
 
 [Expected example results](../examples/README.md). The scripts use fresh report folders; `summary.tsv` records command outcomes and reports carry semantic findings.
 

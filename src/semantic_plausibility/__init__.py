@@ -5,6 +5,7 @@ from .study_compare import compare_reports, verify_audit
 from .terminology_lookup import lookup_terminology
 from .fhir_validation import validate_fhir
 from .laboratory_assessment import assessment_layers
+from .validation_study import prepare_study_review, evaluate_study_review
 
 
 def research_evidence(config_path, report=None, output=None, *, scope=None):
@@ -22,4 +23,5 @@ def import_reviews(report, reviewed, registry, config_path):
     return run(report, reviewed, registry, config_path)
 
 __all__ = ["BatchResult", "run_batch", "run_plausibility_check", "research_evidence", "research_plan",
-           "import_reviews", "compare_reports", "verify_audit", "lookup_terminology", "validate_fhir", "assessment_layers", "__version__"]
+           "import_reviews", "compare_reports", "verify_audit", "lookup_terminology", "validate_fhir", "assessment_layers",
+           "prepare_study_review", "evaluate_study_review", "__version__"]

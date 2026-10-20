@@ -67,6 +67,11 @@ class ResearchCandidate:
     unit_validation_state: str = "not_checked"
     unit_validation_source: str = ""
     source_text_rendering: str = ""
+    source_kind: str = "abstract"
+    source_location: str = ""
+    full_text_source: str = ""
+    source_license: str = ""
+    sample_size: str = ""
 
 
 @dataclass(frozen=True)

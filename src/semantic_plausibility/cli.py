@@ -51,6 +51,13 @@ def main(argv: list[str] | None = None) -> int:
     feedback.add_argument("--report", type=Path, required=True)
     feedback.add_argument("--review", type=Path, required=True)
     feedback.add_argument("--registry", type=Path, required=True)
+    template = sub.add_parser("study-template", help="Create a blank clinician study CSV from an audited laboratory report")
+    template.add_argument("--report", type=Path, required=True)
+    template.add_argument("--out", type=Path, required=True)
+    metrics = sub.add_parser("study-metrics", help="Measure detection, recommendation quality and review effort from clinician labels")
+    metrics.add_argument("--report", type=Path, required=True)
+    metrics.add_argument("--review", type=Path, required=True)
+    metrics.add_argument("--out", type=Path, required=True)
     compare = sub.add_parser("compare", help="Compare matched LIS/FHIR/CDS Hub distinct reports")
     compare.add_argument("--baseline", type=Path, required=True)
     compare.add_argument("--target", type=Path, action="append", required=True)
@@ -154,6 +161,12 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "review-import":
             from .review_feedback import import_reviews
             print(json.dumps(import_reviews(args.report, args.review, args.registry, args.config), indent=2))
+        elif args.command == "study-template":
+            from .validation_study import prepare_study_review
+            print(json.dumps(prepare_study_review(args.report, args.out), indent=2))
+        elif args.command == "study-metrics":
+            from .validation_study import evaluate_study_review
+            print(json.dumps(evaluate_study_review(args.report, args.review, args.out), indent=2))
         elif args.command == "compare":
             from .study_compare import compare_reports
 
@@ -219,7 +232,8 @@ def main(argv: list[str] | None = None) -> int:
 def run_main(argv=None):
     """The named runner defaults to the deterministic check; legacy CLI stays available."""
     arguments = list(sys.argv[1:] if argv is None else argv)
-    commands = {"batch", "check", "research-evidence", "review-import", "compare", "verify", "lookup", "decision-serve",
+    commands = {"batch", "check", "research-evidence", "review-import", "study-template", "study-metrics",
+                "compare", "verify", "lookup", "decision-serve",
                 "profile-import", "profile-init", "config-check", "model-init", "catalog-init", "package-init", "package-check", "validator-init", "terminology-init", "validate-fhir"}
     if not arguments or arguments[0] not in commands and arguments[0] not in {"-h", "--help"}:
         arguments.insert(0, "check")

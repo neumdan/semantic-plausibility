@@ -63,7 +63,8 @@ def research_plan(config_path, report=None, *, scope=None):
         targets[key] = {"code": code, "version": key[1], "analyte_name": label,
             "name_lookup": row.get("analyte_name", ""), "unit": row["unit_code"],
             "study_queries": (queries if code else "After exact verification of retrieved candidates") if scope == "studies" else {},
-            "provider_queries": {provider: {category: provider_query(query, provider) for category, query in queries.items()}
+            "provider_queries": {provider: {category: provider_query(query, provider,
+                full_text=config.data.get("research", {}).get("europe_pmc", {}).get("FULL_TEXT", True)) for category, query in queries.items()}
                 for provider in config.data.get("research", {}).get("sources", ["pubmed"])} if queries else {}}
     return {"goal": "Evidence of reported practice supports clinician semantic adjudication",
         "scope": scope,
@@ -74,6 +75,7 @@ def research_plan(config_path, report=None, *, scope=None):
         "study_sources": config.data.get("research", {}).get("sources", ["pubmed"]) if scope == "studies" else [],
         "max_articles_per_loinc": config.data.get("research", {}).get("max_articles_per_loinc", 3) if scope == "studies" else 0,
         "europe_pmc_query_filter": config.data.get("research", {}).get("europe_pmc", {}).get("QUERY_FILTER", "") if scope == "studies" else "",
+        "europe_pmc_full_text": config.data.get("research", {}).get("europe_pmc", {}).get("FULL_TEXT", True) if scope == "studies" else False,
         "system_prompt": prompts.SYSTEM,
         "prompts": {name: {"instruction": getattr(prompts, name), "response_schema": response_schema(getattr(prompts, name))}
             for name in ("NAME_QUERIES", "LOINC_REVIEW", "UNIT_SPELLING", "UNIT_CANDIDATES", "LOINC_UNITS", "LOINC_RANGES", "STUDY_BOUNDS", "STUDY_MEASUREMENTS", "STUDY_EXTRACT", "TERMINOLOGY_CLAIMS")
@@ -212,6 +214,12 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
                                     row[key] = candidate_grades[key]
                                 row["evidence_json"] = encoded(assessment)
                                 row.update(review_set_fields(row, assessment))
+                                if scope == "studies":
+                                    from .evidence_comparison import compare_published_evidence
+                                    comparison = compare_published_evidence(row, item, payload, detail["observed_values"],
+                                        json.loads(row["study_evidence_json"]), checker.ucum)
+                                    row["study_comparison_json"] = encoded(comparison)
+                                    assessment["study_comparison"] = comparison
                                 assessment["assessment_context"] = item_context(assessment_run, row, assessment)
                                 assessment["assessment_context"]["execution"] = execution_since(checker, execution_start)
                                 row["assessment_context_json"] = encoded(assessment["assessment_context"])
@@ -246,6 +254,7 @@ def research_evidence(config_path, report=None, output=None, *, scope=None, prog
                                 **query_counts(getattr(evidence, "query_log", [])), "accepted_model_calls": getattr(llm, "audit_records", []),
                                 "partially_accepted_model_calls": sum(bool(t.get("extraction_rejections")) and t.get("state") == "accepted_by_source_guards" for t in getattr(llm, "trace", [])),
                                 "max_articles_per_loinc": evidence.max_articles_per_loinc,
+                                "europe_pmc_full_text": evidence.europe_pmc_full_text,
                                 "model_state": "responses_accepted" if getattr(llm, "audit_records", []) else
                                     "no_accepted_response" if getattr(llm, "trace", []) else "not_needed",
                                 "groups_with_code_proposals": sum(bool(row.get("suggested_code")) for row in reviewed),
@@ -303,5 +312,8 @@ def query_counts(events):
         "articles_screened": sum(event.get("task") == "study_screen" for event in events),
         "articles_selected": sum(event.get("task") == "study_screen" and event.get("state") == "selected" for event in events),
         "articles_excluded": sum(event.get("task") == "study_screen" and event.get("state") == "excluded" for event in events),
-        "extraction_failures": sum("task" in event and event.get("state") == "unavailable" for event in events),
+        "full_text_requests": sum(event.get("endpoint") == "fullTextXML" for event in retrievals),
+        "full_text_parsed": sum(event.get("task") == "full_text_parse" and event.get("state") == "parsed" for event in events),
+        "extraction_failures": sum(event.get("task") == "study_extract" and event.get("state") == "unavailable" for event in events),
+        "full_text_parse_failures": sum(event.get("task") == "full_text_parse" and event.get("state") == "unavailable" for event in events),
         "retrieval_failures": sum("task" not in event and event.get("state") == "unavailable" for event in events)}

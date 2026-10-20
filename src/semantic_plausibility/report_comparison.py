@@ -110,7 +110,8 @@ def citation_link(record, number, prefix):
 def field_details_html(fields, *, prefix):
     sources = ''.join('<li id="' + escape(prefix, quote=True) + '-source-' + str(i) + '">'
         + source_html(r['source'], title=r.get('title') or r.get('source_title') or r['source'], version=r.get('version') or '',
-            excerpt=r.get('excerpt') or '', sha256=r.get('sha256') or '', retrieved_at=r.get('retrieved_at') or '') + '</li>'
+            excerpt=r.get('excerpt') or '', sha256=r.get('source_sha256') or r.get('sha256') or '', retrieved_at=r.get('retrieved_at') or '')
+        + ('<p class="source-meta">Location: ' + display(r.get('source_location')) + '</p>' if r.get('source_location') else '') + '</li>'
         for i, r in enumerate(citations(fields), 1))
     reasons = ''.join('<dt>' + display(item.name) + '</dt><dd>' + display(item.reason) + '</dd>' for item in fields if item.reason)
     return ('<h3>Sources used in this table</h3><ol class="source-list">' + sources + '</ol>' if sources else

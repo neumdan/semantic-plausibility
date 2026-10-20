@@ -40,6 +40,10 @@ def project(row, detail, *, operation="check", summary=None):
         flatten(layers, "qc", result)
         transform = json.loads(row.get("transformation_json") or "{}")
         flatten(transform, "transformation", result)
+        if row.get("study_comparison_json"):
+            comparison = json.loads(row["study_comparison_json"])
+            # Detailed comparisons remain in the audit; scalar columns expose each value.
+            flatten(comparison, "evidence_comparison", result)
     else:
         from .medication_report_table import medication_fields
         source = detail.get("source_set", {})
@@ -54,7 +58,7 @@ def project(row, detail, *, operation="check", summary=None):
         prefix = "assessment." + name
         sources = []
         for record in field.sources:
-            source = {key: record[key] for key in ("source", "version", "title", "excerpt")
+            source = {key: record[key] for key in ("source", "version", "title", "excerpt", "source_location", "source_sha256")
                       if record.get(key) not in (None, "") and not isinstance(record[key], (dict, list))}
             if source and source not in sources:
                 sources.append(source)

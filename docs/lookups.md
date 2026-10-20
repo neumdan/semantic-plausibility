@@ -34,9 +34,18 @@ For `fhir_artifacts`, extract the package's actual `.json` resources, including 
 
 All paths can be overridden with `path` in TOML. Native Python resolves relative paths from the TOML directory. Compose mounts `local/` at `/app/local/` and sibling `../input/` at `/input/`. To store downloads elsewhere, set `SQC_LOCAL_DIR` or `SQC_INPUT_DIR` in `.env`; use the corresponding container path in TOML. [Mount reference](configuration.md#paths-and-container-mounts).
 
-## 3. Configure LOINC and UCUM
+## 3. API, files and fallback in one TOML
 
-Edit the existing `[lookups.loinc]` and `[lookups.ucum]` blocks; select one primary route for each.
+Edit the existing lookup tables in `pipeline.toml`. Each table name is a unique **alias**; its `source` selects a row in `catalog.csv`. The template includes an API alias `loinc`, a disabled file alias `loinc_local`, and a separate `ucum` service. There is one dedicated LOINC API and one UCUM grammar/conversion endpoint; additional local files and generic FHIR sources can participate in membership routing.
+
+| Desired lookup | `lookups.loinc.enabled` | `lookups.loinc_local.enabled` | `terminology.strategy` |
+| --- | --- | --- | --- |
+| Official LOINC API | `true` — credentials below | `false` | `"fallback"` |
+| Your full LOINC file | `false` | `true` — file and edition below | `"fallback"` |
+| File first, API as fallback | `true` | `true` | `"fallback"` |
+| Compare file and API membership | `true` | `true` | `"all"` |
+
+Keep `network.mode="lookups"` when using any API, including local UCUM/Blaze. File-only **LOINC** can still use the NLM UCUM API. The source selection and actual attempts are recorded separately in each report.
 
 ### Official LOINC API
 
@@ -54,16 +63,43 @@ Set **`LOINC_FHIR_USERNAME`** and **`LOINC_FHIR_PASSWORD`** in ignored `.env`. T
 Download and extract the full `Loinc.csv`, preserving its publisher headers. Set the release you downloaded, for example:
 
 ```toml
-[lookups.loinc]
+[lookups.loinc_local]
 enabled = true
 role = "primary"
 source = "loinc-file"
 path = "local/terminologies/loinc/Loinc.csv"
-version = "2.83"
+version = ""                         # REQUIRED when enabled: your downloaded edition, e.g. "2.83".
 complete = true
 ```
 
 This reads the file directly and provides codes, names, axes and example units. `version` is the release edition; each row's `VersionLastChanged` is different metadata. Code absence is invalid only for a declared complete edition.
+
+### Fallback or multiple membership checks
+
+After providing the file and API credentials, enable **both** tables above and edit the existing routing table:
+
+```toml
+[terminology]
+strategy = "fallback"                # Change to "all" for all applicable membership sources.
+```
+
+For a declared LOINC code, fallback checks the local file first. A valid result stops the membership search; unknown, unavailable or invalid results continue to the next applicable source. `all` asks every enabled membership source covering that canonical system. A returned valid/invalid disagreement is retained as `unknown` with a conflict reason. An incomplete catalogue's missing code stays unknown. Local sources come before APIs; roles `primary`, `source`, `optional` determine order within each group, then configuration order breaks ties.
+
+**Setup precedes fallback:** provide every enabled file and configured secret. Fix missing files/credentials when `config-check` reports them. These are setup failures, separate from a running source returning no coverage or being unavailable. UCUM syntax/conversion uses the single service in `lookups.ucum`; selecting `all` adds membership cross-checks, not multiple conversion engines. Label/candidate searches and profile-binding checks record their own sources.
+
+To add another API, use a new alias and its covered canonical systems. Example for an institutional FHIR terminology server:
+
+```toml
+[lookups.institution]
+enabled = true
+role = "optional"
+source = "own-fhir"
+endpoint = "https://your-institution.example/fhir" # Replace with your real service URL.
+systems = ["http://loinc.org"]                    # Only the systems it serves.
+# token_env = "TX_FHIR_BEARER_TOKEN"              # Enable if required; value goes in .env.
+```
+
+Use `strategy="all"` to include this source alongside the installed file and primary API for membership cross-checks. Add more uniquely named tables using adapters from `catalog.csv`. `role="source"` is appropriate for your LIS's actual local vocabulary; its canonical URI must match the input. [Bearer tokens, secret files and mTLS](#5-own-servers-and-extending-the-catalogue).
 
 ### German labels from existing downloads
 
@@ -177,9 +213,9 @@ The catalogue also points to SNOMED CT, RxNorm, UNII, EDQM, SemLookP and WHO ICD
 podman-compose run --rm run-plausibility-check config-check --connections
 podman-compose run --rm run-plausibility-check lookup --lookup loinc --code 718-7 --name 'Hemoglobin'
 podman-compose run --rm run-plausibility-check lookup --lookup ucum --code 'g/dL'
-podman-compose run --rm run-plausibility-check check --out output/lookup-01.csv
+podman-compose run --rm run-plausibility-check check --out output/lookup.csv
 ```
 
-`role="source"` describes the LIS vocabulary, `"primary"` the target terminology and `"optional"` corroborating labels/candidates. `strategy="fallback"` tries applicable local sources then enabled APIs; `"all"` records every selected source. APIs receive only terminology/search context. Failures and missing coverage remain visible.
+`lookup --lookup ALIAS` tests the selected source directly; use `--lookup loinc_local` for the file alias. The `check` command applies the configured combination and routing. The report records enabled sources plus actual per-item attempts, so configuration and source use can be distinguished. APIs receive terminology/search context; source failures and missing coverage remain visible.
 
 Version updates are explicit: select a new release, download/import it and run a fresh check. Optional pinned `[packages.*]` metadata can be inspected with `package-check`; the batch never silently replaces a release. Every report records the selected configuration and catalogue fingerprint plus actual supporting sources.

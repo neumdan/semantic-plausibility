@@ -25,6 +25,7 @@ class ReportContextTests(unittest.TestCase):
             context = summary['run_context']
             self.assertEqual(context['input']['columns']['code'], 'code')
             self.assertEqual(context['level'], 'A1')
+            self.assertEqual(context['workflow'], 'lookup')
             self.assertIsNone(context['research']['model'])
             self.assertEqual(context['input']['granularity'], 'distinct')
             rows, _ = report_details(result.csv, hydrate=True)
@@ -41,6 +42,7 @@ class ReportContextTests(unittest.TestCase):
                 self.assertNotIn('private-password-marker', body)
                 self.assertNotIn('private-user-marker', body)
             html = result.report.read_text()
+            self.assertIn('lookup · Observation', html)
             for title in ('Configuration and methods', 'How this item was assessed', 'Assumptions and limits', 'Output and improvement step'):
                 self.assertIn(title, html)
             self.assertEqual(verify_audit(result.log)['status'], 'verified')
@@ -72,6 +74,7 @@ class ReportContextTests(unittest.TestCase):
             with config.deployment.prepare(research=True, source_access=False) as prepared:
                 context = run_context(config, prepared, output_path=folder/'research.csv', source_report=result.csv, source_summary=summary)
             self.assertEqual(context['level'], 'A3')
+            self.assertEqual(context['workflow'], 'ai-evidence')
             self.assertEqual(context['input']['original_input'], summary['run_context']['input'])
             self.assertFalse(context['input']['hospital_data_requeried'])
             self.assertTrue(context['output']['path'].endswith('/research.csv'))
@@ -80,6 +83,9 @@ class ReportContextTests(unittest.TestCase):
             detail = json.loads(result.csv.with_suffix('.evidence.jsonl').read_text().splitlines()[0])
             item = item_context(context, row, detail)
             self.assertEqual(item['check_result_basis'], 'original_A1_report')
+            self.assertEqual(item['workflow'], 'ai-evidence')
+            row['assessment_context_json'] = json.dumps(item)
+            self.assertIn('Original lookup report', item_context_html(row))
             self.assertEqual(item['output']['status'], row['status'])
             self.assertTrue(any('inherited' in x for x in item['assumptions_and_limits']))
 

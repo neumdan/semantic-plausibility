@@ -6,10 +6,14 @@
 
 | Domain | Current implementation | Operator status |
 | --- | --- | --- |
-| Laboratory `Observation` | CSV/FHIR/DB, grouping, terminology and whole-set checks, optional FHIR validation, A2/A3 research, five assessment scopes and clinician feedback | Current documented workflow |
+| Laboratory `Observation` | CSV/FHIR/DB, grouping, terminology and whole-set checks, optional FHIR validation, ai-lookup/ai-evidence research, five assessment scopes and clinician feedback | Current documented workflow |
 | `Medication`, `MedicationRequest`, `MedicationAdministration`, `MedicationStatement` | Existing adapters, terminology, quantities, timing and conditional dose/rate arithmetic | Development checks with regression examples |
 
-**Medication version 2** will build on those adapters: a consistent product–strength–dose–route–timing assessment, medication-specific AI/evidence, profile setup and clinician review. The four laboratory modes and five assessment scopes below apply to laboratory data. [Existing medication checks](examples/medication/README.md).
+**Medication version 2** will build on those adapters: a consistent product–strength–dose–route–timing assessment, medication-specific AI/evidence, profile setup and clinician review. The laboratory workflows and five assessment scopes below apply to laboratory data. [Existing medication checks](examples/medication/README.md).
+
+**Objective:** identify incomplete or conflicting laboratory sets and provide sourced proposals for clinician review. Terminology agreement, FHIR conformance and clinical plausibility are assessed separately. Clinical sensitivity and recommendation quality require expert evaluation. [Objectives and limitations](docs/workflow.md#objectives-and-limitations).
+
+**Evaluate with clinicians:** `study-template` creates a blank review CSV from a grouped report; `study-metrics` calculates error sensitivity, recommendation acceptability and review effort. Both run locally from saved reports. [Lean study: template, labels and two commands](docs/studies.md).
 
 ## What you configure
 
@@ -31,7 +35,7 @@ Run these commands in the repository directory. Existing private files are prese
 ```sh
 cp -n pipeline.example.toml pipeline.toml
 cp -n .env.example .env
-mkdir -p local/profiles local/terminologies/loinc local/terminologies/bfarm-lab local/secrets output ../input
+mkdir -p local/input local/data local/profiles local/terminologies/loinc local/terminologies/bfarm-lab local/secrets output ../input
 ```
 
 Open **`pipeline.toml`**. The supplied input is `examples/laboratory.csv`. Choose your LOINC route:
@@ -39,9 +43,12 @@ Open **`pipeline.toml`**. The supplied input is `examples/laboratory.csv`. Choos
 | Route | What to do |
 | --- | --- |
 | **Official API** — default | Keep `lookups.loinc.source="loinc-api"`. Enter your LOINC account in `.env`: `LOINC_FHIR_USERNAME` and `LOINC_FHIR_PASSWORD`. [Register/access](https://loinc.org/kb/api/auth) |
-| **Local release** | Download the full [LOINC CSV](https://loinc.org/downloads/), place `Loinc.csv` in `local/terminologies/loinc/`. Set `source="loinc-file"`, `version="YOUR_RELEASE"`, `complete=true` in the existing LOINC block. |
+| **Local release** | Download the full [LOINC CSV](https://loinc.org/downloads/) to `local/terminologies/loinc/Loinc.csv`. Enable `lookups.loinc_local`, enter the actual `version`, and disable `lookups.loinc` for file-only LOINC lookup. |
+| **File + API fallback** | Enable both blocks with their file/credentials; keep `terminology.strategy="fallback"`. Local membership is checked first. Use `"all"` to compare all applicable membership sources. |
 
 Keep `lookups.ucum.source="ucum-api"` for the public NLM service. To add your BfArM translations, extract them under `local/terminologies/bfarm-lab/` and enable `lookups.bfarm_lab`. The full base LOINC edition supplies membership and axes; the matching translation supplies German names. [All downloads, local servers and credentials](docs/lookups.md).
+
+**Use your own export:** put it in `local/input/` or `local/data/`, set `input.path`, match its `delimiter`, and map the exact headers on the **right** of `input.columns`. Remove mappings for absent columns. Choose `granularity="individual"` for measurements or `"distinct"` for counts/statistics; `output.mode="distinct"` prepares both for research. The template explains these choices directly beside each setting. [Fill in your own export, step by step](docs/configuration.md#fill-in-your-own-export).
 
 ### Choose one runtime
 
@@ -52,7 +59,7 @@ podman machine start
 podman-compose build run-plausibility-check
 podman-compose --profile setup run --rm profile-init
 podman-compose run --rm run-plausibility-check config-check --connections
-podman-compose run --rm run-plausibility-check check --out output/01-lookup.csv
+podman-compose run --rm run-plausibility-check check --out output/lookup.csv
 ```
 
 **Docker** — with Docker running:
@@ -61,7 +68,7 @@ podman-compose run --rm run-plausibility-check check --out output/01-lookup.csv
 docker compose build run-plausibility-check
 docker compose --profile setup run --rm profile-init
 docker compose run --rm run-plausibility-check config-check --connections
-docker compose run --rm run-plausibility-check check --out output/01-lookup.csv
+docker compose run --rm run-plausibility-check check --out output/lookup.csv
 ```
 
 **Python / uv** — Python and dependencies are selected by `uv.lock`:
@@ -70,10 +77,10 @@ docker compose run --rm run-plausibility-check check --out output/01-lookup.csv
 uv sync --locked --extra postgres
 uv run --no-sync --env-file .env run-plausibility-check profile-init
 uv run --no-sync --env-file .env run-plausibility-check config-check --connections
-uv run --no-sync --env-file .env run-plausibility-check check --out output/01-lookup.csv
+uv run --no-sync --env-file .env run-plausibility-check check --out output/lookup.csv
 ```
 
-`profile-init` retrieves the pinned MII Laboratory snapshot and selected HL7 binding into `local/profiles/`; repeat calls verify and reuse them. `config-check --connections` tests the selected sources. Open **`output/01-lookup.html`** and inspect each field's finding, proposal and source. Use a fresh `--out` name for the next run.
+`profile-init` retrieves the pinned MII Laboratory snapshot and selected HL7 binding into `local/profiles/`; repeat calls verify and reuse them. `config-check --connections` tests the selected sources. Open **`output/lookup.html`** and inspect each field's finding, proposal and source. Use a fresh `--out` name for the next run.
 
 **Read the report:** each field shows its finding, condition, recommendation, short **Why**, and sources. **Conditional match** means, for example, “if the intended system is LOINC, `2823-3` is valid.” Matching name and compatible unit strengthen this finding: **code → code + name → code + name + unit**. These are evidence levels, not probabilities. Missing system URIs stay missing until confirmed; the actual specimen also needs source confirmation. A valid number is a format result, not clinical approval.
 
@@ -88,14 +95,16 @@ Each laboratory item also has five small assessment rows: **profile element QC; 
 | FHIR files or server export | `type="fhir_file"`, `granularity="individual"` | [FHIR](examples/lab/README.md#fhir): JSON, Bundle, NDJSON; select server data upstream with TORCH/CQL |
 | Database | `type="sqlite"` or `"postgres"`, table + column map | [SQLite / PostgreSQL](examples/lab/README.md#sqlite): read-only source access |
 
-`output.mode="distinct"` groups equivalent semantic contexts for evidence research. `mode="items"` retains source IDs for A1 review; create a grouped A1 report before A2/A3. Units and reference contexts remain part of the group key. Mean, SD, min and max contain **numbers**, with their unit in the row's `unit_code`.
+`output.mode="distinct"` groups equivalent semantic contexts for evidence research. `mode="items"` retains source IDs for lookup review; create a grouped lookup report before ai-lookup/ai-evidence. Units and reference contexts remain part of the group key. Mean, SD, min and max contain **numbers**, with their unit in the row's `unit_code`.
 
 | Method | Command after setup | Result |
 | --- | --- | --- |
-| A1: lookup + consistency | `check` | Code/name, UCUM, code–unit fit, numeric/reference consistency |
-| A2: AI-supported lookup | `research-evidence --scope lookup --report output/01-lookup.csv --out output/03-ai.csv` | Candidate corrections, sourced and awaiting review |
-| A3: AI lookup + study evidence | `research-evidence --scope studies --report output/01-lookup.csv --out output/04-evidence.csv` | Relevant study quotations, measured values/intervals and applicability context |
-| Full FHIR validation | `validation.enabled=true` for complete FHIR input | Separate Matchbox/HL7 conformance results before aggregation; [setup](docs/validation.md) |
+| `lookup`: terminology + consistency | `check` | Code/name, UCUM, code–unit fit, numeric/reference consistency |
+| `ai-lookup`: AI-supported lookup | `research-evidence --scope lookup --report output/lookup.csv --out output/ai-lookup.csv` | Candidate corrections, sourced and awaiting review |
+| `ai-evidence`: AI lookup + study evidence | `research-evidence --scope studies --report output/lookup.csv --out output/ai-evidence.csv` | Relevant study quotations, measured values/intervals and applicability context |
+| `fhir-validation` | `validation.enabled=true` for complete FHIR input | Separate Matchbox/HL7 conformance results before aggregation; [setup](docs/validation.md) |
+
+Europe PMC evidence includes permitted open-access paragraphs and labelled table cells (`research.europe_pmc.FULL_TEXT=true`). Reports compare your statistics and reference bounds with source-checked study numbers, retaining context and source locations. [Small evidence pipeline and a real potassium example](docs/research.md#small-evidence-pipeline-values-and-reference-intervals).
 
 ### Local AI: select, download, run
 
@@ -105,15 +114,15 @@ Set **`models.local.model`** in TOML. The template selects `ministral-3:3b`. `ba
 podman-compose --profile research up -d ollama
 podman-compose --profile research run --rm model-init
 podman-compose --profile research run --rm catalog-init
-podman-compose --profile research run --rm research-evidence research-evidence --scope lookup --report output/01-lookup.csv --out output/03-ai.csv
-podman-compose --profile research run --rm research-evidence research-evidence --scope studies --report output/01-lookup.csv --out output/04-evidence.csv
+podman-compose --profile research run --rm research-evidence research-evidence --scope lookup --report output/lookup.csv --out output/ai-lookup.csv
+podman-compose --profile research run --rm research-evidence research-evidence --scope studies --report output/lookup.csv --out output/ai-evidence.csv
 ```
 
 Docker uses the same commands with `docker compose` in place of `podman-compose`. Python uses `uv run --no-sync --env-file .env run-plausibility-check` followed by the same subcommands, with your local Ollama running. `model-init` downloads the selected model only if missing; weights persist in `semantic-plausibility-ollama`. `catalog-init` explicitly acquires the official UCUM definition/candidate files for AI spelling suggestions, stored in `local/`. [Own model / LM Studio](docs/shipped-stack.md#models).
 
 ### Optional Laya input assessment — experimental
 
-In the existing `[decision]` block of `pipeline.toml`, set `enabled=true`. Laya adds **domain, declared unit-system and next-step suggestions** to each checked laboratory group. Ministral continues to perform A2/A3 research and extraction.
+In the existing `[decision]` block of `pipeline.toml`, set `enabled=true`. Laya adds **domain, declared unit-system and next-step suggestions** to each checked laboratory group. Ministral continues to perform ai-lookup/ai-evidence research and extraction.
 
 ```sh
 mkdir -p local/laya
@@ -139,32 +148,32 @@ FHIR `resourceType` identifies the resource. CSV/DB columns are mapped explicitl
 flowchart TD
     INPUT["Selected laboratory input<br/>CSV / FHIR export / read-only SQLite or PostgreSQL<br/>TORCH / CQL selects server exports upstream<br/>Mapped columns or native FHIR fields"]
     CONFIG["One pipeline.toml + catalog.csv<br/>Mapping, grouping, profile, sources and model<br/>Downloaded profiles / terminology under local/<br/>Credentials in .env or secret files"]
-    A1["A1: Python runner + embedded DuckDB<br/>Preflight → optional validation → normalize → group → check<br/>Preserve code / system, name, specimen, values and units<br/>Check reference context and cross-field consistency"]
-    TX["Terminology evidence<br/>Direct files OR selected APIs<br/>Optional Blaze: imported content<br/>UCUM: NLM API OR local service"]
-    VALIDATE["Optional full FHIR validation<br/>Complete file / FHIR-in-CSV → Matchbox / HL7<br/>Pinned guide + local Blaze terminology; separate outcomes"]
+    LOOKUP["lookup: Python + embedded DuckDB<br/>Preflight → optional validation → normalize → group → check<br/>Preserve code / system, name, specimen, values and units<br/>Check reference context and cross-field consistency"]
+    TX["Terminology evidence<br/>Files + APIs: fallback or all<br/>Optional Blaze: imported content<br/>UCUM: NLM API OR local service"]
+    VALIDATE["Optional fhir-validation<br/>Complete file / FHIR-in-CSV → Matchbox / HL7<br/>Pinned guide + local Blaze terminology; separate outcomes"]
     LAYA["Optional local Laya<br/>Advisory domain / next step<br/>Configured source is retained"]
-    R1["A1: audited CSV + HTML<br/>Field decisions + five laboratory assessment scopes<br/>Evidence JSONL + summary + hash-chained audit"]
+    R1["lookup: audited CSV + HTML<br/>Field decisions + five laboratory assessment scopes<br/>Evidence JSONL + summary + hash-chained audit"]
     MODEL["Ollama / own local API<br/>Candidate selection + extraction<br/>Bounded texts; retained weights"]
-    RESEARCH["A2 / A3: Python research runner<br/>Read grouped A1 report and its verified sidecars<br/>Retrieve source text → local model → verify claims<br/>A3 includes AI lookup plus study extraction"]
-    WEB["Selected source APIs / pages<br/>A2: terminology + LOINC pages<br/>A3: Europe PMC / PubMed<br/>Python retrieves source text"]
-    OUT["CSV + HTML: clinical review<br/>Field → finding / condition → recommendation + why → sources<br/>Clinician approval → local registry; recheck targets and factors on later A1 runs"]
-    INPUT --> A1
-    CONFIG --> A1
-    A1 --> |"lookup"| TX
-    A1 -.-> |"if selected and applicable"| VALIDATE
-    A1 -.-> |"advisory"| LAYA
-    A1 --> |"check results"| R1
+    RESEARCH["ai-lookup / ai-evidence: Python research<br/>Read grouped lookup report and its verified sidecars<br/>Text/tables → parser or local model → source guards<br/>ai-evidence includes AI lookup plus study extraction"]
+    WEB["Selected source APIs / pages<br/>ai-lookup: terminology / pages<br/>ai-evidence: literature APIs<br/>Python retrieves source text"]
+    OUT["CSV + HTML: clinical review<br/>Field → finding / condition → recommendation + why → sources<br/>Clinician approval → local registry; recheck targets and factors on later lookup runs"]
+    INPUT --> LOOKUP
+    CONFIG --> LOOKUP
+    LOOKUP --> |"lookup"| TX
+    LOOKUP -.-> |"if selected and applicable"| VALIDATE
+    LOOKUP -.-> |"advisory"| LAYA
+    LOOKUP --> |"check results"| R1
     VALIDATE --> |"outcomes"| R1
     LAYA -.-> |"hints"| R1
-    R1 -.-> |"A2 / A3 selected"| RESEARCH
-    R1 --> |"A1 review"| OUT
+    R1 -.-> |"AI research selected"| RESEARCH
+    R1 --> |"lookup review"| OUT
     RESEARCH -.-> |"inference"| MODEL
     RESEARCH --> |"retrieval"| WEB
     RESEARCH --> |"sourced proposals"| OUT
     classDef normal fill:#f3f7fa,stroke:#c4d5df,color:#142d42
     class INPUT,CONFIG,TX,VALIDATE,LAYA,MODEL,WEB normal
     classDef teal fill:#eef7f4,stroke:#a8cfc6,color:#142d42
-    class A1,R1,RESEARCH,OUT teal
+    class LOOKUP,R1,RESEARCH,OUT teal
 ```
 <!-- architecture:end -->
 
@@ -172,38 +181,38 @@ flowchart TD
 ```mermaid
 %% Generated with decision-flow.svg by tools/render_batch_diagrams.py.
 flowchart TD
-    INPUT["1. Configure and map laboratory input<br/>Code + system + name + specimen/method + value/statistics + unit/system + reference context<br/>Preflight checks mappings, types, paths, profile and source editions"]
+    INPUT["Configure and map laboratory input<br/>Code + system + name + specimen/method + value/statistics + unit/system + reference context<br/>Preflight checks mappings, types, paths, profile and source editions"]
     VALIDATION{"Validate complete FHIR?<br/>Enabled + file / FHIR-in-CSV"}
-    FHIR["Validate with local Matchbox / HL7<br/>Installed profile + binding terminology<br/>Retain OperationOutcome; continue semantic checks<br/>Failed validation affects the configured exit status"]
+    FHIR["fhir-validation: Matchbox / HL7<br/>Installed profile + binding terminology<br/>Retain OperationOutcome; continue semantic checks<br/>Failed validation affects the configured exit status"]
     SKIP["Disabled / not applicable<br/>Scalar CSV/DB: not_applicable when selected<br/>DB JSON: export for complete-document validation"]
-    GROUP["Aggregate or retain items<br/>distinct: group contexts; calculate / pool statistics<br/>items: retain source IDs for A1 review"]
-    A1["2. A1: check the whole laboratory set<br/>Declared systems → lookup; missing systems → verify exact candidates<br/>Supported candidate → conditional match; source systems/specimen stay unchanged<br/>Check name/context, numeric quantities, code–unit fit and reference consistency"]
-    REPORT["3. Persist the audited A1 report<br/>CSV + HTML + field decisions + five scope results / completeness / reasons<br/>Distinguish missing metadata, unverified findings and demonstrated errors"]
-    METHOD{"4. Select the next command<br/>A2/A3 require audited distinct semantic sets"}
-    A2["A2: research-evidence --scope lookup<br/>Read grouped A1 and sidecars; retrieve candidates<br/>Local model → check against actual terminology<br/>Record sources, proposals and review conditions"]
-    A3["A3: research-evidence --scope studies<br/>Read the same grouped A1; include AI lookup<br/>Python retrieves studies; local model extracts<br/>Verify quote / analyte / number / unit / interval type"]
-    REVIEW["5. Clinician review and scoped reuse<br/>Review field and whole-set findings, short reasons, source support and applicability<br/>A numeric value is a format check; study evidence needs clinical interpretation<br/>Approve / reject / defer in a review copy; recheck approved targets and factors on reuse"]
+    GROUP["Aggregate or retain items<br/>distinct: group contexts; calculate / pool statistics<br/>items: retain source IDs for lookup review"]
+    LOOKUP["lookup: check the whole laboratory set<br/>Declared systems → lookup; missing systems → verify exact candidates<br/>Supported candidate → conditional match; source systems/specimen stay unchanged<br/>Check name/context, numeric quantities, code–unit fit and reference consistency"]
+    REPORT["Persist the audited lookup report<br/>CSV + HTML + field decisions + five scope results / completeness / reasons<br/>Distinguish missing metadata, unverified findings and demonstrated errors"]
+    METHOD{"Select the research command<br/>Research commands require audited distinct semantic sets"}
+    AI_LOOKUP["ai-lookup: --scope lookup<br/>Read grouped lookup and sidecars; retrieve candidates<br/>Local model → check against actual terminology<br/>Record sources, proposals and review conditions"]
+    AI_EVIDENCE["ai-evidence: --scope studies<br/>Read the same grouped lookup; include AI lookup<br/>Open-access text/tables; guarded extraction<br/>Verify claims; compare values/bounds locally"]
+    REVIEW["Clinician review and scoped reuse<br/>Review field and whole-set findings, short reasons, source support and applicability<br/>A numeric value is a format check; study evidence needs clinical interpretation<br/>Approve / reject / defer in a review copy; recheck approved targets and factors on reuse"]
     INPUT --> VALIDATION
     VALIDATION --> |"yes"| FHIR
     VALIDATION --> |"no"| SKIP
     FHIR --> GROUP
     SKIP --> GROUP
-    GROUP --> A1
-    A1 --> REPORT
+    GROUP --> LOOKUP
+    LOOKUP --> REPORT
     REPORT --> METHOD
-    METHOD -.-> |"lookup: grouped A1"| A2
-    METHOD -.-> |"studies: grouped A1"| A3
-    METHOD --> |"A1 only / items"| REVIEW
-    A2 --> REVIEW
-    A3 --> REVIEW
+    METHOD -.-> |"lookup: grouped lookup"| AI_LOOKUP
+    METHOD -.-> |"studies: grouped lookup"| AI_EVIDENCE
+    METHOD --> |"lookup only / items"| REVIEW
+    AI_LOOKUP --> REVIEW
+    AI_EVIDENCE --> REVIEW
     classDef normal fill:#f3f7fa,stroke:#c4d5df,color:#142d42
-    class INPUT,VALIDATION,FHIR,SKIP,GROUP,METHOD,A2,A3 normal
+    class INPUT,VALIDATION,FHIR,SKIP,GROUP,METHOD,AI_LOOKUP,AI_EVIDENCE normal
     classDef teal fill:#eef7f4,stroke:#a8cfc6,color:#142d42
-    class A1,REPORT,REVIEW teal
+    class LOOKUP,REPORT,REVIEW teal
 ```
 <!-- decision-flow:end -->
 
-Both diagrams are generated from the same definitions as the HTML manual. Python retrieves terminology/pages/studies and verifies model claims; Ollama performs local inference. A2 and A3 each read the original grouped A1 CSV and audited sidecars. A3 includes AI lookup and study extraction.
+Both diagrams are generated from the same definitions as the HTML manual. Python retrieves terminology/pages/studies and verifies model claims; Ollama performs local inference. ai-lookup and ai-evidence each read the original grouped lookup CSV and audited sidecars. ai-evidence includes AI lookup and study extraction.
 
 The runner is a one-shot batch command. Laya, Ollama, Blaze, UCUM and Matchbox are optional persistent services. Start Blaze only to serve your imported terminology or support FHIR validation. Direct file lookup reads local files without a server. [Containers and persistent storage](docs/shipped-stack.md).
 
@@ -213,7 +222,7 @@ The runner is a one-shot batch command. Laya, Ollama, Blaze, UCUM and Matchbox a
 bash tools/run-podman-examples.sh
 ```
 
-This separate example suite uses `examples/lab/aggregated.csv`, explicitly selected **public test LOINC + NLM APIs**, real profile downloads, Matchbox with Blaze’s explicitly enabled built-in LOINC, and Ollama. It creates four separate report folders and prints the index path. Mode 02 uses a complete FHIR-in-CSV example; modes 03/04 reuse the grouped mode-01 report. [Inputs and expected results per mode](examples/README.md#four-laboratory-modes). Your private input/configuration stays selected only for your own runner commands. Preview with `--dry-run`; run A1 alone with `--lookup-only`. Cached images and volumes are reused.
+This separate example suite uses `examples/lab/aggregated.csv`, explicitly selected **public test LOINC + NLM APIs**, real profile downloads, Matchbox with Blaze’s explicitly enabled built-in LOINC, and Ollama. It creates four separate report folders and prints the index path. `fhir-validation` uses a complete FHIR-in-CSV example; `ai-lookup` and `ai-evidence` reuse the grouped `lookup` report. [Inputs and expected results per workflow](examples/README.md#laboratory-workflows). Your private input/configuration stays selected only for your own runner commands. Preview with `--dry-run`; run lookup alone with `--lookup-only`. Cached images and volumes are reused.
 
 For library tests, install the actual profile once, then:
 

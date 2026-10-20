@@ -71,7 +71,7 @@ Each scalar row describes one complete product and one instruction. Full FHIR/DB
 
 ## Output
 
-CSV outputs use scalar columns. Structured consumers use the audited evidence sidecar; the A2/A3 and review commands handle this hand-off automatically.
+CSV outputs use scalar columns. Structured consumers use the audited evidence sidecar; the ai-lookup/ai-evidence and review commands handle this hand-off automatically.
 
 Every check writes a matching file set:
 
@@ -83,7 +83,7 @@ Every check writes a matching file set:
 | `.summary.json` | Configuration fingerprint, mapping, assumptions, methods, versions, counts, timing and artifact hashes |
 | `.audit.jsonl` | Hash-chained execution events and file integrity |
 | `.fhir-validation.jsonl` | Full-resource outcomes when validation is selected |
-| `.studies.csv`, `.trace.jsonl` | A3 candidates/quotations and actual queries/model responses; A2 also records its trace |
+| `.studies.csv`, `.trace.jsonl` | ai-evidence candidates/quotations and actual queries/model responses; ai-lookup also records its trace |
 
 CSV column families:
 
@@ -106,6 +106,8 @@ CSV column families:
 | `review_decision`, `reviewer`, `reviewed_at`, `review_evidence`, `approved_*` | Clinician feedback in a separate review copy |
 
 Headers are the union of fields found in that run. Empty cells retain absence; every repeated bound/coding/dose has its own position. Formula-like strings are escaped for spreadsheet safety. Full objects formerly embedded in `*_json` CSV columns are now in the audited evidence file. Library consumers can use `report_details(path, hydrate=True)` from `semantic_plausibility.review_feedback` to read a verified complete row; older audited reports remain readable.
+
+The run summary identifies the selected workflow with `run_context.workflow`: `lookup`, `fhir-validation`, `ai-lookup` or `ai-evidence`. The HTML uses these names too. Legacy `level` and `check_result_basis` identifiers remain available for consumers of earlier audited reports. Validation success is recorded separately from the workflow name.
 
 ## Status meanings across workflows
 

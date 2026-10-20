@@ -6,12 +6,12 @@ Start with the [setup in pipeline.toml](../README.md#1-first-setup). This page e
 
 | Category | Select | Settings / command |
 | --- | --- | --- |
-| **A. Plausibility level** | A1 lookup-only; A2 AI-supported lookup; A3 AI-supported evidence | `check`; optionally `research-evidence --scope lookup` or `--scope studies` on the original checked report |
+| **A. Plausibility level** | lookup; ai-lookup; ai-evidence | `check`; optionally `research-evidence --scope lookup` or `--scope studies` on the original checked report |
 | **B. Input** | CSV, PostgreSQL/SQLite, native FHIR or server export | `[input]`, `[input.columns]`, `[database]`, `[output]` |
 | **C. Lookup / terminology sources** | Downloaded catalogues, enabled APIs, or a combination | `[lookups]`, `[terminology]`, `[network]`; credential references only |
 | **D. Laboratory target** | Quantitative Observation with the pinned MII Laboratory guide | `general.RESOURCE_TYPE`, `[specification]`, optional `[validation]` |
 
-FHIR validation is independent: `[validation]` applies to complete resources, not scalar aggregates. A2/A3 currently support laboratory Observations only. Model settings belong in `[models]`; study APIs/budgets in `[research]`. **For laboratory, use one TOML for all three levels**, and keep `.env`/secret files for credentials. No shell exports are needed.
+FHIR validation is independent: `[validation]` applies to complete resources, not scalar aggregates. ai-lookup/ai-evidence currently support laboratory Observations only. Model settings belong in `[models]`; study APIs/budgets in `[research]`. **For laboratory, use one TOML for all workflows**, and keep `.env`/secret files for credentials. No shell exports are needed.
 
 Map actual source facts: a local LIS test identifier stays local until reviewed. Profiles supply target rules, not a guess about source column meanings. Reports are CSV/HTML; automatic FHIR/OMOP/database output writers are not implemented. All relative paths resolve from the selected TOML. [Laboratory configuration overview](index.html#setup) · [Input walkthroughs](index.html#inputs) · [Download/API walkthroughs](index.html#terminology).
 
@@ -24,6 +24,37 @@ Map actual source facts: a local LIS test identifier stays local until reviewed.
 | Podman Compose | Same `.env`; run `podman-compose run --rm run-plausibility-check` | Same host/container paths |
 
 Keep the default `pipeline.toml` selector for CSV, FHIR, database and research runs. `SQC_CONFIG_FILE` remains available for deployments that already select a private root file. The setup copy commands preserve an existing `.env` and `pipeline.toml`.
+
+## Fill in your own export
+
+Edit the existing sections of **`pipeline.toml`**, using the comments in [the template](../pipeline.example.toml). TOML tables appear once; replace a source block when switching input types. Keep this file at the repository root for the supplied Compose stack.
+
+1. **Place your input.** Create `local/input/` (or use `local/data/`) and copy your export there. Both are already inside the Compose `local/` mount. Set `input.path="local/input/laboratory.csv"` to its actual filename.
+2. **Read its header.** Set `input.delimiter` to the character between column names: `","`, `";"`, or `"\t"` for tabs. `delimiter` is the column separator. Numeric cells use a decimal point, e.g. `13.5`.
+3. **Map its columns.** The left-hand name is a pipeline role; the right-hand value is your exact header. For example, `analyte_name="test_name"` reads `test_name`. Remove mappings for absent columns. Keep missing systems/context as review points; add `input.defaults` only for documented constants from the source.
+4. **Describe the rows.** Use `granularity="individual"` and `value="result"` for single measurements. For supplied summaries use `granularity="distinct"`, remove `value`, and map `value_mean="mean"`, `value_sd="sd"`, `value_min="min"`, `value_max="max"`. Map `count` only when it counts the measurements represented. Statistics are numbers sharing the row's unit; reference bounds have their own fields. Use `output.mode="distinct"` for shared evidence research.
+5. **Select the target and sources.** Keep the pinned MII Laboratory profile initially. Choose API, direct files, or file + API in the [source recipes](lookups.md#3-api-files-and-fallback-in-one-toml). Fill credentials in `.env` or secret files; download real terminology manually to the configured paths.
+6. **Install the target definitions and check setup.** Run the commands below. `profile-init` acquires the selected profile/bindings into `local/profiles/`; terminology downloads have their own source paths.
+
+```sh
+podman-compose build run-plausibility-check
+podman-compose --profile setup run --rm profile-init
+podman-compose run --rm run-plausibility-check config-check --connections
+podman-compose run --rm run-plausibility-check check --out output/my-run/lookup.csv
+```
+
+Open **`output/my-run/lookup.html`**. Choose a new output folder for the next run and keep its CSV, summary, evidence and audit files together. The same TOML configures all workflows:
+
+| Workflow | What to select | Command after setup |
+| --- | --- | --- |
+| `lookup` | Your mapped input, sources and profile | `check --out output/my-run/lookup.csv` |
+| `fhir-validation` | Complete FHIR input, `validation.enabled=true`, [prepared validator](validation.md) | `check --out output/my-run/fhir-validation.csv` |
+| `ai-lookup` | [Start/provision Ollama and the unit catalogue](../README.md#local-ai-select-download-run) | `research-evidence --scope lookup --report output/my-run/lookup.csv --out output/my-run/ai-lookup.csv` |
+| `ai-evidence` | Same model, plus selected study APIs in `[research]` | `research-evidence --scope studies --report output/my-run/lookup.csv --out output/my-run/ai-evidence.csv` |
+
+These are workflow names; the command selects the workflow. Both research commands read the audited, grouped `lookup.csv` and add sourced proposals in separate outputs. For Podman research commands, use the prefix `podman-compose --profile research run --rm research-evidence` followed by the full command in the table. Docker uses `docker compose` instead of `podman-compose`. Python uses `uv run --no-sync --env-file .env run-plausibility-check` followed by the command; keep native model/validator endpoints running when selected.
+
+For FHIR files and DB tables, use the complete replacement [input recipes](../examples/lab/README.md). `origin` describes the source system; `type` describes how the runner reads it. A CSV exported from a LIS therefore uses `type="csv"`, `origin="lis"`.
 
 ## Configuration sections
 
@@ -64,7 +95,7 @@ For the supplied Compose stack, edit `pipeline.toml` in the repository root. `SQ
 | `examples/laboratory.csv` | Repository example | `/app/examples/laboratory.csv`, read-only |
 | `../input/laboratory.csv` | Sibling private input directory | `/input/laboratory.csv`, read-only |
 | `../input/terminologies/…` | Sibling real downloads | `/input/terminologies/…`, read-only |
-| `local/laboratory.csv` | Your input export | `/app/local/laboratory.csv`, read-only for checking |
+| `local/input/laboratory.csv` or `local/data/laboratory.csv` | Your input export | Same path under `/app/local/`, read-only for checking |
 | `local/profiles/…` | Downloaded profile/bindings | `/app/local/profiles/…`, read-only for checking |
 | `local/terminologies/…` | Installed real terminology | `/app/local/terminologies/…`, read-only for checking |
 | `local/secrets/…` | Secret files | `/app/local/secrets/…`, read-only for checking |
@@ -78,7 +109,7 @@ Follow the [individual/aggregate CSV manual](../examples/lab/README.md). `input.
 
 Grouping retains codes/editions, name, unit/system, reference qualifiers, comparator, specimen, method and status. Individual values produce count, mean, sample SD/SE, observed min/max, median and quartiles. Summary pooling uses disjoint groups, counts and sample SD; retain that assumption in your source-export documentation. Use numeric statistics and one common `unit_code` per row. Omit unavailable count/statistic roles.
 
-For separate A1 inspection, `output.mode="items"` retains source IDs. Adding `"value"` to the default `aggregation.group_by` creates exact code–value sets. Evidence research reads an audited context-grouped report; run a fresh `check` with `mode="distinct"` and the default grouping for that stage.
+For separate lookup inspection, `output.mode="items"` retains source IDs. Adding `"value"` to the default `aggregation.group_by` creates exact code–value sets. Evidence research reads an audited context-grouped report; run a fresh `check` with `mode="distinct"` and the default grouping for that stage.
 
 Map one reference interval to scalar columns; preserve multiple qualified intervals through native FHIR or a DB `reference_ranges_json` column. The `specimen` scalar role is a resolved LOINC system-axis token. [Complete field roles](data-contract.md#minimum-export).
 
@@ -147,7 +178,7 @@ Profiles define constraints/bindings, not API endpoint URLs or credentials. The 
 | `source` | Check what the LIS's original local codes/units mean | Real site CSV, SQLite, FHIR artifacts or API |
 | `optional` | Additional labels, aliases and candidates | BfArM supplements, SemLookP / OLS or a configured website |
 
-The `fallback` strategy orders local sources before APIs, with primary/source/optional roles within each group. It tries enabled compatible sources until valid; `all` cross-checks every enabled source. Conflicting valid/invalid results stay `unknown` and require review. A partial catalogue absence is never a rejection. A valid local code/unit is separate from target compatibility. Without a real source catalogue, membership stays unknown.
+For **code membership**, `fallback` orders local sources before APIs, with primary/source/optional roles within each group and configuration order for ties. It tries enabled sources covering the canonical system until one returns valid; `all` queries every compatible membership source. Conflicting valid/invalid results stay `unknown` and require review. A partial catalogue absence stays unknown. Install enabled files and configure credentials before running: fallback handles lookup results/service failures after setup. The dedicated UCUM syntax/conversion check uses its one selected service; binding checks and AI candidate searches have separate evidence records. [Concrete API/file/fallback recipes](lookups.md#3-api-files-and-fallback-in-one-toml).
 
 ```toml
 [lookups.lis_catalogue]
@@ -190,7 +221,7 @@ Environment references name a variable whose value lives in `.env` or the runtim
 
 ## Local models and research
 
-`check` uses deterministic terminology/consistency checks. With `decision.enabled=true`, it also records separate Laya input hints. Research/extraction remain explicit A2/A3 commands. `research-evidence --scope lookup` selects terminology AI without study queries; `--scope studies` adds the configured literature providers. A scope argument overrides TOML for that invocation and is retained in the report/trace. Use the separate `research-evidence` command on the completed audited report. The legacy `plausibility batch` command still honours `research.enabled`.
+`check` uses deterministic terminology/consistency checks. With `decision.enabled=true`, it also records separate Laya input hints. Research/extraction remain explicit ai-lookup/ai-evidence commands. `research-evidence --scope lookup` selects terminology AI without study queries; `--scope studies` adds the configured literature providers. A scope argument overrides TOML for that invocation and is retained in the report/trace. Use the separate `research-evidence` command on the completed audited report. The legacy `plausibility batch` command still honours `research.enabled`.
 
 ```toml
 [models.local]
@@ -245,7 +276,7 @@ uv run --no-sync --env-file .env run-plausibility-check decision-serve
 
 In another terminal, run the ordinary `check --out output/laya-laboratory.csv` command. The service uses CPU by default; native macOS can select `device="mps"` when supported. Optional settings are `threads=2`, `timeout_seconds=120` and `cache_dir="local/laya"`. Container images use CPU wheels. Changing a cache path also requires changing the matching Compose mount. Local/LAN endpoints only; use `api_key_env="LAYA_SERVICE_KEY"` with its value in `.env`, or `api_key_file="local/secrets/laya-key"`, when protecting the service.
 
-The HTML adds one **Input decision** row per laboratory set. CSV uses scalar `decision.*` columns; audited `*.evidence.jsonl` retains the full bounded request, response, model revision, timing and response hash. A2/A3 preserve this record from the checked report. Set `enabled=false` to use the original model-free check.
+The HTML adds one **Input decision** row per laboratory set. CSV uses scalar `decision.*` columns; audited `*.evidence.jsonl` retains the full bounded request, response, model revision, timing and response hash. ai-lookup/ai-evidence preserve this record from the checked report. Set `enabled=false` to use the original model-free check.
 
 ### Use your own model or service
 
@@ -282,10 +313,10 @@ Run against an audited lookup report, with a fresh output:
 
 ```sh
 # Native Python/uv
-uv run --no-sync --env-file .env research-evidence --config pipeline.toml --scope studies --report output/01-lookup.csv --out output/my-model-research.csv
+uv run --no-sync --env-file .env research-evidence --config pipeline.toml --scope studies --report output/lookup.csv --out output/my-model-research.csv
 
 # Podman (Docker: replace podman-compose with docker compose)
-podman-compose --profile research run --rm research-evidence research-evidence --config /app/pipeline.toml --scope studies --report /app/output/01-lookup.csv --out /app/output/my-model-research.csv
+podman-compose --profile research run --rm research-evidence research-evidence --config /app/pipeline.toml --scope studies --report /app/output/lookup.csv --out /app/output/my-model-research.csv
 ```
 
 These are alternative commands. Add `--plan` to inspect queries/prompts. External runtimes need no Compose Ollama service or `model-init` download. All models face the same quotation, number, analyte and unit guards; a model change is not a clinical validation.
@@ -385,7 +416,7 @@ The catalogue never enables a service automatically. Missing code/system, uncove
 
 `run_context` in the summary is a whitelist of effective settings: A–D choices, input column/element/table selection, defaults/context, profile, grouping, source aliases, credential mechanism (not its values), model/scope and output. URL credentials/query strings are omitted from this projection. It is not a copy of TOML or the process environment.
 
-Each evidence record's `assessment_context` references the configuration hash and records input accounting, method results, assumptions, actual lookup evidence, validation scope and the next improvement step. Individual mode retains IDs; distinct mode does not. Defaults are disclosed as configured source assertions; the adapter does not track which individual fields originally used each default. Research reads the audited A1 report, records its original input/configuration, and keeps its verdict separate from new candidates. New model/retrieval events are counted per item; cached results may be reused without a new call. Existing reports without these fields are never retroactively assigned today's settings.
+Each evidence record's `assessment_context` references the configuration hash and records input accounting, method results, assumptions, actual lookup evidence, validation scope and the next improvement step. Individual mode retains IDs; distinct mode does not. Defaults are disclosed as configured source assertions; the adapter does not track which individual fields originally used each default. Research reads the audited lookup report, records its original input/configuration, and keeps its verdict separate from new candidates. New model/retrieval events are counted per item; cached results may be reused without a new call. Existing reports without these fields are never retroactively assigned today's settings.
 
 ## Laboratory summary statistics
 

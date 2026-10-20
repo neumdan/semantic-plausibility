@@ -341,6 +341,18 @@ def laboratory_fields(row, summary):
                 fields[name].action = "Review published evidence"
                 fields[name].recommendation = "Retain source pending context review; no automatic replacement"
         limits = [r for r in supported if r.get("evidence_type") in {"analytical_limit", "analytical_interval"}]
+        comparison = document(row.get("study_comparison_json"))
+        if comparison:
+            from .evidence_comparison import comparison_findings
+            for name, field in (("Value / statistics", "values"), ("Reference ranges", "reference_ranges")):
+                fields[name].findings += comparison_findings(comparison, field)
+                if comparison.get("condition"):
+                    fields[name].findings.append("Comparison condition: " + comparison["condition"])
+                fields[name].sources += [c for c in comparison.get("comparisons", []) if c["field"] == field]
+                if comparison.get("comparisons") and fields[name].source_state != "red":
+                    fields[name].proposal_state = "yellow"
+                    fields[name].action = "Review published comparison"
+                    fields[name].reason = "Numerical agreement or difference does not establish population or assay applicability."
         if limits:
             fields["Analytical limits"] = Field("Analytical limits", "Instrument performance evidence", [
                 r.get("value_kind", "limit").replace("_", " ") + ": " + str(r["reported_value"])

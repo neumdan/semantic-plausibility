@@ -2,6 +2,7 @@
 
 import csv
 import importlib.util
+import json
 from pathlib import Path
 import re
 import shutil
@@ -16,6 +17,36 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SingleConfigurationTests(unittest.TestCase):
+    def test_documented_csv_separators_preserve_values_and_grouping(self):
+        from test_batch import configuration
+
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            config = configuration(folder)
+            template = config.read_text()
+            source = ROOT / "examples/laboratory.csv"
+            with source.open(newline="", encoding="utf-8-sig") as stream:
+                rows = list(csv.reader(stream))
+            for index, delimiter in enumerate((",", ";", "\t")):
+                with self.subTest(delimiter=repr(delimiter)):
+                    export = folder / f"input-{index}.csv"
+                    with export.open("w", newline="", encoding="utf-8") as stream:
+                        csv.writer(stream, delimiter=delimiter).writerows(rows)
+                    config.write_text(template.replace(str(source), str(export)).replace(
+                        'delimiter = ","', 'delimiter = ' + json.dumps(delimiter), 1))
+                    result = run_plausibility_check(config, output=folder / f"check-{index}.csv")
+                    self.assertEqual((result.input_records, result.distinct_tuples), (8, 7))
+                    summary = json.loads(result.summary.read_text())
+                    self.assertEqual(summary["run_context"]["input"]["delimiter"], delimiter)
+                    self.assertEqual(summary["weighted_readiness"]["denominator"], 84)
+                    with result.csv.open(encoding="utf-8-sig", newline="") as stream:
+                        actual = list(csv.DictReader(stream))
+                    values = [(row["code"], row["unit_code"], row["value_mean"]) for row in actual]
+                    if index == 0:
+                        expected = values
+                    else:
+                        self.assertEqual(values, expected)
+
     def test_documented_sources_preserve_profile_lookups_and_grouped_research(self):
         manual = (ROOT / "examples/lab/README.md").read_text()
         inputs = [block for block in re.findall(r"```toml\n(.*?)```", manual, re.S)

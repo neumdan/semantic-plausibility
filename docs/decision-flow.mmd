@@ -1,30 +1,30 @@
 %% Generated with decision-flow.svg by tools/render_batch_diagrams.py.
 flowchart TD
-    INPUT["1. Configure and map laboratory input<br/>Code + system + name + specimen/method + value/statistics + unit/system + reference context<br/>Preflight checks mappings, types, paths, profile and source editions"]
+    INPUT["Configure and map laboratory input<br/>Code + system + name + specimen/method + value/statistics + unit/system + reference context<br/>Preflight checks mappings, types, paths, profile and source editions"]
     VALIDATION{"Validate complete FHIR?<br/>Enabled + file / FHIR-in-CSV"}
-    FHIR["Validate with local Matchbox / HL7<br/>Installed profile + binding terminology<br/>Retain OperationOutcome; continue semantic checks<br/>Failed validation affects the configured exit status"]
+    FHIR["fhir-validation: Matchbox / HL7<br/>Installed profile + binding terminology<br/>Retain OperationOutcome; continue semantic checks<br/>Failed validation affects the configured exit status"]
     SKIP["Disabled / not applicable<br/>Scalar CSV/DB: not_applicable when selected<br/>DB JSON: export for complete-document validation"]
-    GROUP["Aggregate or retain items<br/>distinct: group contexts; calculate / pool statistics<br/>items: retain source IDs for A1 review"]
-    A1["2. A1: check the whole laboratory set<br/>Declared systems → lookup; missing systems → verify exact candidates<br/>Supported candidate → conditional match; source systems/specimen stay unchanged<br/>Check name/context, numeric quantities, code–unit fit and reference consistency"]
-    REPORT["3. Persist the audited A1 report<br/>CSV + HTML + field decisions + five scope results / completeness / reasons<br/>Distinguish missing metadata, unverified findings and demonstrated errors"]
-    METHOD{"4. Select the next command<br/>A2/A3 require audited distinct semantic sets"}
-    A2["A2: research-evidence --scope lookup<br/>Read grouped A1 and sidecars; retrieve candidates<br/>Local model → check against actual terminology<br/>Record sources, proposals and review conditions"]
-    A3["A3: research-evidence --scope studies<br/>Read the same grouped A1; include AI lookup<br/>Python retrieves studies; local model extracts<br/>Verify quote / analyte / number / unit / interval type"]
-    REVIEW["5. Clinician review and scoped reuse<br/>Review field and whole-set findings, short reasons, source support and applicability<br/>A numeric value is a format check; study evidence needs clinical interpretation<br/>Approve / reject / defer in a review copy; recheck approved targets and factors on reuse"]
+    GROUP["Aggregate or retain items<br/>distinct: group contexts; calculate / pool statistics<br/>items: retain source IDs for lookup review"]
+    LOOKUP["lookup: check the whole laboratory set<br/>Declared systems → lookup; missing systems → verify exact candidates<br/>Supported candidate → conditional match; source systems/specimen stay unchanged<br/>Check name/context, numeric quantities, code–unit fit and reference consistency"]
+    REPORT["Persist the audited lookup report<br/>CSV + HTML + field decisions + five scope results / completeness / reasons<br/>Distinguish missing metadata, unverified findings and demonstrated errors"]
+    METHOD{"Select the research command<br/>Research commands require audited distinct semantic sets"}
+    AI_LOOKUP["ai-lookup: --scope lookup<br/>Read grouped lookup and sidecars; retrieve candidates<br/>Local model → check against actual terminology<br/>Record sources, proposals and review conditions"]
+    AI_EVIDENCE["ai-evidence: --scope studies<br/>Read the same grouped lookup; include AI lookup<br/>Open-access text/tables; guarded extraction<br/>Verify claims; compare values/bounds locally"]
+    REVIEW["Clinician review and scoped reuse<br/>Review field and whole-set findings, short reasons, source support and applicability<br/>A numeric value is a format check; study evidence needs clinical interpretation<br/>Approve / reject / defer in a review copy; recheck approved targets and factors on reuse"]
     INPUT --> VALIDATION
     VALIDATION --> |"yes"| FHIR
     VALIDATION --> |"no"| SKIP
     FHIR --> GROUP
     SKIP --> GROUP
-    GROUP --> A1
-    A1 --> REPORT
+    GROUP --> LOOKUP
+    LOOKUP --> REPORT
     REPORT --> METHOD
-    METHOD -.-> |"lookup: grouped A1"| A2
-    METHOD -.-> |"studies: grouped A1"| A3
-    METHOD --> |"A1 only / items"| REVIEW
-    A2 --> REVIEW
-    A3 --> REVIEW
+    METHOD -.-> |"lookup: grouped lookup"| AI_LOOKUP
+    METHOD -.-> |"studies: grouped lookup"| AI_EVIDENCE
+    METHOD --> |"lookup only / items"| REVIEW
+    AI_LOOKUP --> REVIEW
+    AI_EVIDENCE --> REVIEW
     classDef normal fill:#f3f7fa,stroke:#c4d5df,color:#142d42
-    class INPUT,VALIDATION,FHIR,SKIP,GROUP,METHOD,A2,A3 normal
+    class INPUT,VALIDATION,FHIR,SKIP,GROUP,METHOD,AI_LOOKUP,AI_EVIDENCE normal
     classDef teal fill:#eef7f4,stroke:#a8cfc6,color:#142d42
-    class A1,REPORT,REVIEW teal
+    class LOOKUP,REPORT,REVIEW teal

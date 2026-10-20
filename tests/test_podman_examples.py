@@ -30,7 +30,7 @@ class PodmanExampleTests(unittest.TestCase):
             self.assertEqual(len(commands), 4)
             self.assertEqual(len({line.split(" --out ")[1].strip() for line in commands}), 4)
             for line in commands[2:4]:
-                self.assertIn("/01-lab-lookup/report.csv", line)
+                self.assertIn("/lookup/report.csv", line)
             self.assertIn("--scope lookup", commands[2])
             self.assertIn("--scope studies", commands[3])
             self.assertIn("/tests/configurations/lab/fhir-csv.toml", commands[1])

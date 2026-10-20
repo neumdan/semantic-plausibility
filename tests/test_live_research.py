@@ -82,7 +82,7 @@ class CandidateTests(unittest.TestCase):
 
 @unittest.skipUnless(os.getenv("SQC_LIVE_RESEARCH_TESTS") == "1", "Set SQC_LIVE_RESEARCH_TESTS=1 for actual LOINC/PubMed retrieval")
 class ResearchRetrievalTests(unittest.TestCase):
-    def test_real_research_report_keeps_source_and_names_when_model_is_unavailable(self):
+    def test_abstract_research_keeps_source_and_names_when_model_is_unavailable(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)
             config = configuration(root, connected=True)
@@ -100,6 +100,9 @@ class ResearchRetrievalTests(unittest.TestCase):
             text = text.replace('timeout_seconds = 180', 'timeout_seconds = 1')
             text = text.replace('unit_catalog = "local/unit-catalog.json"', '')
             text = text.replace('max_articles_per_loinc = 4', 'max_articles_per_loinc = 1')
+            # Test the model-dependent abstract path. Explicit full-text table
+            # cells can independently support evidence without a model reply.
+            text = text.replace('FULL_TEXT = true', 'FULL_TEXT = false')
             config.write_text(text)
             check = run_plausibility_check(config)
             original_hash = hashlib.sha256(check.csv.read_bytes()).hexdigest()

@@ -35,7 +35,8 @@ from .model_schemas import explicit_token as _explicit_token
 from .model_schemas import evidence_schema, model_evidence, resolve_sentences, ground_study_units, guard_study_parts, response_schema, validate_grounding, validate_response, supports_evidence_type
 from . import research_prompts as prompts
 from .progress import LOGGER, activity
-from .study_sources import ANALYTICAL_LIMITS, TEXT_RENDERING, study_text, study_queries, analyte_aliases, screen_record, ucum_spelling, provider_query
+from .study_sources import ANALYTICAL_LIMITS, TEXT_RENDERING, study_text, study_queries, analyte_aliases, mentions_analyte, screen_record, ucum_spelling, provider_query
+from .study_fulltext import fulltext_passages, NONHUMAN, RENDERING as FULLTEXT_RENDERING
 
 
 class _Response:
@@ -593,6 +594,7 @@ class PublicEvidenceClient:
         europe_pmc_retmax: int = 3,
         max_articles_per_loinc: int = 3,
         europe_pmc_query_filter: str = "",
+        europe_pmc_full_text: bool = True,
         ucum: Any | None = None,
     ):
         if scope not in {"lookup", "studies"}:
@@ -611,6 +613,10 @@ class PublicEvidenceClient:
         if not isinstance(europe_pmc_query_filter, str) or len(europe_pmc_query_filter) > 1000:
             raise ValueError("Europe PMC query filter must be a bounded public search expression")
         self.europe_pmc_query_filter = europe_pmc_query_filter
+        if type(europe_pmc_full_text) is not bool:
+            raise ValueError("Europe PMC full_text must be true or false")
+        self.europe_pmc_full_text = europe_pmc_full_text
+        self._fulltext_cache = {}
         if type(max_articles_per_loinc) is not int or not 1 <= max_articles_per_loinc <= 12:
             raise ValueError("max_articles_per_loinc must be 1..12")
         self.max_articles_per_loinc = max_articles_per_loinc
@@ -839,6 +845,12 @@ class PublicEvidenceClient:
 
     @staticmethod
     def _abstract_payload(record):
+        if record.get("passages"):
+            passages = record["passages"]
+            return {"abstract": record["evidence_text"],
+                    "excerpt_candidates": [p["excerpt"] for p in passages],
+                    "table_cells": {p["excerpt"]: p["table_cell"] for p in passages if p.get("table_cell")},
+                    "source_locations": {p["excerpt"]: p["location"] for p in passages}}
         text = record["abstract"][:6000]
         excerpts = re.split(r"(?<=[.!?])\s+(?=[A-Z])", text)
         return {"abstract": text, "excerpt_candidates": [part for part in excerpts if part]}
@@ -853,21 +865,36 @@ class PublicEvidenceClient:
         LOGGER.info("LOINC %s: retrieve up to %s distinct articles from %s", term.code, self.max_articles_per_loinc, ", ".join(self.research_sources))
         records = {}
         aliases = analyte_aliases(term)
+        fulltext_attempts = set()
         # Screen a bounded result pool before spending the model article budget.
         # Omitted articles remain in the trace with deterministic reasons.
         for category, query in self.study_queries(term).items():
             for source in self.research_sources:
                 LOGGER.info("Study search: %s · %s · LOINC %s", source, category, term.code)
                 try:
-                    search = provider_query(query, source)
+                    search = provider_query(query, source, full_text=self.europe_pmc_full_text)
                     found = (self._pubmed_records(self._pubmed_ids(search)) if source == "pubmed"
                              else self._europe_pmc_records(search))
                     for record in found:
                         identity = record.get("doi", "").casefold() or record.get("record_key") or "pmid:" + record["pmid"]
-                        if identity not in records or len(record["abstract"]) > len(records[identity]["abstract"]):
+                        if identity not in records or (not records[identity].get("passages")
+                            and len(record["abstract"]) > len(records[identity]["abstract"])):
                             records[identity] = record
                 except (OSError, ValueError, RuntimeError) as exc:
                     self.query_log.append({"source": source, "state": "unavailable", "error_type": type(exc).__name__})
+            if self.europe_pmc_full_text and "europe_pmc" in self.research_sources:
+                # A missing numeric abstract is not a rejection before inspecting permitted full text.
+                pool = sorted(records.values(), key=lambda r: (
+                    -int(bool(re.search(r"reference\s+(?:interval|range)", r["title"], re.I))),
+                    -int(mentions_analyte(r["title"], aliases))))
+                for record in pool:
+                    pmcid = record.get("pmcid")
+                    if len(fulltext_attempts) >= self.max_articles_per_loinc:
+                        break
+                    if not pmcid or not record.get("open_access") or pmcid in fulltext_attempts or NONHUMAN.search(record["title"]):
+                        continue
+                    fulltext_attempts.add(pmcid)
+                    self._add_full_text(record, aliases)
             if sum(screen_record(r, aliases, term.property)[0] > 0 for r in records.values()) >= self.max_articles_per_loinc:
                 break
         ranked = sorted(records.values(), key=lambda r: -screen_record(r, aliases, term.property)[0])
@@ -879,13 +906,36 @@ class PublicEvidenceClient:
                 "reason": reason if score == 0 or record in selected else "model_article_budget",
                 "aliases": aliases, "terminology_source": term.source, "terminology_version": term.version,
                 "source_sha256": record["source_sha256"], "abstract": record["abstract"],
-                "source_text_rendering": TEXT_RENDERING})
+                "source_text_rendering": FULLTEXT_RENDERING if record.get("passages") else TEXT_RENDERING,
+                "full_text_source": record.get("full_text_source", ""),
+                "passages": record.get("passages", [])})
         LOGGER.info("LOINC %s: screened %s articles; selected %s for extraction", term.code, len(records), len(selected))
         candidates = []
         for article_index, record in enumerate(selected, 1):
             before = len(candidates)
             extraction_unavailable = False
             LOGGER.info("LOINC %s: article %s/%s, source %s", term.code, article_index, len(selected), record["url"])
+            # Deterministic table roles retain all selected cells/strata; the model
+            # handles prose and can select only independently checked table claims.
+            payload = {"analyte_definition": {"aliases": aliases, "property": term.property},
+                       **self._abstract_payload(record)}
+            for part in record.get("passages", []):
+                cell = part.get("table_cell")
+                if not cell:
+                    continue
+                context = {"population": " | ".join(v for v in cell["context"] if re.match(r"age|sex|gender|population|partition|group|cohort", v, re.I)),
+                    "specimen": next((v for v in cell["context"] if re.match(r"specimen", v, re.I)), ""),
+                    "method": next((v for v in cell["context"] if re.match(r"method", v, re.I)), ""),
+                    "excerpt": part["excerpt"], "unit": cell["unit"]}
+                if cell.get("bounds"):
+                    claim = {**context, **cell["bounds"]}
+                    validate_grounding(prompts.STUDY_BOUNDS, claim, payload)
+                    candidates += self._extract_study_candidates("reference_interval", [record], term, answers=[claim])
+                for role, value in cell["measurements"]:
+                    claim = {**context, "value_kind": role, "reported_value": value}
+                    validate_grounding(prompts.STUDY_MEASUREMENTS, {"measurements": [claim]}, payload)
+                    candidates.append(ResearchCandidate("reported_measurement", record["url"],
+                        **claim, **self._study_provenance(record, part["excerpt"])))
             if self.llm is not None:
                 try:
                     answer = self.llm.json(prompts.STUDY_EXTRACT, {
@@ -900,7 +950,7 @@ class PublicEvidenceClient:
                         candidates.append(ResearchCandidate(kind, record["url"],
                             unit=row["unit"], population=row["population"], specimen=row["specimen"],
                             method=row["method"], excerpt=row["excerpt"], reported_value=row["reported_value"],
-                            value_kind=row["value_kind"], **self._study_provenance(record)))
+                            value_kind=row["value_kind"], **self._study_provenance(record, row["excerpt"])))
                 except (OSError, ValueError, RuntimeError) as exc:
                     extraction_unavailable = True
                     self.query_log.append({"source": record["url"], "task": "study_extract", "state": "unavailable", "error_type": type(exc).__name__})
@@ -909,6 +959,11 @@ class PublicEvidenceClient:
                 candidates.append(ResearchCandidate("unclassified_discovery", record["url"],
                     excerpt=record["title"], status="extraction_unavailable" if extraction_unavailable else "no_supported_extraction",
                     **self._study_provenance(record)))
+        distinct = {}
+        for candidate in candidates:
+            distinct.setdefault((candidate.source, candidate.evidence_type, candidate.value_kind,
+                candidate.reported_value, candidate.low, candidate.high, candidate.unit, candidate.excerpt), candidate)
+        candidates = list(distinct.values())
         # Retain the literal unit; validate a separate typography-derived UCUM spelling.
         for index, candidate in enumerate(candidates):
             if not candidate.unit or self.ucum is None:
@@ -926,6 +981,42 @@ class PublicEvidenceClient:
                 unit_validation_state=state, unit_validation_source=source)
         self._study_cache[key] = candidates
         return list(candidates)
+
+    def _add_full_text(self, record, aliases):
+        pmcid = record["pmcid"]
+        if not re.fullmatch(r"PMC\d+", pmcid):
+            return
+        url = self.europe_pmc_base_url + "/" + pmcid + "/fullTextXML"
+        LOGGER.info("Full text: %s; bounded XML, relevant paragraphs and labelled table cells", pmcid)
+        if pmcid not in self._fulltext_cache:
+            self.query_log.append({"source": url, "endpoint": "fullTextXML"})
+            try:
+                response = self.session.get(url, timeout=self.timeout)
+                response.raise_for_status()
+                digest = hashlib.sha256(response.text.encode()).hexdigest()
+                provenance = {"source": url, "sha256": digest,
+                              "retrieved_at": datetime.now(timezone.utc).isoformat()}
+                self.source_records[digest] = provenance
+                self._fulltext_cache[pmcid] = (response.text, provenance)
+            except (OSError, ValueError, RuntimeError) as exc:
+                self._fulltext_cache[pmcid] = None
+                self.query_log.append({"source": url, "state": "unavailable", "error_type": type(exc).__name__})
+        cached = self._fulltext_cache[pmcid]
+        if cached is None:
+            return
+        xml, provenance = cached
+        try:
+            parsed = fulltext_passages(xml, aliases)
+        except (ValueError, ET.ParseError) as exc:
+            self.query_log.append({"source": url, "task": "full_text_parse", "state": "unavailable", "error_type": type(exc).__name__})
+            return
+        self.query_log.append({"source": url, "task": "full_text_parse", "state": "parsed",
+            "passages": len(parsed["passages"]), "skipped_tables": parsed["skipped_tables"],
+            "omitted_passages": parsed["omitted_passages"], "source_sha256": provenance["sha256"]})
+        if parsed["passages"]:
+            record.update(passages=parsed["passages"], evidence_text="\n".join(p["excerpt"] for p in parsed["passages"]),
+                          full_text_source=url, full_text_sha256=provenance["sha256"],
+                          full_text_retrieved_at=provenance["retrieved_at"], source_license=parsed["license"])
 
     def _europe_pmc_records(self, query):
         if self.europe_pmc_query_filter:
@@ -947,6 +1038,7 @@ class PublicEvidenceClient:
             if not re.fullmatch(r"[A-Z]+", source) or not re.fullmatch(r"[A-Za-z0-9_-]+", identifier):
                 continue
             records.append({"pmid": identifier if source == "MED" else "",
+                "pmcid": str(row.get("pmcid", "")), "open_access": row.get("isOpenAccess") == "Y",
                 "record_key": "pmid:" + identifier if source == "MED" else source + ":" + identifier,
                 "title": study_text(row.get("title", "")), "abstract": study_text(row.get("abstractText", "")),
                 "source_sha256": digest, "retrieved_at": retrieved_at, "doi": str(row.get("doi", "")),
@@ -990,7 +1082,7 @@ class PublicEvidenceClient:
     def _extract_study_candidates(
         self, evidence_type: str, records: list[dict[str, str]], term: LoincTerm, *, answers=None
     ) -> list[ResearchCandidate]:
-        if self.llm is None:
+        if self.llm is None and answers is None:
             return [
                 ResearchCandidate(evidence_type, record["url"], excerpt=record["title"], **self._study_provenance(record)) for record in records
             ]
@@ -1010,7 +1102,8 @@ class PublicEvidenceClient:
                 },
             )
             excerpt = str(answer.get("excerpt") or "").strip()
-            if excerpt and excerpt not in record["abstract"]:
+            supplied_text = record.get("evidence_text", record["abstract"])
+            if excerpt and excerpt not in supplied_text:
                 continue
             low = answer.get("low")
             high = answer.get("high")
@@ -1039,7 +1132,7 @@ class PublicEvidenceClient:
             anchored = {}
             for field in ("population", "specimen", "method"):
                 label = str(answer.get(field) or "").strip()
-                anchored[field] = label if label and label.casefold() in record["abstract"].casefold() else ""
+                anchored[field] = label if label and label.casefold() in supplied_text.casefold() else ""
             unit = str(answer.get("unit") or "").strip()
             if not excerpt or not unit or not _explicit_token(unit, excerpt):
                 unit = ""
@@ -1048,7 +1141,8 @@ class PublicEvidenceClient:
             kind = answer["evidence_type"]
             if kind is None:
                 continue
-            if not supports_evidence_type(kind, excerpt, record["abstract"]):
+            table = next((p.get("table_cell") for p in record.get("passages", []) if p["excerpt"] == excerpt), None)
+            if not table and not supports_evidence_type(kind, excerpt, supplied_text):
                 kind = "unclassified_numeric_range"
             result.append(
                 ResearchCandidate(
@@ -1062,17 +1156,22 @@ class PublicEvidenceClient:
                     method=anchored["method"],
                     excerpt=excerpt or record["title"],
                     status="candidate",
-                    **self._study_provenance(record),
+                    **self._study_provenance(record, excerpt),
                 )
             )
         return result
 
     @staticmethod
-    def _study_provenance(record):
+    def _study_provenance(record, excerpt=""):
         """Citation metadata comes from the retrieved provider record, never the model."""
-        return {"source_title": record.get("title", ""), "source_sha256": record.get("source_sha256", ""),
-                "retrieved_at": record.get("retrieved_at", ""), "doi": record.get("doi", ""),
-                "source_text_rendering": TEXT_RENDERING}
+        part = next((p for p in record.get("passages", []) if p["excerpt"] == excerpt), {})
+        return {"source_title": record.get("title", ""), "source_sha256": record.get("full_text_sha256", record.get("source_sha256", "")) if part else record.get("source_sha256", ""),
+                "retrieved_at": record.get("full_text_retrieved_at", record.get("retrieved_at", "")) if part else record.get("retrieved_at", ""), "doi": record.get("doi", ""),
+                "source_text_rendering": FULLTEXT_RENDERING if part else TEXT_RENDERING,
+                "source_kind": part.get("kind", "abstract"), "source_location": part.get("location", "abstract"),
+                "full_text_source": record.get("full_text_source", "") if part else "",
+                "source_license": record.get("source_license", "") if part else "",
+                "sample_size": part.get("table_cell", {}).get("sample_size", "")}
 
 
 def services_from_environment(
@@ -1111,6 +1210,7 @@ def services_from_environment(
             europe_pmc_base_url=os.getenv("EUROPE_PMC_BASE_URL", "https://www.ebi.ac.uk/europepmc/webservices/rest"),
             europe_pmc_retmax=int(os.getenv("SQC_EUROPE_PMC_RETMAX", "3")),
             europe_pmc_query_filter=os.getenv("SQC_EUROPE_PMC_QUERY_FILTER", ""),
+            europe_pmc_full_text=os.getenv("SQC_EUROPE_PMC_FULL_TEXT", "true").lower() == "true",
             max_articles_per_loinc=int(os.getenv("SQC_MAX_ARTICLES_PER_LOINC", "3")),
         ) if use_llm else None,
     )

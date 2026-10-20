@@ -17,11 +17,11 @@ case "$argument" in
   --include-medication) LAB_ONLY=false ;;
   -h|--help)
     printf '%s\n' 'Usage: bash tools/run-podman-examples.sh [--lookup-only] [--include-medication] [--dry-run] [--rebuild]' \
-      'Runs four laboratory modes using the shipped input and real services.' \
+      'Runs lookup, fhir-validation, ai-lookup and ai-evidence using the shipped input and real services.' \
       'Uses real APIs, local Matchbox/Blaze and Ollama; first use downloads images/model.' \
       'Writes separate reports under output/podman-examples-<timestamp>-<unique suffix>/.' \
       '--include-medication adds five developer regression examples for later medication work.' \
-      '--lookup-only runs the laboratory A1 check, without Ollama or the FHIR validator.' \
+      '--lookup-only runs the laboratory lookup check, without Ollama or the FHIR validator.' \
       '--dry-run prints the plan without creating files, downloading or running containers.' \
       '--rebuild explicitly rebuilds the runner and validator, retaining cached layers/volumes.'
     exit 0 ;;
@@ -107,7 +107,7 @@ if ! "$DRY_RUN"; then
   trap 'exit 143' TERM
   if [[ ! -e .env ]]; then cp .env.example .env; fi
   exec > >(tee -a "$RUN_DIR/run.log") 2>&1
-  printf 'mode\texit_code\tstate\treport\n' > "$RUN_DIR/summary.tsv"
+  printf 'workflow\texit_code\tstate\treport\n' > "$RUN_DIR/summary.tsv"
   printf '%s\n' '<!doctype html><html lang="en"><meta charset="utf-8"><title>Example runs</title><h1>Example runs</h1><p>Completed means the command finished; inspect each report for findings, missing evidence and model failures.</p><ul>' > "$RUN_DIR/index.html"
 fi
 RUN_DIR="$ROOT/output/$RUN_NAME"
@@ -134,24 +134,24 @@ wait_healthy() {
 }
 
 record() {
-  local mode=$1 code=$2 state=$3
+  local workflow=$1 code=$2 state=$3
   if [[ "$code" != 0 ]]; then FAILURES=$((FAILURES + 1)); fi
   if ! "$DRY_RUN"; then
-    printf '%s\t%s\t%s\t%s\n' "$mode" "$code" "$state" "$mode/report.csv" >> "$RUN_DIR/summary.tsv"
-    if [[ -f "$RUN_DIR/$mode/report.html" ]]; then
-      printf '<li><a href="%s/report.html">%s</a>: %s (exit %s)</li>\n' "$mode" "$mode" "$state" "$code" >> "$RUN_DIR/index.html"
+    printf '%s\t%s\t%s\t%s\n' "$workflow" "$code" "$state" "$workflow/report.csv" >> "$RUN_DIR/summary.tsv"
+    if [[ -f "$RUN_DIR/$workflow/report.html" ]]; then
+      printf '<li><a href="%s/report.html">%s</a>: %s (exit %s)</li>\n' "$workflow" "$workflow" "$state" "$code" >> "$RUN_DIR/index.html"
     else
-      printf '<li>%s: %s (exit %s); see run.log</li>\n' "$mode" "$state" "$code" >> "$RUN_DIR/index.html"
+      printf '<li>%s: %s (exit %s); see run.log</li>\n' "$workflow" "$state" "$code" >> "$RUN_DIR/index.html"
     fi
   fi
 }
 
 report() {
-  local mode=$1 code=0
+  local workflow=$1 code=0
   shift
-  if ! "$DRY_RUN"; then mkdir "$RUN_DIR/$mode"; fi
-  step "$mode" pc run --rm "$@" --out "$CONTAINER_RUN/$mode/report.csv" || code=$?
-  if [[ "$code" == 0 ]]; then record "$mode" 0 completed; else record "$mode" "$code" nonzero; fi
+  if ! "$DRY_RUN"; then mkdir "$RUN_DIR/$workflow"; fi
+  step "$workflow" pc run --rm "$@" --out "$CONTAINER_RUN/$workflow/report.csv" || code=$?
+  if [[ "$code" == 0 ]]; then record "$workflow" 0 completed; else record "$workflow" "$code" nonzero; fi
   return "$code"
 }
 
@@ -181,7 +181,7 @@ step 'Install pinned MII profile and selected HL7 binding (local/profiles)' pc r
   --config /app/tests/configurations/lab/aggregated.toml
 
 lookup_ready=false
-if report 01-lab-lookup run-plausibility-check check --config /app/tests/configurations/lab/aggregated.toml; then lookup_ready=true; fi
+if report lookup run-plausibility-check check --config /app/tests/configurations/lab/aggregated.toml; then lookup_ready=true; fi
 
 if ! "$LOOKUP_ONLY"; then
 if step 'Prepare pinned MII laboratory validator' pc run --rm validator-init validator-init \
@@ -190,9 +190,9 @@ if step 'Prepare pinned MII laboratory validator' pc run --rm validator-init val
    && step 'Install real guide terminology' pc run --rm terminology-init terminology-init \
      --config /app/tests/configurations/lab/fhir-csv.toml \
    && prepare_matchbox; then
-  report 02-lab-fhir-validation run-plausibility-check check --config /app/tests/configurations/lab/fhir-csv.toml || true
+  report fhir-validation run-plausibility-check check --config /app/tests/configurations/lab/fhir-csv.toml || true
 else
-  record 02-lab-fhir-validation - setup_failed
+  record fhir-validation - setup_failed
 fi
 step 'Release validator memory before model inference' stop_services matchbox blaze || true
 
@@ -200,13 +200,13 @@ if "$lookup_ready" \
    && step 'Start local Ollama' pc up -d ollama && wait_healthy ollama \
    && step 'Provision configured model' pc run --rm model-init model-init --config /app/tests/configurations/lab/aggregated.toml \
    && step 'Download real UCUM catalogue' pc run --rm catalog-init catalog-init --config /app/tests/configurations/lab/aggregated.toml; then
-  report 03-lab-ai-recommendations research-evidence research-evidence --config /app/tests/configurations/lab/aggregated.toml \
-    --scope lookup --report "$CONTAINER_RUN/01-lab-lookup/report.csv" || true
-  report 04-lab-ai-evidence research-evidence research-evidence --config /app/tests/configurations/lab/aggregated.toml \
-    --scope studies --report "$CONTAINER_RUN/01-lab-lookup/report.csv" || true
+  report ai-lookup research-evidence research-evidence --config /app/tests/configurations/lab/aggregated.toml \
+    --scope lookup --report "$CONTAINER_RUN/lookup/report.csv" || true
+  report ai-evidence research-evidence research-evidence --config /app/tests/configurations/lab/aggregated.toml \
+    --scope studies --report "$CONTAINER_RUN/lookup/report.csv" || true
 else
-  record 03-lab-ai-recommendations - dependency_failed
-  record 04-lab-ai-evidence - dependency_failed
+  record ai-lookup - dependency_failed
+  record ai-evidence - dependency_failed
 fi
 
 fi # Full lab workflow; --lookup-only skips validator and model services.
@@ -224,5 +224,5 @@ if ! "$DRY_RUN"; then
   printf '%s\n' '</ul><p><a href="summary.tsv">Exit summary</a> · <a href="run.log">Run log</a></p></html>' >> "$RUN_DIR/index.html"
   printf '\n'; cat "$RUN_DIR/summary.tsv"
 fi
-printf '\nEach mode writes its own report.csv, report.html and provenance files.\n'
-if (( FAILURES > 0 )); then printf '%s mode(s) need attention; see summary.tsv and run.log.\n' "$FAILURES" >&2; exit 1; fi
+printf '\nEach workflow writes its own report.csv, report.html and provenance files.\n'
+if (( FAILURES > 0 )); then printf '%s workflow(s) need attention; see summary.tsv and run.log.\n' "$FAILURES" >&2; exit 1; fi

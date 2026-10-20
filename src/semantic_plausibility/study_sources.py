@@ -173,7 +173,7 @@ def quantity_exclusion(text, unit, property_code="", *, bounds=False, analytical
     """Conservative exclusions, not a clinical equivalence or applicability test."""
     if unit_key(unit) == "%" and property_code in {"MCnc", "SCnc", "NCnc", "EntMCnc"}:
         return "percentage_is_not_the_requested_concentration"
-    if re.search(r"\bbias\b|limits? of agreement|Bland.?Altman|\bdifference\b", text, re.I):
+    if re.search(r"\bbias\b|limits? of agreement|Bland.?Altman|\bdifferences?\b", text, re.I):
         return "method_difference_is_not_an_analyte_result"
     if re.search(r"\binterferen\w*\b|\bspik(?:e|ed|ing)\b", text, re.I):
         return "interference_experiment_is_not_an_analyte_result"
@@ -185,24 +185,34 @@ def quantity_exclusion(text, unit, property_code="", *, bounds=False, analytical
 
 
 def screen_record(record, aliases, property_code=""):
-    abstract = record.get("abstract", "")
+    from .study_fulltext import NONHUMAN
+    if NONHUMAN.search(record.get("title", "")):
+        return 0, "explicit_nonhuman_title"
+    abstract = record.get("evidence_text", record.get("abstract", ""))
     if not abstract:
         return 0, "no_abstract"
+    table_claims = any(p.get("table_cell", {}).get("bounds") or p.get("table_cell", {}).get("measurements")
+                       for p in record.get("passages", []))
     clauses = analyte_clauses(abstract, aliases)
     quantitative = [c for c in clauses if re.search(r"\d", c) and any(
         not quantity_exclusion(c, u, property_code, analytical=True,
             bounds=bool(re.search(r"reference\s+(?:interval|range)|\bRIs?\b", c, re.I)))
         for u in unit_tokens(c))]
-    if not quantitative:
+    if not quantitative and not table_claims:
         return 0, "no_eligible_analyte_quantity_in_abstract"
     title = record.get("title", "")
     reference = bool(re.search(r"reference\s+(?:interval|range)", title, re.I))
-    return 10 + 5 * reference + 2 * mentions_analyte(title, aliases), "analyte_quantity_in_abstract"
+    return 10 + 5 * reference + 2 * mentions_analyte(title, aliases), (
+        "analyte_quantity_in_full_text" if record.get("passages") else "analyte_quantity_in_abstract")
 
 
-def provider_query(query, provider):
+def provider_query(query, provider, *, full_text=False):
     """Search the part we actually extract, not unrelated mentions in full text."""
     if provider == "europe_pmc":
+        if full_text:
+            # Require a dedicated interval article, while allowing the analyte
+            # itself to occur in a results table rather than the abstract.
+            return re.sub(r'"(reference (?:intervals?|ranges?))"', r'TITLE:"\1"', query)
         return re.sub(r'"([^"\n]+)"', r'TITLE_ABS:"\1"', query)
     return re.sub(r'"([^"\n]+)"', r'"\1"[Title/Abstract]', query)
 
@@ -213,6 +223,7 @@ def study_queries(term):
     return {
         "reference_interval": f'({topic}) AND ("reference interval" OR "reference intervals" OR "reference range" OR "reference ranges")',
         "summary_statistics": f'({topic}) AND ("mean" OR "median" OR "standard deviation" OR "minimum" OR "maximum")',
+        "observational_studies": f'({topic}) AND (cohort OR epidemiology OR "population study")',
         "analytical_interval": f'({topic}) AND ("analytical measuring interval" OR "reportable range")',
         "documented_extreme": f'({topic}) AND ("extreme value" OR "case report")',
         "reported_measurement": f'({topic}) AND (measurement OR concentration OR units)',

@@ -455,6 +455,7 @@ class Deployment:
                         "EUROPE_PMC_BASE_URL": settings.get("europe_pmc", {}).get("base_url", "https://www.ebi.ac.uk/europepmc/webservices/rest"),
                         "SQC_EUROPE_PMC_RETMAX": settings.get("europe_pmc", {}).get("max_results", 3),
                         "SQC_EUROPE_PMC_QUERY_FILTER": settings.get("europe_pmc", {}).get("query_filter", ""),
+                        "SQC_EUROPE_PMC_FULL_TEXT": str(settings.get("europe_pmc", {}).get("full_text", True)).lower(),
                         "SQC_MAX_ARTICLES_PER_LOINC": settings.get("max_articles_per_loinc", 3),
                     }
                 )

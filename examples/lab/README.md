@@ -12,7 +12,7 @@ First setup: [Podman / Docker / Python](../../docs/shipped-stack.md). Every exam
 | SQLite file | [SQLite](#sqlite) | Read the selected table and mapped columns |
 | PostgreSQL / CDS Hub | [PostgreSQL](#postgresql) | Read the selected view/table and mapped columns |
 
-The source adapter always feeds the same laboratory set: **code + system + name + specimen/method + value or statistics + unit/system + reference context**. The target profile supplies field requirements; your column map supplies the actual data. Select `output.mode="distinct"` for the evidence pipeline; `"items"` retains individual IDs for A1 inspection.
+The source adapter always feeds the same laboratory set: **code + system + name + specimen/method + value or statistics + unit/system + reference context**. The target profile supplies field requirements; your column map supplies the actual data. Select `output.mode="distinct"` for the evidence pipeline; `"items"` retains individual IDs for lookup inspection.
 
 ## Individual CSV
 
@@ -21,6 +21,7 @@ Replace the input tables with this complete example:
 ```toml
 [input]
 type = "csv"
+delimiter = "," # Match your header: comma, semicolon (";"), or tab ("\t").
 path = "examples/lab/individual.csv"
 origin = "lis"
 source_namespace = "example-laboratory"
@@ -52,6 +53,7 @@ Replace the input tables with:
 ```toml
 [input]
 type = "csv"
+delimiter = "," # Match your header: comma, semicolon (";"), or tab ("\t").
 path = "examples/lab/aggregated.csv"
 origin = "lis"
 source_namespace = "example-laboratory"
@@ -101,6 +103,7 @@ For complete FHIR JSON stored in CSV, use this input block instead:
 ```toml
 [input]
 type = "csv"
+delimiter = "," # Match your header: comma, semicolon (";"), or tab ("\t").
 path = "examples/laboratory-fhir.csv"
 origin = "fhir"
 source_namespace = "example-laboratory"
@@ -174,9 +177,9 @@ For a hospital/CDS Hub connection, select a read-only account, host/database, sc
 
 ```sh
 podman-compose run --rm run-plausibility-check config-check
-podman-compose run --rm run-plausibility-check check --out output/lab-01.csv
+podman-compose run --rm run-plausibility-check check --out output/lookup.csv
 ```
 
-Open `output/lab-01.html`. Change the output filename on the next run. Docker uses `docker compose`. Python uses `uv run --no-sync --env-file .env run-plausibility-check` in place of the Compose prefix (install `--extra postgres` for PostgreSQL).
+Open `output/lookup.html`. Change the output filename on the next run. Docker uses `docker compose`. Python uses `uv run --no-sync --env-file .env run-plausibility-check` in place of the Compose prefix (install `--extra postgres` for PostgreSQL).
 
 Then use the **same configuration** and grouped report for `research-evidence --scope lookup` or `--scope studies`. [Ollama setup and exact commands](../../README.md#local-ai-select-download-run). Inputs and values stay local; configured APIs provide terminology and study evidence. A missing source remains visibly unverified.

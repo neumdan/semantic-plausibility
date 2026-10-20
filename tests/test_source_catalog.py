@@ -18,6 +18,41 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SourceCatalogTests(unittest.TestCase):
+    def test_template_api_file_and_combined_selections_resolve_without_inventing_data(self):
+        from test_batch import configuration
+        with tempfile.TemporaryDirectory() as name:
+            path = configuration(Path(name), connected=True)
+            template = path.read_text().replace('source = "loinc-public-test"', 'source = "loinc-api"')
+            for api, local in ((True, False), (False, True), (True, True)):
+                for strategy in ('fallback', 'all'):
+                    with self.subTest(api=api, local=local, strategy=strategy):
+                        selected = template.replace('[lookups.loinc]\nenabled = true',
+                                                    '[lookups.loinc]\nenabled = ' + str(api).lower())
+                        selected = selected.replace('[lookups.loinc_local]\nenabled = false',
+                                                    '[lookups.loinc_local]\nenabled = ' + str(local).lower())
+                        selected = selected.replace('version = ""', 'version = "2.83"')
+                        selected = selected.replace('strategy = "fallback"', 'strategy = "' + strategy + '"')
+                        path.write_text(selected)
+                        # Parse/routing configuration only; no fabricated file/API replies.
+                        config = BatchConfiguration(path)
+                        self.assertEqual(config.lookup_strategy, strategy)
+                        self.assertEqual(config.data['lookups']['loinc']['enabled'], api)
+                        self.assertEqual(config.data['lookups']['loinc']['type'], 'loinc')
+                        file_source = config.data['lookups']['loinc_local']
+                        self.assertEqual(file_source['enabled'], local)
+                        self.assertEqual(file_source['type'], 'loinc_csv')
+                        self.assertEqual(file_source['systems'], ['http://loinc.org'])
+                        self.assertNotIn('password_env', file_source)
+
+    def test_enabling_the_file_requires_the_operator_to_fill_its_edition(self):
+        from test_batch import configuration
+        with tempfile.TemporaryDirectory() as name:
+            path = configuration(Path(name))
+            path.write_text(path.read_text().replace('[lookups.loinc_local]\nenabled = false',
+                                                     '[lookups.loinc_local]\nenabled = true'))
+            with self.assertRaisesRegex(ValueError, 'downloaded release version'):
+                BatchConfiguration(path)
+
     def test_default_api_local_file_and_container_routes_are_explicit(self):
         config = BatchConfiguration(ROOT / 'pipeline.example.toml')
         self.assertEqual(config.data['lookups']['loinc']['endpoint'], 'https://fhir.loinc.org')

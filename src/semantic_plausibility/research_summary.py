@@ -16,7 +16,7 @@ def counts(candidates):
 
 
 def write_studies(path, rows):
-    fields = ['loinc', 'tuple_ids', 'evidence_type', 'status', 'value_kind', 'reported_value', 'low', 'high', 'unit', 'unit_ucum', 'unit_validation_state', 'unit_validation_source', 'source_text_rendering', 'population', 'specimen', 'method', 'source_title', 'source', 'doi', 'excerpt', 'source_sha256', 'retrieved_at']
+    fields = ['loinc', 'tuple_ids', 'evidence_type', 'status', 'value_kind', 'reported_value', 'low', 'high', 'unit', 'unit_ucum', 'unit_validation_state', 'unit_validation_source', 'source_text_rendering', 'source_kind', 'source_location', 'full_text_source', 'source_license', 'sample_size', 'population', 'specimen', 'method', 'source_title', 'source', 'doi', 'excerpt', 'source_sha256', 'retrieved_at']
     entries = {}
     for row in rows:
         for item in json.loads(row.get('study_evidence_json') or '[]'):
@@ -47,4 +47,5 @@ def html(summary, csv_name):
     table = '<table><thead><tr><th>Measure</th><th>Count</th></tr></thead><tbody>' + ''.join(
         '<tr><th scope="row">' + label + '</th><td>' + escape(str(data.get(key, 'not recorded'))) + '</td></tr>'
         for key, label in labels.items()) + '</tbody></table>'
-    return '<section><h2>Study evidence: retrieval versus extraction</h2><p>' + escape(data.get('scope', 'No study retrieval in lookup-only mode.')) + '</p><p><a href="'+escape(name, quote=True)+'">Open study evidence CSV: statistics, units, quotations and sources</a></p>' + table + '<p>Input means and SDs are descriptive summaries. Published intervals and study statistics remain context-dependent review evidence; no pooled population reference interval is inferred.</p></section>'
+    fulltext = '<p>Open-access full text: ' + str(research.get('full_text_requests', 0)) + ' requests; ' + str(research.get('full_text_parsed', 0)) + ' article/analyte parses. Exact table-cell locations and reported sample sizes are in the study CSV. Ambiguous tables are recorded as skipped in the trace.</p>'
+    return '<section><h2>Study evidence: retrieval versus extraction</h2><p>' + escape(data.get('scope', 'No study retrieval in lookup-only mode.')) + '</p><p><a href="'+escape(name, quote=True)+'">Open study evidence CSV: statistics, units, quotations and sources</a></p>' + table + fulltext + '<p>Input means and SDs are descriptive summaries. Published intervals and study statistics remain context-dependent review evidence; no pooled population reference interval is inferred.</p></section>'

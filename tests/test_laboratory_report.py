@@ -159,7 +159,7 @@ class RecordedRunTests(unittest.TestCase):
                 if summary.get("research", {}).get("scope") == "studies" and study_counts.get("extracted_measurements") == 0 and study_counts.get("extracted_intervals") == 0:
                     self.assertIn("No study-derived value or reference-range recommendation.", html)
                     self.assertLess(html.index("No study-derived value"), html.index('class="item"'))
-                if folder.name in {"01-lab-lookup", "03-lab-ai-recommendations", "04-lab-ai-evidence"}:
+                if folder.name in {"01-lab-lookup", "03-lab-ai-recommendations", "04-lab-ai-evidence", "lookup", "ai-lookup", "ai-evidence"}:
                     self.assertIn("g/dL; value × 0.1", html)
                     self.assertIn("ucum.nlm.nih.gov", html)
                 self.assertEqual(verify_audit(folder / "report.audit.jsonl")["status"], "verified")

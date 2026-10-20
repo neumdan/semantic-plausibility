@@ -26,6 +26,11 @@ def select(data, keys):
     return {key: data[key] for key in keys if key in data}
 
 
+def workflow_name(context):
+    """Use descriptive names while retaining support for earlier audited reports."""
+    return context.get("workflow") or {"A1": "lookup", "A2": "ai-lookup", "A3": "ai-evidence"}.get(context.get("level"), "lookup")
+
+
 def run_context(config, prepared, *, output_path=None, source_report=None, source_summary=None):
     """Allowlist settings; never serialize the complete configuration or environment."""
     research = config.kind == "Observation" and config.data.get("research", {}).get("enabled", False)
@@ -50,7 +55,7 @@ def run_context(config, prepared, *, output_path=None, source_report=None, sourc
         model = select(selected, ("alias", "model", "temperature", "max_tokens", "timeout_seconds", "response_mode", "reasoning_effort", "enable_thinking"))
         model["endpoint"] = safe_location(selected.get("base_url"))
     original = source_summary or {}
-    source = select(config.input, ("type", "origin", "path", "granularity", "columns", "defaults", "elements", "context", "context_file", "manifest", "snapshot"))
+    source = select(config.input, ("type", "origin", "path", "granularity", "delimiter", "columns", "defaults", "elements", "context", "context_file", "manifest", "snapshot"))
     source["database_selection"] = select(config.database, ("DB_SCHEMA", "DB_TABLE"))
     if source_report:
         source = {"type": "audited_check_report", "path": str(source_report), "hospital_data_requeried": False,
@@ -63,6 +68,8 @@ def run_context(config, prepared, *, output_path=None, source_report=None, sourc
     return {"format_version": 1, "created_at": datetime.now(timezone.utc).isoformat(),
             "configuration_file": str(config.path), "configuration_sha256": config.deployment.sha256,
             "operation": config.operation, "level": "A3" if scope == "studies" else "A2" if scope == "lookup" else "A1",
+            "workflow": ("ai-evidence" if scope == "studies" else "ai-lookup" if scope == "lookup"
+                         else "fhir-validation" if config.validation.get("enabled") and config.full_fhir_input else "lookup"),
             "resource_type": config.kind, "network_mode": config.network_mode,
             "input": source, "output": {"csv_layout": "scalar-columns-v1", "mode": config.output.get("mode", "distinct"), "path": str(output_path or config.output.get("path", ""))},
             "grouping": {"engine": "duckdb", "group_by": sorted(config.group_by) if config.kind == "Observation" else "Complete medication, dosage, status and context set"},
@@ -166,13 +173,14 @@ def item_context(context, row, detail):
         assumptions.append("Configured defaults/context are listed in the run configuration. Field-level default provenance is not retained by this adapter.")
     research = context["operation"] == "research-evidence"
     if research:
-        assumptions.append("Check status and numeric readiness are inherited from the original A1 report. Research adds candidates; it does not certify or replace that result.")
+        assumptions.append("Check status and numeric readiness are inherited from the original lookup report. Research adds candidates; it does not certify or replace that result.")
     status = row.get("status", "unknown")
     action = ("Review failed checks against the original export; correct approved source/ETL issues and rerun." if status == "error"
               else "No correction identified within the implemented checks; semantic correctness still requires expert review." if status == "passed"
               else "Review sourced candidates and missing evidence; apply only approved changes in the source mapping/ETL, then rerun.")
     return {"configuration_sha256": context["configuration_sha256"], "configuration_section": "run-configuration",
             "tuple_id": row.get("tuple_id"), "level": context["level"], "resource_type": row.get("resource_type", "Observation"),
+            "workflow": workflow_name(context),
             "check_result_basis": "original_A1_report" if research else "this_run",
             "input": {"rows": row.get("source_rows", row.get("input_rows")), "occurrences": row.get("occurrence_count"),
                       "frequency_known": row.get("frequency_known"),
@@ -199,7 +207,7 @@ def run_context_html(summary, csv_name):
              ('Validation and model settings', {"validation": context['validation'], "research": context['research'],
                                                 "input_decision": context.get('input_decision', {"enabled": False})}),
              ('Output and reproducibility', {"output": context['output'], "input_sha256": summary.get('input_sha256'), "software": summary.get('software')})]
-    return '<section id="run-configuration"><h2>Configuration and methods</h2><p><b>' + escape(context['level'] + ' · ' + context['resource_type']) + '</b> · ' + escape(context['network_mode']) + '</p><p>Configuration: <code>' + escape(context['configuration_file']) + '</code><br>Configuration SHA-256: <code>' + escape(context['configuration_sha256']) + '</code></p><p>' + escape(context['configuration_scope']) + '</p>' + ''.join('<details><summary>' + label + '</summary>' + _json(data) + '</details>' for label, data in parts) + '<p>' + links + '</p></section>'
+    return '<section id="run-configuration"><h2>Configuration and methods</h2><p><b>' + escape(workflow_name(context) + ' · ' + context['resource_type']) + '</b> · ' + escape(context['network_mode']) + '</p><p>Configuration: <code>' + escape(context['configuration_file']) + '</code><br>Configuration SHA-256: <code>' + escape(context['configuration_sha256']) + '</code></p><p>' + escape(context['configuration_scope']) + '</p>' + ''.join('<details><summary>' + label + '</summary>' + _json(data) + '</details>' for label, data in parts) + '<p>' + links + '</p></section>'
 
 
 def item_context_html(row):
@@ -209,4 +217,4 @@ def item_context_html(row):
     methods = ''.join('<tr><td>' + escape(str(r['method'])) + '</td><td>' + escape(str(r['result'])) + '</td></tr>' for r in item['methods'])
     sources = ''.join('<tr><td>' + escape(str(r.get('code', ''))) + '<br>' + escape(str(r.get('system', ''))) + '</td><td>' + escape(str(r.get('state', 'unknown'))) + ('<br>' + escape(r['scope']) if r.get('scope') else '') + ('<details><summary>Lookup availability / errors</summary>' + _json(select(r, ('availability', 'error_type', 'errors', 'reason'))) + '</details>' if r.get('errors') or r.get('error_type') or r.get('availability') == 'service_unavailable' else '') + '</td><td>' + source_html(r.get('source'), version=r.get('version', ''), sha256=r.get('source_sha256', '')) + '</td></tr>' for r in item['lookup_evidence'])
     execution = '<h4>Model and research activity for this item</h4>' + _json(item['execution']) if item.get('execution') else ''
-    return '<details class="assessment"><summary>How this item was assessed · ' + escape(str(item.get('tuple_id', ''))) + '</summary><p><a href="#run-configuration">Run configuration, mapping and target profile</a> · ' + escape(item['level']) + '<br>Configuration SHA-256: <code>' + escape(item['configuration_sha256']) + '</code><br>Check result basis: ' + escape(item['check_result_basis']) + '</p><h4>Input accounting</h4>' + _json(item['input']) + '<h4>Methods and results</h4><table><tr><th>Method</th><th>Result</th></tr>' + methods + '</table>' + execution + '<p>FHIR validation (run-level): ' + escape(str(item['fhir_validation']['run_state'])) + '. ' + escape(item['fhir_validation']['scope']) + '</p><h4>Assumptions and limits</h4><ul>' + ''.join('<li>' + escape(t) + '</li>' for t in item['assumptions_and_limits']) + '</ul><h4>Lookup evidence and attempts for this item</h4><table><tr><th>Code / system</th><th>Result</th><th>Source / edition</th></tr>' + (sources or '<tr><td colspan="3">No lookup evidence recorded.</td></tr>') + '</table><h4>Output and improvement step</h4><p>' + escape(item['output']['status']) + ': ' + escape(item['output']['next_step']) + '</p><p>See the sourced proposal for candidate fields, explanations and conversion factors. Input data remains unchanged.</p></details>'
+    return '<details class="assessment"><summary>How this item was assessed · ' + escape(str(item.get('tuple_id', ''))) + '</summary><p><a href="#run-configuration">Run configuration, mapping and target profile</a> · ' + escape(workflow_name(item)) + '<br>Configuration SHA-256: <code>' + escape(item['configuration_sha256']) + '</code><br>Check result basis: ' + escape('Original lookup report' if item['check_result_basis'] == 'original_A1_report' else 'This run') + '</p><h4>Input accounting</h4>' + _json(item['input']) + '<h4>Methods and results</h4><table><tr><th>Method</th><th>Result</th></tr>' + methods + '</table>' + execution + '<p>FHIR validation (run-level): ' + escape(str(item['fhir_validation']['run_state'])) + '. ' + escape(item['fhir_validation']['scope']) + '</p><h4>Assumptions and limits</h4><ul>' + ''.join('<li>' + escape(t) + '</li>' for t in item['assumptions_and_limits']) + '</ul><h4>Lookup evidence and attempts for this item</h4><table><tr><th>Code / system</th><th>Result</th><th>Source / edition</th></tr>' + (sources or '<tr><td colspan="3">No lookup evidence recorded.</td></tr>') + '</table><h4>Output and improvement step</h4><p>' + escape(item['output']['status']) + ': ' + escape(item['output']['next_step']) + '</p><p>See the sourced proposal for candidate fields, explanations and conversion factors. Input data remains unchanged.</p></details>'
